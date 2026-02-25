@@ -126,7 +126,7 @@ export default function TabLayout() {
         }}
       >
         <Tabs.Screen
-        name="community"
+        name="Community"
         options={{
           tabBarIcon: ({ focused }) => (
         <Image source={require("../../assets/images/Community.png")}
