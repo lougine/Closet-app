@@ -1,84 +1,134 @@
-import { Inter_400Regular, useFonts } from '@expo-google-fonts/inter';
+import * as Google from 'expo-auth-session/providers/google';
+import { Inter_400Regular, useFonts, Inter_700Bold } from '@expo-google-fonts/inter';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import React from 'react';
-import { Dimensions, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
+import React, { useEffect } from 'react';
+import { Dimensions, Image, StyleSheet, Text, TextInput, TouchableOpacity, View, ScrollView } from 'react-native';
 
-const { width, height } = Dimensions.get('window');
+WebBrowser.maybeCompleteAuthSession();
+
+const { width } = Dimensions.get('window');
 
 export default function SignUpScreen() {
   const router = useRouter();
   
   const [fontsLoaded] = useFonts({
-    'Inter-Regular': Inter_400Regular
+    'Inter-Regular': Inter_400Regular,
+    'Inter-Bold': Inter_700Bold
   });
+
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    clientId: '441160248309-5io4gv5g2gnmsufpv5rqg8vtnge8fets.apps.googleusercontent.com',
+    androidClientId: '441160248309-6ks3f21nj0614d11hgl1biq913orclal.apps.googleusercontent.com',
+    iosClientId: '441160248309-lo594apa54pj6r70j0od0jete9p0r906.apps.googleusercontent.com',
+  });
+
+  // Handle Google Auth Navigation
+  useEffect(() => {
+    if (response?.type === 'success') {
+      const { authentication } = response;
+      fetchUserInfo(authentication?.accessToken);
+    }
+  }, [response]);
+
+  const fetchUserInfo = async (token: string | undefined) => {
+    if (!token) return;
+    try {
+      const res = await fetch('https://www.googleapis.com/userinfo/v2/me', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const user = await res.json();
+      console.log('Google user:', user);
+      
+      // Navigate to setup details after successful Google Login
+      router.push('/(auth)/signupdetials'); 
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const topImageHeight = 160;
+
+  if (!fontsLoaded) return null;
 
   return (
     <View style={styles.container}>
-          <StatusBar style="light" translucent backgroundColor="transparent" />
+      <StatusBar style="light" translucent backgroundColor="transparent" />
       
+      {/* 1. WAVE IMAGE (Fixed to top) */}
       <Image
-              source={require('@/assets/images/auth.png')}
-              style={[styles.topImage, { width, height: topImageHeight }]}
-              resizeMode="stretch"
-            />
+        source={require('@/assets/images/auth.png')}
+        style={[styles.topImage, { width, height: topImageHeight }]}
+        resizeMode="stretch"
+      />
 
-      {/* CONTENT BELOW PNG */}
-      <View style={[styles.contentContainer, { marginTop: topImageHeight }]}>
-        <Text style={[styles.title, { fontFamily: 'Inter-Regular' }]}>Welcome!</Text>
-        <Text style={[styles.subtitle, { fontFamily: 'Inter-Regular' }]}>
-          Create an account to join Dribble
-        </Text>
-
-        {/* 3. INPUT FIELDS */}
-        <InputField label="First Name" placeholder="Enter your first name" />
-        <InputField label="Last Name" placeholder="Enter your last name" />
-        <InputField label="Email" placeholder="Enter your email" />
-        <InputField label="Password" placeholder="Enter your password" secureTextEntry />
-        <InputField label="Confirm password" placeholder="Re-enter your password" secureTextEntry />
-
-        {/* 4. SIGN UP BUTTON */}
-        <TouchableOpacity style={styles.signUpButton}>
-          <Text style={[styles.signUpButtonText, fontsLoaded && { fontFamily: 'Inter-Regular' }]}>Sign up</Text>
-        </TouchableOpacity>
-
-        {/* 5. DIVIDER SECTION */}
-        <View style={styles.dividerContainer}>
-          <View style={styles.line} />
-          <Text style={styles.orText}>or</Text>
-          <View style={styles.line} />
-        </View>
-
-        {/* 6. GOOGLE SIGN UP WITH LOGO */}
-        <TouchableOpacity style={styles.googleButton}>
-          <View style={styles.googleContent}>
-            <Image 
-              source={require('@/assets/images/google.png')} 
-              style={styles.googleIcon}
-              resizeMode="contain"
-            />
-            <Text style={[styles.googleButtonText, fontsLoaded && { fontFamily: 'Inter-Bold' }]}>
-              Sign up with google
-            </Text>
-          </View>
-        </TouchableOpacity>
-
-        {/* 7. SIGN IN LINK */}
-        <TouchableOpacity onPress={() => router.back()}>
-          <Text style={styles.footerText}>
-            Already have an account? <Text style={styles.signInLink}>SIGN IN</Text>
+      <ScrollView 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingTop: topImageHeight }}
+      >
+        <View style={styles.contentContainer}>
+          <Text style={styles.title}>Welcome!</Text>
+          <Text style={styles.subtitle}>
+            Create an account to join Dribble
           </Text>
-        </TouchableOpacity>
 
-        {/* 8. BIG BOTTOM LOGO */}
-        <Image 
-          source={require('@/assets/images/logo.png')} 
-          style={styles.bottomLogo}
-          resizeMode="contain"
-        />
-      </View>
-      </View>
+          {/* 3. INPUT FIELDS */}
+          <InputField label="First Name" placeholder="Enter your first name" />
+          <InputField label="Last Name" placeholder="Enter your last name" />
+          <InputField label="Email" placeholder="Enter your email" />
+          <InputField label="Password" placeholder="Enter your password" secureTextEntry />
+          <InputField label="Confirm password" placeholder="Re-enter your password" secureTextEntry />
+
+          {/* 4. MAIN SIGN UP BUTTON (Navigates directly) */}
+          <TouchableOpacity 
+  style={styles.signUpButton} 
+  onPress={() => router.push('/(auth)/signupdetials')}
+>
+            <Text style={styles.signUpButtonText}>Sign up</Text>
+          </TouchableOpacity>
+
+          {/* 5. DIVIDER */}
+          <View style={styles.dividerContainer}>
+            <View style={styles.line} />
+            <Text style={styles.orText}>or</Text>
+            <View style={styles.line} />
+          </View>
+
+          {/* 6. GOOGLE SIGN UP */}
+          <TouchableOpacity
+            style={styles.googleButton}
+            disabled={!request}
+            onPress={() => promptAsync()}
+          >
+            <View style={styles.googleContent}>
+              <Image 
+                source={require('@/assets/images/google.png')} 
+                style={styles.googleIcon}
+                resizeMode="contain"
+              />
+              <Text style={styles.googleButtonText}>
+                Sign up with google
+              </Text>
+            </View>
+          </TouchableOpacity>
+
+          {/* 7. SIGN IN LINK */}
+          <TouchableOpacity onPress={() => console.log('Go to Login')}>
+            <Text style={styles.footerText}>
+              Already have an account? <Text style={styles.signInLink}>SIGN IN</Text>
+            </Text>
+          </TouchableOpacity>
+
+          {/* 8. BOTTOM LOGO */}
+          <Image 
+            source={require('@/assets/images/logo.png')} 
+            style={styles.bottomLogo}
+            resizeMode="contain"
+          />
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -101,75 +151,78 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#121212',
   },
-   contentContainer: {
-    flex: 1,
-    paddingHorizontal: 35,
-    alignItems: 'center',
-  },
   topImage: {
     position: 'absolute',
+    top: 0,
+    zIndex: 10,
   },
-  contentSection: {
+  contentContainer: {
     paddingHorizontal: 35,
     alignItems: 'center',
-    paddingBottom: 15,
+    paddingBottom: 20,
   },
   title: {
     color: '#FFF',
     fontSize: 40, 
     alignSelf: 'flex-start',
-    marginTop: -5,
+    fontFamily: 'Inter-Bold',
+    marginTop: 10,
   },
   subtitle: {
     color: '#888',
     fontSize: 15,
     alignSelf: 'flex-start',
-    marginBottom: 15,
+    fontFamily: 'Inter-Regular',
+    marginBottom: 20,
   },
   inputWrapper: {
     width: '100%',
-    marginBottom: 10,
+    marginBottom: 12,
   },
   label: {
     color: '#FFF',
     fontSize: 14,
+    fontFamily: 'Inter-Regular',
     marginBottom: 6,
   },
   input: {
     backgroundColor: '#000',
     borderRadius: 25,
-    paddingVertical: 10,
+    paddingVertical: 12,
     paddingHorizontal: 20,
     color: '#FFF',
     borderWidth: 1,
     borderColor: '#1A1A1A',
+    fontFamily: 'Inter-Regular',
   },
   signUpButton: {
     backgroundColor: '#FB92BD',
-    paddingVertical: 12,
-    paddingHorizontal: 45,
+    paddingVertical: 14,
+    paddingHorizontal: 50,
     borderRadius: 25,
-    marginTop: 10,
+    marginTop: 15,
   },
   signUpButtonText: {
     color: '#FFF',
     fontSize: 16,
+    fontFamily: 'Inter-Bold',
   },
   dividerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 15,
+    marginVertical: 20,
     width: '100%',
   },
   line: {
     flex: 1,
     height: 1,
     backgroundColor: '#FB92BD',
-    opacity: 0.5,
+    opacity: 0.3,
   },
   orText: {
     color: '#888',
     marginHorizontal: 15,
+    fontFamily: 'Inter-Regular',
   },
   googleButton: {
     backgroundColor: '#FB92BD',
@@ -177,34 +230,36 @@ const styles = StyleSheet.create({
     width: '100%',
     borderRadius: 25,
     alignItems: 'center',
-    marginBottom: 15,
+    marginBottom: 20,
   },
   googleContent: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   googleIcon: {
-    width: 24,
-    height: 24,
+    width: 20,
+    height: 20,
     marginRight: 10,
   },
   googleButtonText: {
     color: '#FFF',
     fontSize: 15,
+    fontFamily: 'Inter-Bold',
   },
   footerText: {
     color: '#888',
     fontSize: 13,
-    marginBottom: 5,
+    marginBottom: 10,
+    fontFamily: 'Inter-Regular',
   },
   signInLink: {
     color: '#F0507B',
+    fontFamily: 'Inter-Bold',
   },
   bottomLogo: {
-    width: width * 1.0,
-    height: 220,
-    marginTop: -30,
+    width: 180,
+    height: 180,
+    marginTop: 10,
     alignSelf: 'center',
-    opacity: 0.9,
   },
 });
