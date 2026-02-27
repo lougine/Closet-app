@@ -194,6 +194,22 @@ export default function TabLayout() {
       />
     ),
   }}
+ /* />
+<Tabs.Screen
+  name="analytics"
+  options={{
+    tabBarIcon: ({ focused }) => (
+      // TODO: replace this Ionicons icon with your custom image asset
+      // like the other tabs e.g:
+      // <Image source={require("../../assets/images/analytics.png")} ... />
+      <Ionicons
+        name="bar-chart-outline"
+        size={24}
+        color={focused ? "#F0507B" : "#ffffff"}
+        style={{ position: 'relative', top: 12 }}
+      />
+    ),
+  }} */
 />
       </Tabs>
       <ExpandableFAB />
