@@ -56,7 +56,7 @@ export default function SettingsScreen() {
         onPress: async () => {
           await SecureStore.deleteItemAsync('userToken');
           // TODO: replace with your actual auth/login screen path
-          router.replace('/C:\Users\Gaming Store\OneDrive\Desktop\closetdripp\frontend\closet\app\(tabs)\index.tsx');
+          router.replace('/C:\Users\Gaming Store\OneDrive\Desktop\closetdripp\frontend\closet\app\(tabs)\signup.tsx/login');
         },
       },
     ]);
@@ -121,7 +121,7 @@ export default function SettingsScreen() {
           onPress={() => router.push('/settings/personal-info')} />
         <Separator />
         <SettingsRow label="Passwords & privacy"
-          onPress={() => router.push('C:\Users\Gaming Store\OneDrive\Desktop\closetdripp\frontend\closet\app\settings\passwords-privacy.tsx.tsx')} />
+          onPress={() => router.push('/settings/passwords-privacy')} />
         <Separator />
         <SettingsRow label="Notifications & reminders"
           onPress={() => router.push('/settings/notifications')} />

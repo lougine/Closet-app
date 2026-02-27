@@ -339,16 +339,17 @@ export default function CalendarScreen() {
             })}
           </View>
 
+          {/* Wave cut at bottom of pink header — mirrors the signup page wave style */}
           <Svg
             width={SCREEN_WIDTH}
-            height={40}
-            viewBox={`0 0 ${SCREEN_WIDTH} 40`}
+            height={80}
+            viewBox="0 0 1440 320"
             style={styles.headerWave}
             preserveAspectRatio="none"
           >
             <Path
-              d={`M0,0 C${SCREEN_WIDTH * 0.3},40 ${SCREEN_WIDTH * 0.7},40 ${SCREEN_WIDTH},0 L${SCREEN_WIDTH},40 L0,40 Z`}
-              fill={COLORS.white}  
+              fill={COLORS.white}
+              d="M0,160 C400,320 1000,0 1440,220 L1440,320 L0,320 Z"
             />
           </Svg>
         </View>
