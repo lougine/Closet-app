@@ -3,7 +3,6 @@ import * as ImagePicker from 'expo-image-picker';
 import { Tabs, useRouter } from 'expo-router';
 import React, { useRef, useState } from 'react';
 import { Alert, Animated, Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
- import { Ionicons } from '@expo/vector-icons';
 
 function ActionButton({ label, onPress, icon, iconColor }: any) {
   return (

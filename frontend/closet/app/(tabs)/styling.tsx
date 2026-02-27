@@ -7,6 +7,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Fonts } from '@/constants/theme';
 import { StatusBar } from 'expo-status-bar';
 import { Image, SafeAreaView, StyleSheet } from 'react-native';
+import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 
 export default function TabTwoScreen() {
   return (

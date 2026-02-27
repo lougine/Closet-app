@@ -1,14 +1,8 @@
-import React from 'react';
-import { 
-  StyleSheet, View, Text, TextInput, TouchableOpacity, 
-  Dimensions, ScrollView, Image 
-} from 'react-native';
-import { StatusBar } from 'expo-status-bar';
-import Svg, { Path } from 'react-native-svg';
+import { Inter_400Regular, useFonts } from '@expo-google-fonts/inter';
 import { useRouter } from 'expo-router';
-
-// Font Imports
-import { useFonts, Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/inter';
+import { StatusBar } from 'expo-status-bar';
+import React from 'react';
+import { Dimensions, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 const { width, height } = Dimensions.get('window');
 
@@ -16,29 +10,25 @@ export default function SignUpScreen() {
   const router = useRouter();
   
   const [fontsLoaded] = useFonts({
-    'Inter-Regular': Inter_400Regular,
-    'Inter-Bold': Inter_700Bold,
+    'Inter-Regular': Inter_400Regular
   });
+  const topImageHeight = 160;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
-      <StatusBar style="light" />
+    <View style={styles.container}>
+          <StatusBar style="light" translucent backgroundColor="transparent" />
+      
+      <Image
+              source={require('@/assets/images/auth.png')}
+              style={[styles.topImage, { width, height: topImageHeight }]}
+              resizeMode="stretch"
+            />
 
-      {/* 1. TOP WAVE DESIGN */}
-      <View style={styles.topWaveContainer}>
-        <Svg height="100%" width="100%" viewBox="0 0 1440 320" preserveAspectRatio="none">
-          <Path
-            fill="#FB92BD"
-            d="M0,160 C400,0 600,400 1440,100 L1440,0 L0,0 Z"
-          />
-        </Svg>
-      </View>
-
-      <View style={styles.contentSection}>
-        {/* 2. WELCOME HEADER - Set to 48px per Figma */}
-        <Text style={[styles.title, fontsLoaded && { fontFamily: 'Inter-Bold' }]}>Welcome!</Text>
-        <Text style={[styles.subtitle, fontsLoaded && { fontFamily: 'Inter-Regular' }]}>
-          Create an account to join dribble
+      {/* CONTENT BELOW PNG */}
+      <View style={[styles.contentContainer, { marginTop: topImageHeight }]}>
+        <Text style={[styles.title, { fontFamily: 'Inter-Regular' }]}>Welcome!</Text>
+        <Text style={[styles.subtitle, { fontFamily: 'Inter-Regular' }]}>
+          Create an account to join Dribble
         </Text>
 
         {/* 3. INPUT FIELDS */}
@@ -50,7 +40,7 @@ export default function SignUpScreen() {
 
         {/* 4. SIGN UP BUTTON */}
         <TouchableOpacity style={styles.signUpButton}>
-          <Text style={[styles.signUpButtonText, fontsLoaded && { fontFamily: 'Inter-Bold' }]}>Sign up</Text>
+          <Text style={[styles.signUpButtonText, fontsLoaded && { fontFamily: 'Inter-Regular' }]}>Sign up</Text>
         </TouchableOpacity>
 
         {/* 5. DIVIDER SECTION */}
@@ -88,7 +78,7 @@ export default function SignUpScreen() {
           resizeMode="contain"
         />
       </View>
-    </ScrollView>
+      </View>
   );
 }
 
@@ -111,33 +101,34 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#121212',
   },
-  scrollContent: {
-    flexGrow: 1,
+   contentContainer: {
+    flex: 1,
+    paddingHorizontal: 35,
+    alignItems: 'center',
   },
-  topWaveContainer: {
-    height: 100,
-    width: width,
+  topImage: {
+    position: 'absolute',
   },
   contentSection: {
     paddingHorizontal: 35,
     alignItems: 'center',
-    paddingBottom: 20,
+    paddingBottom: 15,
   },
   title: {
     color: '#FFF',
-    fontSize: 48, 
+    fontSize: 40, 
     alignSelf: 'flex-start',
-    marginTop: 5,
+    marginTop: -5,
   },
   subtitle: {
     color: '#888',
     fontSize: 15,
     alignSelf: 'flex-start',
-    marginBottom: 20,
+    marginBottom: 15,
   },
   inputWrapper: {
     width: '100%',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   label: {
     color: '#FFF',
@@ -212,7 +203,7 @@ const styles = StyleSheet.create({
   bottomLogo: {
     width: width * 1.0,
     height: 220,
-    marginTop: 10,
+    marginTop: -30,
     alignSelf: 'center',
     opacity: 0.9,
   },

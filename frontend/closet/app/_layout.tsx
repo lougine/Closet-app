@@ -1,22 +1,17 @@
 import { Stack } from 'expo-router';
+import { useState } from "react";
 import 'react-native-reanimated';
 
-
-export const unstable_settings = {
-  anchor: '(tabs)',
-};
-
 export default function RootLayout() {
-   return (
-    <Stack>
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen
-        name="modal"
-        options={{
-          presentation: "modal",
-          headerShown: false,
-        }}
-      />
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  return (
+    <Stack screenOptions={{ headerShown: false }}>
+      {isLoggedIn ? (
+        <Stack.Screen name="(auth)" />
+      ) : (
+        <Stack.Screen name="(tabs)" />
+      )}
     </Stack>
   );
 }
