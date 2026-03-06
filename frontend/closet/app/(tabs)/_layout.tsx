@@ -1,18 +1,8 @@
-import { IconSymbol } from "@/components/ui/icon-symbol";
-import * as ImagePicker from "expo-image-picker";
-import { Tabs, useRouter } from "expo-router";
-import React, { useRef, useState } from "react";
-import {
-  Alert,
-  Animated,
-  Image,
-  Modal,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import * as ImagePicker from 'expo-image-picker';
+import { Tabs, useRouter } from 'expo-router';
+import React, { useRef, useState } from 'react';
+import { Alert, Animated, Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 function ActionButton({ label, onPress, icon, iconColor }: any) {
   return (
@@ -68,46 +58,22 @@ function ExpandableFAB() {
     setTimeout(() => setShowAddSheet(true), 250);
   };
 
-  // ── Launch camera ─────────────────────────────────────────────────────────
-  const launchCamera = async () => {
-    setShowAddSheet(false);
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert("Permission denied", "Camera permission is required.");
-      return;
-    }
-    const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: true,
-      quality: 0.7,
-    });
-    if (!result.canceled) {
-      router.push({
-        pathname: "/features/add-items" as any,
-        params: { image: result.assets[0].uri },
-      });
-    }
-  };
+  const { status } = await ImagePicker.requestCameraPermissionsAsync();
+  if (status !== 'granted') {
+    Alert.alert('Permission denied', 'Camera permission is required to add items.');
+    return;
+  }
 
-  // ── Launch gallery ────────────────────────────────────────────────────────
-  const launchGallery = async () => {
-    setShowAddSheet(false);
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert("Permission denied", "Gallery permission is required.");
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 0.7,
-    });
-    if (!result.canceled) {
-      router.push({
-        pathname: "/features/add-items" as any,
-        params: { image: result.assets[0].uri },
-      });
-    }
-  };
+  const result = await ImagePicker.launchCameraAsync({
+    allowsEditing: true,
+    quality: 0.7,
+  });
+
+  if (!result.canceled) {
+    console.log('Captured image:', result.assets[0].uri);
+    router.push({ pathname: '/features/add-items', params: { image: result.assets[0].uri } });
+  }
+};
 
   return (
     <>
@@ -251,61 +217,74 @@ export default function TabLayout() {
           }}
         />
         <Tabs.Screen
-          name="calendar"
-          options={{
-            tabBarIcon: ({ focused }) => (
-              <Image
-                source={require("../../assets/images/calender.png")}
-                style={{
-                  width: 30,
-                  height: 30,
-                  tintColor: focused ? "#F0507B" : "#ffffff",
-                  position: "relative",
-                  top: 12,
-                  right: 20,
-                }}
-                resizeMode="contain"
-              />
-            ),
-          }}
-        />
+        name="calendar"
+        options={{
+          tabBarIcon: ({ focused }) => (
+        <Image source={require("../../assets/images/calender.png")}
+        style={{
+          width: 30,
+          height: 30,
+          tintColor: focused ? "#F0507B" : "#ffffff",
+          position: "relative", 
+          top:12,
+          right: 20,
+        }}
+        resizeMode="contain"
+      />
+    ),
+  }}
+/>
         <Tabs.Screen
-          name="styling"
-          options={{
-            tabBarIcon: ({ focused }) => (
-              <Image
-                source={require("../../assets/images/styling.png")}
-                style={{
-                  width: 50,
-                  height: 50,
-                  tintColor: focused ? "#F0507B" : "#ffffff",
-                  position: "relative",
-                  top: 12,
-                  left: 20,
-                }}
-                resizeMode="contain"
-              />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="index"
-          options={{
-            tabBarIcon: ({ focused }) => (
-              <Image
-                source={require("../../assets/images/waredrobe.png")}
-                style={{
-                  width: 40,
-                  height: 40,
-                  tintColor: focused ? "#F0507B" : "#ffffff",
-                  position: "relative",
-                  top: 12,
-                }}
-                resizeMode="contain"
-              />
-            ),
-          }}
-        />
+        name="styling"
+        options={{
+          tabBarIcon: ({ focused }) => (
+        <Image source={require("../../assets/images/styling.png")}
+        style={{
+          width: 50,
+          height: 50,
+          tintColor: focused ? "#F0507B" : "#ffffff",
+          position: "relative", 
+          top:12,
+          left: 20,
+        }}
+        resizeMode="contain"
+      />
+    ),
+  }}
+/>
+       <Tabs.Screen
+        name="index"
+        options={{
+          tabBarIcon: ({ focused }) => (
+        <Image source={require("../../assets/images/waredrobe.png")}
+        style={{
+          width: 40,
+          height: 40,
+          tintColor: focused ? "#F0507B" : "#ffffff",
+          position: "relative", 
+          top:12,
+        }}
+        resizeMode="contain"
+      />
+    ),
+  }}
+ /* />
+<Tabs.Screen
+  name="analytics"
+  options={{
+    tabBarIcon: ({ focused }) => (
+      // TODO: replace this Ionicons icon with your custom image asset
+      // like the other tabs e.g:
+      // <Image source={require("../../assets/images/analytics.png")} ... />
+      <Ionicons
+        name="bar-chart-outline"
+        size={24}
+        color={focused ? "#F0507B" : "#ffffff"}
+        style={{ position: 'relative', top: 12 }}
+      />
+    ),
+  }} */
+/>
       </Tabs>
       <ExpandableFAB />
     </>
@@ -431,3 +410,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 });
+function useSafeAreaInsets() {
+  throw new Error('Function not implemented.');
+}
+
