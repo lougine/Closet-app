@@ -3,6 +3,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Tabs, useRouter } from 'expo-router';
 import React, { useRef, useState } from 'react';
 import { Alert, Animated, Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+ import { Ionicons } from '@expo/vector-icons';
 
 function ActionButton({ label, onPress, icon, iconColor }: any) {
   return (
@@ -59,7 +60,7 @@ const createAnimation = (distance: number) => ({
 
   if (!result.canceled) {
     console.log('Captured image:', result.assets[0].uri);
-    router.push({ pathname: '/features/add-items', params: { image: result.assets[0].uri } });
+    router.push({ pathname: '../features/add-items', params: { image: result.assets[0].uri } });
   }
 };
 
@@ -146,7 +147,7 @@ export default function TabLayout() {
         name="calendar"
         options={{
           tabBarIcon: ({ focused }) => (
-        <Image source={require("../../assets/images/calender.png")}
+        <Image source={require("../../assets/images/calendar.png")}
         style={{
           width: 30,
           height: 30,
@@ -194,22 +195,7 @@ export default function TabLayout() {
       />
     ),
   }}
- /* />
-<Tabs.Screen
-  name="analytics"
-  options={{
-    tabBarIcon: ({ focused }) => (
-      // TODO: replace this Ionicons icon with your custom image asset
-      // like the other tabs e.g:
-      // <Image source={require("../../assets/images/analytics.png")} ... />
-      <Ionicons
-        name="bar-chart-outline"
-        size={24}
-        color={focused ? "#F0507B" : "#ffffff"}
-        style={{ position: 'relative', top: 12 }}
-      />
-    ),
-  }} */
+
 />
       </Tabs>
       <ExpandableFAB />
