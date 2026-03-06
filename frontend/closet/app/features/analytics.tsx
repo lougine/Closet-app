@@ -183,25 +183,24 @@ export default function AnalyticsScreen() {
       showsVerticalScrollIndicator={false}>
 
       {/* ══════════════════════════════════════════════════════
-          HEADER — light pink with asymmetric rounded bottom
+          HEADER — light pink block with SVG wave bottom edge
+          Title sits inside the pink area above the wave
           ══════════════════════════════════════════════════════ */}
-       {/* 1. TOP WAVE DESIGN */}
-     <View style={styles.headerBg}>
-  {/* Wave fills the entire header as background */}
-  <View style={styles.topWaveContainer}>
-    <Svg height="100%" width="100%" viewBox="0 0 1440 320" preserveAspectRatio="none">
-      <Path
-        fill="#FB92BD"
-        d="M0,160 C400,0 600,400 1440,100 L1440,0 L0,0 Z"
-      />
-    </Svg>
-  </View>
-  {/* Title overlaid on top of the wave */}
-  <View style={styles.headerTextWrap}>
-    <Text style={styles.headerTitle}>Closet Insights ✨</Text>
-    <Text style={styles.headerSub}>Everything your wardrobe is telling you</Text>
-  </View>
-</View>
+      <View style={styles.headerBg}>
+        <Text style={styles.headerTitle}>Closet Insights ✨</Text>
+        <Text style={styles.headerSub}>Everything your wardrobe is telling you</Text>
+        <Svg
+          width={SW} height={80}
+          viewBox="0 0 1440 320"
+          style={{ marginBottom: -1 }}
+          preserveAspectRatio="none"
+        >
+          <Path
+            fill={COLORS.white}
+            d="M0,160 C400,320 1000,0 1440,220 L1440,320 L0,320 Z"
+          />
+        </Svg>
+      </View>
 
       {/* ══════════════════════════════════════════════════════
           ROW 1 — Wardrobe Usage + Outfits Worn side by side
@@ -483,26 +482,20 @@ function UsageSection({
 const ITEM_SIZE = (SW - 40 - 24) / 3; // 3 columns with padding
 
 const styles = StyleSheet.create({
- scroll: { flex: 1, backgroundColor: COLORS.white },
-container: { paddingBottom: 20 },
-loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.white },
+  scroll: { flex: 1, backgroundColor: COLORS.white },
+  container: { paddingBottom: 20 },
+  loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.offWhite },
 
-headerBg: {
-  height: 160,
-  marginBottom: 0,
-  position: 'relative',
-},
-topWaveContainer: {
-  position: 'absolute',
-  top: 0, left: 0, right: 0, bottom: -100,
-},
-headerTextWrap: {
-  position: 'absolute',
-  bottom: 38,
-  right: 90,
-},
-headerTitle: { fontSize: 26, fontWeight: '800', color: 'rgb(0, 0, 0)', marginBottom: 4 },
-headerSub: { fontSize: 13, color: 'rgb(0, 0, 0)' },
+  // ── Header — wave image as background, title overlaid on top ────────────────
+  headerBg: {
+    backgroundColor: COLORS.lightPink,
+    paddingTop: 60,
+    paddingHorizontal: 24,
+    paddingBottom: 0,
+    marginBottom: 16,
+  },
+  headerTitle: { fontSize: 26, fontWeight: '800', color: COLORS.white, marginBottom: 4 },
+  headerSub: { fontSize: 13, color: 'rgba(255,255,255,0.85)', marginBottom: 16 },
 
   // ── Generic card ───────────────────────────────────────────────────────────
   card: {
