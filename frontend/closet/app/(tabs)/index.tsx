@@ -1,102 +1,204 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { Feather, Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
+import { useRouter } from "expo-router";
+import React, { useState } from "react";
+import { Dimensions, FlatList, Image, Modal, ScrollView, StatusBar, Text, TextInput, TouchableOpacity, View } from "react-native";
+import Svg, { Path } from "react-native-svg";
+import { useWardrobe } from "../../context/wardrobeContext";
+import { s } from "../Styles/index.styles";
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
-import Svg, { Circle, Rect } from 'react-native-svg';
+const { width: W } = Dimensions.get("window");
 
-export default function HomeScreen() {
+const FILTER_TABS = ["All", "Footwear", "Tops", "Bottoms", "Accessories"];
+
+const Wave = () => (
+  <Svg
+    width={W}
+    height={44}
+    viewBox={`0 0 ${W} 44`}
+    preserveAspectRatio="none"
+    style={{ position: "absolute", width: "100%", height: "100%" }}
+  >
+    <Path
+      d={`M0,44 L0,22 Q${W * 0.25},50.6 ${W * 0.5},16.72 Q${W * 0.75},-8.8 ${W},22.88 L${W},44 Z`}
+      fill="#f2f2f2"
+    />
+  </Svg>
+);
+
+export default function WardrobeScreen() {
+  const router = useRouter();
+  const { items, counts } = useWardrobe();
+
+  const [profilePic, setProfilePic] = useState<string | null>(null);
+  const [bgImage, setBgImage] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState("All");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [imageMenuFor, setImageMenuFor] = useState<"profile" | "bg" | null>(
+    null
+  );
+
+  const pickImage = async (source: "library" | "camera") => {
+    const result =
+      source === "library"
+        ? await ImagePicker.launchImageLibraryAsync({ quality: 0.8 })
+        : await ImagePicker.launchCameraAsync({ quality: 0.8 });
+
+    if (!result.canceled && result.assets[0]) {
+      if (imageMenuFor === "profile") setProfilePic(result.assets[0].uri);
+      else setBgImage(result.assets[0].uri);
+    }
+
+    setImageMenuFor(null);
+  };
+
+  const filtered = items.filter((item) => {
+    const matchSearch = item.label
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase());
+
+    const matchTab =
+      activeTab === "All"
+        ? true
+        : activeTab === "Tops"
+        ? item.category?.includes("Tops")
+        : activeTab === "Bottoms"
+        ? item.category?.includes("Bottoms")
+        : activeTab === "Footwear"
+        ? item.category?.includes("Footwear")
+        : true;
+
+    return matchSearch && matchTab;
+  });
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <><Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo} /><Svg height="50%" width="50%" viewBox="0 0 100 100">
-            <Circle cx="500" cy="50" r="45" stroke="blue" strokeWidth="0.5" fill="blue" />
-            <Rect x="15" y="15" width="70" height="70" stroke="blue" strokeWidth="2" fill="blue" />
-            <Circle cx="90" cy="90" r="20" stroke="red" strokeWidth="1" fill="red" />
-          </Svg></>
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">hi</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+    <View style={s.root}>
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+      <View style={s.headerShell}>
+        <TouchableOpacity
+          style={s.headerImg}
+          onPress={() => setImageMenuFor("bg")}
+          activeOpacity={0.9}
+        >
+          {bgImage ? (
+            <Image source={{ uri: bgImage }} style={s.bgImage} />
+          ) : (
+            <View style={s.headerDefault} />
+          )}
+
+          <View style={s.waveWrap}>
+            <Wave />
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={s.settingsBtn}
+          onPress={() => router.push("/features/settings")}
+        >
+          <Feather name="settings" size={15} color="#fff" />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={s.profileWrap}
+          onPress={() => setImageMenuFor("profile")}
+        >
+          {profilePic ? (
+            <Image source={{ uri: profilePic }} style={s.profilePic} />
+          ) : (
+            <View style={[s.profilePic, s.profilePlaceholder]}>
+              <Ionicons name="person" size={36} color="#fff" />
+            </View>
+          )}
+        </TouchableOpacity>
+      </View>
+
+      <View style={s.body}>
+        <View style={s.usernameRow}>
+          <Text style={s.username}>@wizliz</Text>
+          <TouchableOpacity onPress={() => router.push("/features/analytics")}>
+            <Text style={s.analyticsLink}>Style Analytics ›</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={s.statsCard}>
+          <View style={s.statItem}>
+            <Text style={s.statNumPink}>{counts.items}</Text>
+            <Text style={s.statLabel}>Items</Text>
+          </View>
+
+          <View style={s.statDivider} />
+
+          <View style={s.statItem}>
+            <Text style={s.statNum}>{counts.outfits}</Text>
+            <Text style={s.statLabel}>Outfits</Text>
+          </View>
+
+          <View style={s.statDivider} />
+
+          <View style={s.statItem}>
+            <Text style={s.statNum}>{counts.lookbooks}</Text>
+            <Text style={s.statLabel}>Lookbooks</Text>
+          </View>
+        </View>
+
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.tabsScroll}>
+          {FILTER_TABS.map((tab) => (
+            <TouchableOpacity
+              key={tab}
+              style={[s.tab, activeTab === tab && s.tabActive]}
+              onPress={() => setActiveTab(tab)}
+            >
+              <Text style={[s.tabText, activeTab === tab && s.tabTextActive]}>{tab}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        <View style={s.searchRow}>
+          <View style={s.searchBar}>
+            <Ionicons name="search" size={14} color="#aaa" />
+            <TextInput
+              placeholder="Search"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              style={s.searchInput}
+            />
+          </View>
+        </View>
+
+        <FlatList
+          data={filtered}
+          numColumns={3}
+          keyExtractor={(item) => String(item.id)}
+          style={s.grid}
+          renderItem={({ item }) => (
+            <TouchableOpacity style={[s.gridItem, { backgroundColor: item.bg }]}>
+              {item.image ? (
+                <Image source={{ uri: item.image }} style={s.gridImg} />
+              ) : (
+                <Text style={s.gridEmoji}>👗</Text>
+              )}
+              <Text style={s.gridLabel}>{item.label}</Text>
+            </TouchableOpacity>
+          )}
+        />
+      </View>
+
+      <Modal transparent visible={!!imageMenuFor} animationType="slide">
+        <TouchableOpacity style={s.overlay} onPress={() => setImageMenuFor(null)}>
+          <View style={s.sheet}>
+            <Text style={s.sheetTitle}>Change Image</Text>
+
+            <TouchableOpacity style={s.sheetBtn} onPress={() => pickImage("library")}>
+              <Text>Choose from Library</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={s.sheetBtn} onPress={() => pickImage("camera")}>
+              <Text>Take Photo</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    </View>
   );
 }
-
-const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-  },
-});

@@ -1,32 +1,14 @@
-// calendar.tsx
-// This is the full Calendar screen for ClosetDripp.
-// It handles 3 views in one file:
 //   1. DAY VIEW (empty)   → shown when a day has no outfit saved
 //   2. DAY VIEW (filled)  → shown when a day has an outfit image
 //   3. MONTH VIEW         → full calendar grid + analytics
-//
 // Navigation between views is handled by the `view` state variable.
 // All API calls are marked with TODO so your team can wire them up.
 
-import React, { useState, useEffect, useRef } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  Image,
-  Dimensions,
-  Modal,
-  Alert,
-  ActivityIndicator,
-  FlatList,
-} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import Svg, { Path } from 'react-native-svg'; // for the wavy pink header
-
-// ─── CONSTANTS ────────────────────────────────────────────────────────────────
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, Dimensions, Image, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 
 const COLORS = {
   white: '#FFFFFF',
@@ -39,14 +21,9 @@ const COLORS = {
 };
 
 const DAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const MONTHS = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-];
-
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June','July', 'August', 'September', 'October', 'November', 'December' ];
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-// ─── TYPES ────────────────────────────────────────────────────────────────────
 
 // This is what one saved outfit looks like (matches your MongoDB collection)
 type OutfitEntry = {
@@ -647,8 +624,6 @@ export default function CalendarScreen() {
     );
   }
 }
-
-// ─── STYLES ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   // ── Layout ────────────────────────────────────────────────────────────────
