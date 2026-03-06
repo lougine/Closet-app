@@ -49,7 +49,10 @@ export default function SignUpScreen() {
         <InputField label="Confirm password" placeholder="Re-enter your password" secureTextEntry />
 
         {/* 4. SIGN UP BUTTON */}
-        <TouchableOpacity style={styles.signUpButton}>
+        <TouchableOpacity 
+          style={styles.signUpButton}
+          onPress={() => router.push('/(auth)/signupdetials')}
+        >
           <Text style={[styles.signUpButtonText, fontsLoaded && { fontFamily: 'Inter-Bold' }]}>Sign up</Text>
         </TouchableOpacity>
 
