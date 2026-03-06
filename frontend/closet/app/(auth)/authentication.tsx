@@ -44,7 +44,7 @@ export default function Authenication() {
           <Text style={[styles.createButtonText, { fontFamily: 'Inter-Regular' }]}> CREATE ACCOUNT </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.loginLink} onPress={() => router.push('/login')}>
+        <TouchableOpacity style={styles.loginLink} onPress={() => router.push('/signin')}>
           {/* {handleLogin} */}
           <Text style={[styles.loginText, { fontFamily: 'Inter-Regular' }]}>LOG IN</Text>
         </TouchableOpacity>
