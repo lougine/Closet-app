@@ -7,7 +7,14 @@ import { Alert, Animated, Image, StyleSheet, Text, TouchableOpacity, View } from
 function ActionButton({ label, onPress, icon, iconColor }: any) {
   return (
     <TouchableOpacity style={styles.actionButton} onPress={onPress}>
-      {icon && <IconSymbol name={icon} size={20} color={iconColor || "#B8576A"} style={{ marginRight: 10, right: 5 }} />}
+      {icon && (
+        <IconSymbol
+          name={icon}
+          size={20}
+          color={iconColor || "#B8576A"}
+          style={{ marginRight: 10, right: 5 }}
+        />
+      )}
       <Text style={styles.actionText}>{label}</Text>
     </TouchableOpacity>
   );
@@ -16,35 +23,40 @@ function ActionButton({ label, onPress, icon, iconColor }: any) {
 function ExpandableFAB() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [showAddSheet, setShowAddSheet] = useState(false);
   const animation = useRef(new Animated.Value(0)).current;
 
   const toggleMenu = () => {
     Animated.spring(animation, {
-    toValue: open ? 0 : 1,
-    useNativeDriver: true,
-  }).start();
-  setOpen(!open);
-};
-const createAnimation = (distance: number) => ({
-  transform: [
-    {
-      translateY: animation.interpolate({
-        inputRange: [0, 1],
-        outputRange: [0, -distance],
-      }),
-    },
-  ],
-  opacity: animation,
-});
+      toValue: open ? 0 : 1,
+      useNativeDriver: true,
+    }).start();
+    setOpen(!open);
+  };
+
+  const createAnimation = (distance: number) => ({
+    transform: [
+      {
+        translateY: animation.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0, -distance],
+        }),
+      },
+    ],
+    opacity: animation,
+  });
 
   const navigateAndClose = (route: string) => {
     toggleMenu();
-    setTimeout(() => {
-      return router.push(route as any);
-    }, 200);
+    setTimeout(() => router.push(route as any), 200);
   };
-  const handleAddItems = async () => {
-  toggleMenu();
+
+  // ── Opens the choose camera/gallery sheet ─────────────────────────────────
+  const handleAddItems = () => {
+    toggleMenu();
+    // slight delay so FAB closes before sheet opens
+    setTimeout(() => setShowAddSheet(true), 250);
+  };
 
   const { status } = await ImagePicker.requestCameraPermissionsAsync();
   if (status !== 'granted') {
@@ -64,49 +76,110 @@ const createAnimation = (distance: number) => ({
 };
 
   return (
-    <View style={styles.floatingContainer}>
-      
-      {open && (
-  <>
-  <Animated.View style={[styles.actionWrapper, createAnimation(250)]}>
-    <ActionButton label="Add items" icon="plus" onPress={handleAddItems} />
-</Animated.View>
+    <>
+      <View style={styles.floatingContainer}>
+        {open && (
+          <>
+            <Animated.View style={[styles.actionWrapper, createAnimation(250)]}>
+              <ActionButton
+                label="Add items"
+                icon="plus"
+                onPress={handleAddItems}
+              />
+            </Animated.View>
+            <Animated.View style={[styles.actionWrapper, createAnimation(190)]}>
+              <ActionButton
+                label="Create outfit"
+                icon="hanger"
+                onPress={() => navigateAndClose("/outfit")}
+              />
+            </Animated.View>
+            <Animated.View style={[styles.actionWrapper, createAnimation(130)]}>
+              <ActionButton
+                label="Create lookbook"
+                icon="book"
+                onPress={() => navigateAndClose("/lookbook")}
+              />
+            </Animated.View>
+            <Animated.View style={[styles.actionWrapper, createAnimation(70)]}>
+              <ActionButton
+                label="Premium Features"
+                icon="sparkles"
+                onPress={() => navigateAndClose("/premium")}
+              />
+            </Animated.View>
+          </>
+        )}
 
-  <Animated.View style={[styles.actionWrapper, createAnimation(190)]}>
-    <ActionButton label="Create outfit" icon="hanger" onPress={() => navigateAndClose("/outfit")} />
-  </Animated.View> 
+        {/* Main FAB */}
+        <TouchableOpacity
+          style={[
+            styles.floatingButton,
+            { backgroundColor: open ? "#000000" : "#FF4F81" },
+          ]}
+          onPress={toggleMenu}
+          activeOpacity={0.9}
+        >
+          <Image
+            source={require("../../assets/images/hanger.png")}
+            style={styles.fabIcon}
+          />
+        </TouchableOpacity>
+      </View>
 
-  <Animated.View style={[styles.actionWrapper, createAnimation(130)]}>
-   <ActionButton label="Create lookbook" icon="book" onPress={() => navigateAndClose("/lookbook")} />
-  </Animated.View>
-
-  <Animated.View style={[styles.actionWrapper, createAnimation(70)]}>
-   <ActionButton label="Premium Features" icon="sparkles" onPress={() => navigateAndClose("/premium")} />
-  </Animated.View>
-  </>
-)}
-      {/* Main FAB */}
-      <TouchableOpacity
-        style={[
-          styles.floatingButton,
-          { backgroundColor: open ? "#000000" : "#FF4F81" },
-        ]}
-        onPress={toggleMenu}
-        activeOpacity={0.9}
+      {/* ── Camera / Gallery bottom sheet ── */}
+      <Modal
+        transparent
+        visible={showAddSheet}
+        animationType="slide"
+        onRequestClose={() => setShowAddSheet(false)}
       >
-      <Image source={ open
-      ? require("../../assets/images/hanger.png")
-      : require("../../assets/images/hanger.png")
-       }
-       style={styles.fabIcon}
-       
-      />
-      </TouchableOpacity>
-    </View>
+        <TouchableOpacity
+          style={styles.sheetOverlay}
+          activeOpacity={1}
+          onPress={() => setShowAddSheet(false)}
+        >
+          <View style={styles.sheet}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle}>Add Item</Text>
+
+            <TouchableOpacity style={styles.sheetBtn} onPress={launchCamera}>
+              <View style={styles.sheetBtnIcon}>
+                <Text style={{ fontSize: 22 }}>📷</Text>
+              </View>
+              <View>
+                <Text style={styles.sheetBtnLabel}>Take a Photo</Text>
+                <Text style={styles.sheetBtnSub}>Use your camera</Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.sheetBtn} onPress={launchGallery}>
+              <View style={styles.sheetBtnIcon}>
+                <Text style={{ fontSize: 22 }}>🖼️</Text>
+              </View>
+              <View>
+                <Text style={styles.sheetBtnLabel}>Choose from Gallery</Text>
+                <Text style={styles.sheetBtnSub}>Pick an existing photo</Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.cancelBtn}
+              onPress={() => setShowAddSheet(false)}
+            >
+              <Text style={styles.cancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    </>
   );
 }
 
 export default function TabLayout() {
+  const insets = useSafeAreaInsets();
+  const tabBarBottom = Math.max(insets.bottom, 8) + 8;
+
   return (
     <>
       <Tabs
@@ -115,33 +188,34 @@ export default function TabLayout() {
           tabBarShowLabel: false,
           tabBarStyle: {
             position: "absolute",
-            bottom: 20,
+            bottom: tabBarBottom,
             left: 20,
             right: 20,
             backgroundColor: "#1E1E1E",
             borderRadius: 25,
             height: 58,
-            borderColor: 'transparent',
+            borderColor: "transparent",
           },
         }}
       >
         <Tabs.Screen
-        name="Community"
-        options={{
-          tabBarIcon: ({ focused }) => (
-        <Image source={require("../../assets/images/Community.png")}
-        style={{
-          width: 40,
-          height: 40,
-          tintColor: focused ? "#F0507B" : "#ffffff",
-          position: "relative", 
-          top:12,
-        }}
-        resizeMode="contain"
-      />
-    ),
-  }}
-/>
+          name="Community"
+          options={{
+            tabBarIcon: ({ focused }) => (
+              <Image
+                source={require("../../assets/images/Community.png")}
+                style={{
+                  width: 40,
+                  height: 40,
+                  tintColor: focused ? "#F0507B" : "#ffffff",
+                  position: "relative",
+                  top: 12,
+                }}
+                resizeMode="contain"
+              />
+            ),
+          }}
+        />
         <Tabs.Screen
         name="calendar"
         options={{
@@ -261,9 +335,82 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   fabIcon: {
-  width: 37,
-  height: 37,
-  resizeMode: "contain",
-  bottom: 5,
-},
+    width: 37,
+    height: 37,
+    resizeMode: "contain",
+    bottom: 5,
+  },
+
+  // Bottom sheet
+  sheetOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "flex-end",
+  },
+  sheet: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+    paddingTop: 12,
+  },
+  sheetHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: "#e0e0e0",
+    borderRadius: 2,
+    alignSelf: "center",
+    marginBottom: 16,
+  },
+  sheetTitle: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: "#1a1a1a",
+    marginBottom: 20,
+    textAlign: "center",
+  },
+  sheetBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+    backgroundColor: "#fafafa",
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#f0f0f0",
+  },
+  sheetBtnIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: "#fff0f5",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sheetBtnLabel: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#1a1a1a",
+  },
+  sheetBtnSub: {
+    fontSize: 12,
+    color: "#aaa",
+    marginTop: 2,
+  },
+  cancelBtn: {
+    marginTop: 4,
+    padding: 14,
+    alignItems: "center",
+  },
+  cancelText: {
+    fontSize: 15,
+    color: "#FF4F81",
+    fontWeight: "600",
+  },
 });
+function useSafeAreaInsets() {
+  throw new Error('Function not implemented.');
+}
+
