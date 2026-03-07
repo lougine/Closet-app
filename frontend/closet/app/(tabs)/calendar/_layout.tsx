@@ -1,5 +1,5 @@
 import { Stack } from 'expo-router';
-import { CalendarProvider } from './calendar-context';
+import { CalendarProvider } from '../../../context/calendar-context';
 
 export default function CalendarLayout() {
   return (

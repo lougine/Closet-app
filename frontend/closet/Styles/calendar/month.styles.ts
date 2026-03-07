@@ -1,5 +1,5 @@
 import { Dimensions, StyleSheet } from 'react-native';
-import { COLORS } from '../../app/(tabs)/calendar/calendar-context';
+import { COLORS } from '../../context/calendar-context';
 
 export const { width: SW } = Dimensions.get('window');
 

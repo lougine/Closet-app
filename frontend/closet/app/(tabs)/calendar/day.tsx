@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { ActivityIndicator, Alert, Image, Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { styles } from '../../../Styles/calendar/day.styles';
-import { COLORS, DAYS_SHORT, getWeekDays, isSameDay, MONTHS, OutfitEntry, toDateKey, useCalendar } from './calendar-context';
+import { COLORS, DAYS_SHORT, getWeekDays, isSameDay, MONTHS, OutfitEntry, toDateKey, useCalendar } from '../../../context/calendar-context';
 
 export default function DayScreen() {
   const router = useRouter();

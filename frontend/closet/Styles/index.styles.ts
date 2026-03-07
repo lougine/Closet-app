@@ -35,7 +35,7 @@ export const s = StyleSheet.create({
   },
   headerDefault: {
     ...(StyleSheet.absoluteFillObject as any),
-    backgroundColor: "#d6257a",
+    backgroundColor: "#FB92BD",
   },
   waveWrap: {
     position: "absolute",

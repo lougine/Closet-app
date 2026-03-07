@@ -1,18 +1,7 @@
 import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useLocalSearchParams } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
-import {
-  Animated,
-  Dimensions,
-  FlatList,
-  Image,
-  StatusBar,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-  View
-} from "react-native";
+import { Animated, Dimensions, FlatList, Image, StatusBar, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from "react-native";
 import { useWardrobe } from "../../context/wardrobeContext";
 import { PANEL_W, PINK, s } from "../../Styles/styling.styles";
 
@@ -26,13 +15,19 @@ function WardrobePanel({
 }: {
   visible: boolean;
   onClose: () => void;
-  onSelect: (id: number) => void;
-  selected: number[];
+  onSelect: (id: string) => void;
+  selected: string[];
 }) {
   const { items } = useWardrobe();
   const slideAnim = useRef(new Animated.Value(PANEL_W)).current;
-  const [activeTab, setActiveTab]     = useState("All");
+  const [activeTab, setActiveTab] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
+
+  const filtered = items.filter(item => {
+    if (activeTab !== "All" && !item.category?.includes(activeTab)) return false;
+    if (searchQuery && !item.label.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    return true;
+  });
 
   React.useEffect(() => {
     Animated.spring(slideAnim, {
@@ -41,12 +36,6 @@ function WardrobePanel({
       tension: 80, friction: 12,
     }).start();
   }, [visible]);
-
-  const filtered = items.filter(item => {
-    if (activeTab !== "All" && !item.category?.includes(activeTab)) return false;
-    if (searchQuery && !item.label.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-    return true;
-  });
 
   if (!visible) return null;
 
@@ -66,6 +55,8 @@ function WardrobePanel({
           </TouchableOpacity>
         </View>
 
+
+
         {/* Category tabs */}
         <FlatList
           horizontal
@@ -83,7 +74,7 @@ function WardrobePanel({
           )}
         />
 
-        {/* Search + icon row */}
+        {/* Search + filter row */}
         <View style={s.panelSearchRow}>
           <View style={s.panelSearchBar}>
             <Ionicons name="search" size={12} color="#aaa" />
@@ -95,12 +86,6 @@ function WardrobePanel({
               onChangeText={setSearchQuery}
             />
           </View>
-          <TouchableOpacity style={s.panelIconBtn}>
-            <Text style={{ fontSize: 13 }}>⭐</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={s.panelIconBtn}>
-            <Ionicons name="eye-off-outline" size={13} color="#555" />
-          </TouchableOpacity>
           <TouchableOpacity style={s.panelIconBtn}>
             <Feather name="sliders" size={13} color="#555" />
           </TouchableOpacity>
@@ -115,23 +100,17 @@ function WardrobePanel({
           columnWrapperStyle={s.panelRow}
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => {
-            const isSelected = selected.includes(item.id);
+            const isSelected = selected.includes(String(item.id));
             return (
               <TouchableOpacity
                 style={[s.panelItem, { backgroundColor: item.bg }, isSelected && s.panelItemSelected]}
-                onPress={() => onSelect(item.id)}
+                onPress={() => onSelect(String(item.id))}
                 activeOpacity={0.8}
               >
                 {item.image
                   ? <Image source={{ uri: item.image }} style={s.panelImg} resizeMode="cover" />
                   : <Text style={s.panelItemEmoji}>👗</Text>
                 }
-                <View style={s.panelEye}>
-                  <Ionicons name="eye-outline" size={11} color="rgba(255,255,255,0.7)" />
-                </View>
-                <View style={s.panelStar}>
-                  <Ionicons name="star-outline" size={11} color="rgba(255,255,255,0.7)" />
-                </View>
                 {isSelected && (
                   <View style={{
                     ...StyleSheet_absoluteFill,
@@ -162,19 +141,19 @@ export default function StylingScreen() {
 
   const [mode, setMode]           = useState<Mode>(resolveInitialMode);
   const [panelOpen, setPanelOpen] = useState(false);
-  const [selected, setSelected]   = useState<number[]>([]);
+  const [selected, setSelected]   = useState<string[]>([]);
   const [eventText, setEventText] = useState("Lara's wedding");
   const [inputText, setInputText] = useState("");
   const { items } = useWardrobe();
 
-  const toggleItem = (id: number) =>
+  const toggleItem = (id: string) =>
     setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
 
   const handleRandomize = () => {
     if (items.length === 0) return;
     const count   = Math.min(items.length, Math.floor(Math.random() * 3) + 3);
     const shuffled = [...items].sort(() => Math.random() - 0.5);
-    setSelected(shuffled.slice(0, count).map(i => i.id));
+    setSelected(shuffled.slice(0, count).map(i => String(i.id)));
   };
 
   // Auto-randomize if navigated with randomize/discover mode
@@ -184,14 +163,18 @@ export default function StylingScreen() {
     }
   }, []);
 
-  const selectedItems = items.filter(i => selected.includes(i.id));
+  const selectedItems = items.filter(i => selected.includes(String(i.id)));
 
   return (
     <View style={s.root}>
       <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
 
-      {/* Pink header blob */}
-      <View style={s.headerBlob} />
+      {/* Header image */}
+      <Image
+        source={require('../../assets/images/calendar.png')}
+        style={s.headerImg}
+        resizeMode="stretch"
+      />
 
       {/* Title */}
       <View style={s.titleRow}>
@@ -241,7 +224,7 @@ export default function StylingScreen() {
                   borderRadius: 12, overflow: "hidden",
                   alignItems: "center", justifyContent: "center",
                 }}
-                onPress={() => toggleItem(item.id)}
+                onPress={() => toggleItem(String(item.id))}
               >
                 {item.image
                   ? <Image source={{ uri: item.image }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />

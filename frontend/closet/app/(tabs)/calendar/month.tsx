@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import React from 'react';
 import { Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { styles, SW } from '../../../Styles/calendar/month.styles';
-import { COLORS, DAYS_SHORT, getMonthGrid, getMostWornThisMonth, getStreak, isSameDay, MONTHS, toDateKey, useCalendar } from './calendar-context';
+import { COLORS, DAYS_SHORT, getMonthGrid, getMostWornThisMonth, getStreak, isSameDay, MONTHS, toDateKey, useCalendar } from '../../../context/calendar-context';
 
 export default function MonthScreen() {
   const router = useRouter();
