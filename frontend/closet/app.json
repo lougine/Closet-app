@@ -12,6 +12,12 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.closet"
     },
+    "ios": {
+      "infoPlist": {
+        "NSCameraUsageDescription": "Used to add clothing photos",
+        "NSPhotoLibraryUsageDescription": "Used to add clothing photos"
+      }
+    },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
