@@ -3,454 +3,495 @@ import { COLORS, RADIUS, SHADOW } from "./shared";
 
 const { width: W } = Dimensions.get("window");
 const PINK = COLORS.pink;
-const ITEM_SIZE = (W - 4) / 3;
 const HEADER_H = 200;
 const WAVE_H = 44;
 const PIC_SIZE = 88;
 const BODY_BG = COLORS.bodyBg;
 
 export const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: BODY_BG },
-
-  headerShell:{ 
-    width: W, 
-    height: HEADER_H, 
-    overflow: "visible" 
+  root: {
+    flex: 1,
+    backgroundColor: BODY_BG,
   },
-  headerImg:{ 
-    position: "absolute", 
-    top: 0, 
-    left: 0, 
-    right: 0, 
-    height: HEADER_H, 
-    overflow: "hidden" 
+  headerShell: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: HEADER_H,
+    overflow: "visible",
+    zIndex: 0,
   },
-  bgImage:{ 
-    ...(StyleSheet.absoluteFillObject as any) 
+  headerImg: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: HEADER_H,
+    overflow: "hidden",
   },
-  headerDefault:{ 
-    ...(StyleSheet.absoluteFillObject as any), 
-    backgroundColor: "#d6257a" 
+  bgImage: {
+    ...(StyleSheet.absoluteFillObject as any),
   },
-  waveWrap:{ 
-    position: "absolute", 
-    bottom: 0, 
-    left: 0, 
-    right: 0, 
-    height: WAVE_H 
+  headerDefault: {
+    ...(StyleSheet.absoluteFillObject as any),
+    backgroundColor: "#d6257a",
   },
-  settingsBtn:{
-    position: "absolute", 
-    top: 55, 
+  waveWrap: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: WAVE_H,
+  },
+  settingsBtn: {
+    position: "absolute",
+    top: 55,
     right: 16,
-    width: 32, 
-    height: 32, 
-    borderRadius: 16, 
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: "rgba(0,0,0,0.3)",
-    alignItems: "center", 
-    justifyContent: "center", 
+    alignItems: "center",
+    justifyContent: "center",
     zIndex: 20,
   },
-  profileWrap:{ 
-    position: "absolute", 
-    bottom: -(PIC_SIZE / 4), 
-    alignSelf: "center", 
-    zIndex: 2 
+  profileWrap: {
+    position: "absolute",
+    bottom: -(PIC_SIZE / 6),
+    alignSelf: "center",
+    zIndex: 2,
   },
-  profilePic:{ 
-    width: PIC_SIZE, 
-    height: PIC_SIZE, 
-    borderRadius: PIC_SIZE / 2 
+  profilePic: {
+    width: PIC_SIZE,
+    height: PIC_SIZE,
+    borderRadius: PIC_SIZE / 2,
   },
-  profilePlaceholder:{ 
-    backgroundColor: "#2e2a49", 
-    alignItems: "center", 
-    justifyContent: "center" 
+  profilePlaceholder: {
+    backgroundColor: "#2e2a49",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  body:{ 
-    flex: 1, 
-    backgroundColor: BODY_BG 
+  body: {
+    flex: 1,
+    backgroundColor: "transparent",
+    paddingTop: HEADER_H - PIC_SIZE / 2,
   },
   usernameRow: {
-    flexDirection: "row", 
-    alignItems: "center", 
+    flexDirection: "row",
+    alignItems: "center",
     justifyContent: "center",
-    paddingTop: PIC_SIZE / 3, 
-    paddingBottom: 6, 
+    paddingTop: PIC_SIZE / 2 + 14,
+    paddingBottom: 4,
     paddingHorizontal: 16,
+    marginBottom: 5,
   },
-  username:{ 
-    fontSize: 15, 
-    fontWeight: "600", 
-    color: "#1a1a1a", 
-    marginBottom: 5 
+  username: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#1a1a1a",
   },
-  analyticsLink:{ 
-    position: "absolute", 
-    left: 84, 
-    fontSize: 12, 
-    color: "#888" 
+  analyticsLink: {
+    position: "absolute",
+    left: 80,
+    fontSize: 12,
+    color: "#888",
   },
-  statsCard:{
-    marginHorizontal: 18, 
-    marginBottom: 0,
-    backgroundColor: "#d9d9d9", 
+  statsCard: {
+    marginHorizontal: 18,
+    marginBottom: 6,
+    backgroundColor: "#d9d9d9",
     borderRadius: 35,
-    paddingVertical: 10, 
+    paddingVertical: 10,
     paddingHorizontal: 10,
-    flexDirection: "row", 
-    alignItems: "center", 
+    flexDirection: "row",
+    alignItems: "center",
     justifyContent: "space-around",
-    ...SHADOW.card, 
-    borderWidth: 1, 
+    ...SHADOW.card,
+    borderWidth: 1,
     borderColor: COLORS.divider,
   },
-  statItem:{ 
-    flex: 1, 
-    alignItems: "center" 
+  statItem: {
+    flex: 1,
+    alignItems: "center",
   },
-  statNum:{ 
-    fontSize: 13, 
-    fontWeight: "500", 
-    color: "#1a1a1a" 
+  statNum: {
+    fontSize: 13,
+    fontWeight: "500",
+    color: "#1a1a1a",
   },
-  statLabel:{ 
-    fontSize: 11, 
-    color: "#777777", 
-    marginTop: 2, 
-    fontWeight: "700" 
+  statLabel: {
+    fontSize: 11,
+    color: "#777777",
+    marginTop: 2,
+    fontWeight: "700",
   },
-  statLabelPink:{ 
-    fontSize: 11, 
-    fontWeight: "700", 
-    color: PINK 
+  statLabelPink: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: PINK,
   },
-  statDivider:{ 
-    width: 1, 
-    height: 32, 
-    backgroundColor: COLORS.divider 
+  statDivider: {
+    width: 1,
+    height: 32,
+    backgroundColor: COLORS.divider,
   },
-  pagesScroll:{ 
-    flex: 1 
+  pagesScroll: {
+    flex: 1,
   },
-  itemsPage:{ 
-    width: W, 
-    flex: 1 
+  itemsPage: {
+    width: W,
+    flex: 1,
+    flexDirection: "column",
   },
-  tabPage:{ 
-    width: W, 
-    flex: 1 
+  tabPage: {
+    width: W,
+    flex: 1,
   },
-  filterTabsContent: { 
-    paddingHorizontal: 12, 
-    paddingVertical: 4, 
-    gap: 8, 
-    alignItems: "center" as const ,
-    marginTop: -110,
-},
-  tab:{ 
-    paddingHorizontal: 16, 
-    paddingVertical: 6, 
-    borderRadius: 35, 
-    backgroundColor: "#d9d9d9" 
+  filterTabsContent: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    gap: 8,
+    alignItems: "center" as const,
   },
-  tabActive:{ 
-    backgroundColor: "#FB92BD" 
+  tab: {
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 35,
+    backgroundColor: "#d9d9d9",
   },
-  tabText:{ 
-    fontSize: 13, 
-    color: "#555" 
+  tabActive: {
+    backgroundColor: "#F0507B",
   },
-  tabTextActive:{ 
-    color: "#fff", 
-    fontWeight: "600" 
+  tabText: {
+    fontSize: 13,
+    color: "#555",
   },
-  controlDivider:{ 
-    height: 1, 
-    backgroundColor: COLORS.divider, 
-    marginHorizontal: 14, 
-    marginTop: -340, 
+  tabTextActive: {
+    color: "#fff",
+    fontWeight: "600",
+  },
+  controlDivider: {
+    height: 1,
+    backgroundColor: COLORS.divider,
+    marginHorizontal: 14,
   },
   searchSection: {
-    flexDirection: "row", 
+    flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 14, 
-    paddingVertical: 6, 
+    paddingHorizontal: 14,
+    paddingVertical: 6,
     gap: 8,
   },
-  searchRow:{ 
-    flex: 1 
+  searchRow: {
+    flex: 1,
   },
-  searchBar:{
-    flexDirection: "row", 
+  searchBar: {
+    flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#fff", 
+    backgroundColor: "#fff",
     borderRadius: 5,
-    paddingHorizontal: 10, 
-    paddingVertical: 8, 
+    paddingHorizontal: 10,
+    paddingVertical: 8,
     gap: 6,
     ...SHADOW.subtle,
   },
-  searchInput:{ 
-    flex: 1, 
-    fontSize: 13, 
-    color: "#333" 
+  searchInput: {
+    flex: 1,
+    fontSize: 13,
+    color: "#333",
   },
-  iconBtn:{ 
-    width: 36, 
-    height: 36, 
-    borderRadius: 5, 
-    backgroundColor: "#fff", 
-    alignItems: "center", 
-    justifyContent: "center", 
-    ...SHADOW.subtle 
+  iconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 5,
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+    ...SHADOW.subtle,
   },
-  iconBtnActive:{ 
-    backgroundColor: PINK 
+  iconBtnActive: {
+    backgroundColor: PINK,
   },
-  badge:{ 
-    position: "absolute", 
-    top: -4, 
-    right: -4, 
-    width: 16, 
-    height: 16, 
-    borderRadius: 8, 
-    backgroundColor: "#fff", 
-    alignItems: "center", 
-    justifyContent: "center", 
-    borderWidth: 1.5, 
-    borderColor: PINK 
+  badge: {
+    position: "absolute",
+    top: -4,
+    right: -4,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1.5,
+    borderColor: PINK,
   },
-  badgeTxt:{ 
-    fontSize: 9, 
-    color: PINK, 
-    fontWeight: "700" 
+  badgeTxt: {
+    fontSize: 9,
+    color: PINK,
+    fontWeight: "700",
   },
-  activePillsContent:{ 
-    paddingHorizontal: 14, 
-    paddingVertical: 8, 
-    gap: 8 
+  activePillsContent: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    gap: 8,
   },
-  activePill:{ 
-    backgroundColor: "#fff0f5", 
-    borderRadius: RADIUS.full, 
-    paddingHorizontal: 12, 
-    paddingVertical: 5, 
-    borderWidth: 1, 
-    borderColor: "#ffd6e7" 
+  activePill: {
+    backgroundColor: "#fff0f5",
+    borderRadius: RADIUS.full,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: "#ffd6e7",
   },
-  activePillTxt:{ 
-    fontSize: 12, 
-    color: PINK, 
-    fontWeight: "500" 
+  activePillTxt: {
+    fontSize: 12,
+    color: PINK,
+    fontWeight: "500",
   },
-  clearPill:{ 
-    backgroundColor: COLORS.greyLight, 
-    borderRadius: RADIUS.full, 
-    paddingHorizontal: 12, 
-    paddingVertical: 5 
+  clearPill: {
+    backgroundColor: COLORS.greyLight,
+    borderRadius: RADIUS.full,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
   },
-  clearPillTxt:{ 
-    fontSize: 12, 
-    color: "#888", 
-    fontWeight: "500" 
+  clearPillTxt: {
+    fontSize: 12,
+    color: "#888",
+    fontWeight: "500",
   },
-  grid:{ 
-    flex: 1, 
-    backgroundColor: BODY_BG 
+  grid: {
+    flex: 1,
+    backgroundColor: BODY_BG,
+    paddingHorizontal: 8,
+    paddingTop: 6,
   },
-  gridItem:{ 
-    width: ITEM_SIZE, 
-    height: ITEM_SIZE, 
-    alignItems: "center", 
-    justifyContent: "center", 
-    overflow: "hidden" 
+  gridContent: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    paddingHorizontal: 8,
+    paddingTop: 6,
+    paddingBottom: 100,
   },
-  gridImg:{ 
-    width: "100%", 
-    height: "100%" 
+  gridItem: {
+    width: (W - 36) / 3,
+    aspectRatio: 0.75,
+    margin: 3,
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    overflow: "hidden",
+    padding: 6,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  gridEmpty:{ 
-    width: "100%", 
-    height: "100%", 
-    backgroundColor: "#f5f5f5" 
+  gridImg: {
+    width: "100%",
+    height: "88%",
+    borderRadius: 8,
   },
-  gridLabel:{ 
-    position: "absolute", 
-    bottom: 4, 
-    fontSize: 9, 
-    color: "#999", paddingHorizontal: 4 
+  gridEmpty: {
+    width: "100%",
+    height: "88%",
+    backgroundColor: "#f5f5f5",
+    borderRadius: 8,
   },
-  emptyState:{ 
-    flex: 1, 
-    alignItems: "center", 
-    justifyContent: "center", 
-    paddingHorizontal: 40, 
-    gap: 10, 
-    paddingBottom: 120 
+  gridLabel: {
+    position: "absolute",
+    bottom: 4,
+    left: 8,
+    fontSize: 9,
+    color: "#999",
   },
-  emptyTitle:{ 
-    fontSize: 17, 
-    fontWeight: "600", 
-    color: "#1a1a1a" 
+  gridStarBtn: {
+    position: "absolute",
+    top: 6,
+    right: 6,
+    padding: 2,
+    zIndex: 10,
   },
-  emptySubtitle:{ 
-    fontSize: 13, 
-    color: "#aaa", 
-    textAlign: "center" 
+  gridEyeBtn: {
+    position: "absolute",
+    top: 6,
+    left: 6,
+    padding: 2,
+    zIndex: 10,
   },
-  clearBtn:{ 
-    marginTop: 8, 
-    backgroundColor: PINK, 
-    borderRadius: RADIUS.full, 
-    paddingHorizontal: 24, 
-    paddingVertical: 10 
+  gridHiddenOverlay: {
+    ...(StyleSheet.absoluteFillObject as any),
+    backgroundColor: "rgba(255,255,255,0.7)",
+    borderRadius: 12,
   },
-  clearBtnTxt:{ 
-    color: "#fff", 
-    fontWeight: "600", 
-    fontSize: 14 
+  emptyState: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 40,
+    gap: 10,
+    paddingBottom: 120,
+    marginTop: 150,
   },
-  filterOverlay:{ 
-    flex: 1, 
-    backgroundColor: "rgba(0,0,0,0.45)", 
-    justifyContent: "flex-end" 
+  emptyTitle: {
+    fontSize: 17,
+    fontWeight: "600",
+    color: "#1a1a1a",
   },
-  filterDismiss:{ 
-    flex: 1 
+  emptySubtitle: {
+    fontSize: 13,
+    color: "#aaa",
+    textAlign: "center",
   },
-  filterSheet:{ 
-    backgroundColor: "#fff", 
-    borderTopLeftRadius: 24, 
-    borderTopRightRadius: 24, 
-    maxHeight: "85%", 
-    paddingHorizontal: 20, 
-    paddingTop: 16 
+  clearBtn: {
+    marginTop: 8,
+    backgroundColor: PINK,
+    borderRadius: RADIUS.full,
+    paddingHorizontal: 24,
+    paddingVertical: 10,
   },
-  filterHeader:{ 
-    flexDirection: "row", 
-    alignItems: "center", 
-    justifyContent: "space-between", 
-    marginBottom: 20 
+  clearBtnTxt: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 14,
   },
-  filterTitle:{ 
-    fontSize: 17, 
-    fontWeight: "700", 
-    color: "#1a1a1a" 
+  filterOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "flex-end",
   },
-  filterClearTxt:{ 
-    fontSize: 14, 
-    color: PINK, 
-    fontWeight: "500" 
+  filterDismiss: {
+    flex: 1,
   },
-  filterSection:{ 
-    fontSize: 11, 
-    fontWeight: "700", 
-    color: "#aaa", 
-    letterSpacing: 0.8, 
-    marginBottom: 12, 
-    marginTop: 20 
+  filterSheet: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: "85%",
+    paddingHorizontal: 20,
+    paddingTop: 16,
   },
-  filterScrollContent:{ 
-    paddingBottom: 24 
+  filterHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 20,
   },
-  applyBtn:{ 
-    backgroundColor: PINK, 
-    borderRadius: 30, 
-    padding: 16, 
-    alignItems: "center", 
-    margin: 16, 
-    marginTop: 8 
+  filterTitle: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: "#1a1a1a",
   },
-  applyBtnTxt:{ 
-    color: "#fff", 
-    fontSize: 15, 
-    fontWeight: "700" 
+  filterClearTxt: {
+    fontSize: 14,
+    color: PINK,
+    fontWeight: "500",
   },
-  overlay:{ 
-    flex: 1, 
-    backgroundColor: "rgba(0,0,0,0.5)", 
-    justifyContent: "flex-end" 
+  filterSection: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#aaa",
+    letterSpacing: 0.8,
+    marginBottom: 12,
+    marginTop: 20,
   },
-  sheet:{ 
-    backgroundColor: "#fff", 
-    borderTopLeftRadius: 20, 
-    borderTopRightRadius: 20, 
-    padding: 20, 
-    paddingBottom: 40 
+  filterScrollContent: {
+    paddingBottom: 24,
   },
-  sheetTitle:{ 
-    fontSize: 16, 
-    fontWeight: "600", 
-    color: "#333", 
-    marginBottom: 16, 
-    textAlign: "center" 
+  applyBtn: {
+    backgroundColor: PINK,
+    borderRadius: 30,
+    padding: 16,
+    alignItems: "center",
+    margin: 16,
+    marginTop: 8,
   },
-  sheetBtn:{ 
-    backgroundColor: COLORS.greyLight, 
-    borderRadius: 12, 
-    padding: 14, 
-    marginBottom: 8 
+  applyBtnTxt: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+  sheet: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    paddingBottom: 40,
+  },
+  sheetTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 16,
+    textAlign: "center",
+  },
+  sheetBtn: {
+    backgroundColor: COLORS.greyLight,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 8,
   },
 });
 
 export const fc = StyleSheet.create({
-  row:{ 
-    flexDirection: "row", 
-    flexWrap: "wrap", 
-    gap: 8, 
-    marginBottom: 4 
+  row: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 4,
   },
-  chip:{ 
-    paddingHorizontal: 14, 
-    paddingVertical: 8, 
-    borderRadius: RADIUS.full, 
-    borderWidth: 1.5, 
-    borderColor: COLORS.greyBorder, 
-    backgroundColor: "#fafafa" 
+  chip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: RADIUS.full,
+    borderWidth: 1.5,
+    borderColor: COLORS.greyBorder,
+    backgroundColor: "#fafafa",
   },
-  chipOn:{ 
-    backgroundColor: PINK, 
-    borderColor: PINK 
+  chipOn: {
+    backgroundColor: PINK,
+    borderColor: PINK,
   },
-  chipTxt:{ 
-    fontSize: 13, 
-    color: "#555", 
-    fontWeight: "500" 
+  chipTxt: {
+    fontSize: 13,
+    color: "#555",
+    fontWeight: "500",
   },
-  chipTxtOn:{ 
-    color: "#fff", 
-    fontWeight: "600" 
+  chipTxtOn: {
+    color: "#fff",
+    fontWeight: "600",
   },
-  colorRow:{ 
-    flexDirection: "row", 
-    flexWrap: "wrap", 
-    gap: 10, 
-    marginBottom: 4 
+  colorRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginBottom: 4,
   },
-  colorOpt:{ 
-    alignItems: "center", 
-    gap: 4, 
-    width: 44 
+  colorOpt: {
+    alignItems: "center",
+    gap: 4,
+    width: 44,
   },
-  swatch:{ 
-    width: 34, 
-    height: 34, 
-    borderRadius: 17, 
-    alignItems: "center", 
-    justifyContent: "center" 
+  swatch: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  swatchBorder:{ 
-    borderWidth: 1, 
-    borderColor: "#ddd" 
+  swatchBorder: {
+    borderWidth: 1,
+    borderColor: "#ddd",
   },
-  swatchSelected:{ 
-    borderWidth: 3, 
-    borderColor: PINK 
+  swatchSelected: {
+    borderWidth: 3,
+    borderColor: PINK,
   },
-  swatchLabel:{ 
-    fontSize: 9, 
-    color: "#888", 
-    textAlign: "center" 
+  swatchLabel: {
+    fontSize: 9,
+    color: "#888",
+    textAlign: "center",
   },
 });
