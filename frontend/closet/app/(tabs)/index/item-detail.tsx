@@ -1,23 +1,9 @@
-// app/item-detail.tsx
 import { Feather, Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useState } from "react";
-import {
-    Alert,
-    Dimensions,
-    Image,
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    Share,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
-} from "react-native";
-import type { ClothingItem } from "./(tabs)/index";
+import { Alert, Dimensions, Image, Platform, SafeAreaView, ScrollView, Share, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import type { ClothingItem } from "../index";
 
 const { width: W } = Dimensions.get("window");
 const PINK = "#e83d84";

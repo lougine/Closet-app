@@ -10,30 +10,10 @@ export default function RootLayout() {
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="(auth)" />
-          <Stack.Screen
-            name="item-detail"
-            options={{ animation: "slide_from_right" }}
-          />
-          <Stack.Screen
-            name="features/add-items"
-            options={{ animation: "slide_from_bottom" }}
-          />
-          <Stack.Screen
-            name="features/settings"
-            options={{ animation: "slide_from_right" }}
-          />
-          <Stack.Screen
-            name="features/analytics"
-            options={{ animation: "slide_from_right" }}
-          />
-          <Stack.Screen
-            name="outfit"
-            options={{ animation: "slide_from_bottom" }}
-          />
-          <Stack.Screen
-            name="lookbook"
-            options={{ animation: "slide_from_bottom" }}
-          />
+          <Stack.Screen name="modal" />
+          <Stack.Screen name="features/settings"  options={{ animation: "slide_from_right" }} />
+          <Stack.Screen name="features/analytics" options={{ animation: "slide_from_right" }} />
+          <Stack.Screen name="settings" />
         </Stack>
       </WardrobeProvider>
     </UserProvider>

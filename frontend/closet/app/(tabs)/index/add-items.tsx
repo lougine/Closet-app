@@ -1,22 +1,8 @@
-// app/features/add-items.tsx
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from "react-native";
-import { useWardrobe } from "../../context/wardrobeContext";
+import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { useWardrobe } from "../../../context/wardrobeContext";
 
 const PINK = "#FF4F81";
 
@@ -50,7 +36,6 @@ const COLOR_OPTIONS = [
   { label: "Cream", hex: "#FFF8E1" },
 ];
 
-// bg colours per category
 const CATEGORY_BG: Record<string, string> = {
   Tops: "#fce4ec",
   Bottoms: "#f3e5f5",
@@ -126,7 +111,6 @@ export default function AddItemsScreen() {
     }
     setSaving(true);
 
-    // ✅ Actually add to wardrobe context
     addItem({
       id: Date.now(),
       image: (image as string) ?? null,

@@ -18,7 +18,7 @@ export default function CalendarLayout() {
   return (
     <CalendarProvider>
       <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="index" />
+        <Stack.Screen name="calendar-index" />
         <Stack.Screen name="day" />
         <Stack.Screen name="month" />
         {/* Hide context file — it's a utility, not a screen */}

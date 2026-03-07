@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { Image, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
-import styles from "../Styles/communityStyles";
+import styles from "../../Styles/communityStyles";
 
 const CommunityScreen: React.FC = () => {
   const closetItems = [
