@@ -62,11 +62,11 @@ export default function SignInScreen() {
         </View>
 
         {/* 5. FORGOT PASSWORD */}
-        <TouchableOpacity style={styles.forgotContainer}>
-          <Text style={[styles.forgotText, fontsLoaded && { fontFamily: 'Inter-Regular' }]}>
-            Forgot password?
-          </Text>
-        </TouchableOpacity>
+<TouchableOpacity style={styles.forgotContainer} onPress={() => router.push('/(auth)/forgotpass')}>
+  <Text style={[styles.forgotText, fontsLoaded && { fontFamily: 'Inter-Regular' }]}>
+    Forgot password?
+  </Text>
+</TouchableOpacity>
 
         {/* 6. SIGN IN BUTTON */}
         <TouchableOpacity style={styles.signInButton}>
@@ -97,11 +97,11 @@ export default function SignInScreen() {
         </TouchableOpacity>
 
         {/* 9. JOIN NOW LINK */}
-        <TouchableOpacity onPress={() => router.push('/(auth)/signup')}>
-          <Text style={[styles.footerText, fontsLoaded && { fontFamily: 'Inter-Regular' }]}>
-            New to Dribble? <Text style={styles.joinLink}>Join now</Text>
-          </Text>
-        </TouchableOpacity>
+        <TouchableOpacity onPress={() => router.push('/signup')}>
+  <Text style={[styles.footerText, fontsLoaded && { fontFamily: 'Inter-Regular' }]}>
+    New to Dribble? <Text style={styles.joinLink}>Join now</Text>
+  </Text>
+</TouchableOpacity>
 
         {/* 10. BOTTOM LOGO */}
         <Image

@@ -75,6 +75,7 @@ export default function Authenication() {
           </Text>
         </TouchableOpacity>
 
+        <TouchableOpacity style={styles.loginLink} onPress={() => router.push('/signin')}>
         <TouchableOpacity
           style={styles.loginLink}
           onPress={() => router.push("/login")}
