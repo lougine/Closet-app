@@ -1,21 +1,6 @@
-// app/calendar/calendar-context.tsx
-// ─────────────────────────────────────────────────────────────────────────────
-// Shared state for the calendar feature, provided via React Context.
-//
-// WHY A CONTEXT?
-//   day.tsx and month.tsx are separate route files (like settings sub-pages),
-//   so they can't receive props directly. The context lets both screens read
-//   and update the same selectedDate, outfits array, etc. without prop drilling.
-//
-// HOW TO USE:
-//   1. CalendarProvider wraps the calendar stack in app/(tabs)/calendar.tsx
-//   2. day.tsx and month.tsx call useCalendar() to get/set shared state
-// ─────────────────────────────────────────────────────────────────────────────
-
-import React, { createContext, useContext, useEffect, useState } from 'react';
 import * as SecureStore from 'expo-secure-store';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 
-// ─── COLORS (shared across all calendar files) ────────────────────────────────
 export const COLORS = {
   white: '#FFFFFF',
   offWhite: '#F6F6F6',
@@ -26,25 +11,21 @@ export const COLORS = {
   subText: '#888888',
 };
 
-// ─── CONSTANTS ────────────────────────────────────────────────────────────────
 export const DAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 export const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
-// ─── TYPES ────────────────────────────────────────────────────────────────────
 export type OutfitEntry = {
   _id: string;
   userId: string;
-  date: string;           // ISO string e.g. "2025-09-13T00:00:00.000Z"
+  date: string;         
   garmentIds: string[];
   previewImage: string;
 };
 
-export type OutfitMap = Record<string, OutfitEntry>; // "YYYY-MM-DD" → outfit
-
-// ─── HELPER FUNCTIONS ─────────────────────────────────────────────────────────
+export type OutfitMap = Record<string, OutfitEntry>; 
 
 export function toDateKey(date: Date): string {
   return date.toISOString().split('T')[0];
@@ -108,16 +89,13 @@ export function getStreak(outfitMap: OutfitMap): number {
   return streak;
 }
 
-// ─── CONTEXT ──────────────────────────────────────────────────────────────────
 type CalendarContextType = {
-  // State
   selectedDate: Date;
   currentMonth: Date;
   outfits: OutfitEntry[];
   outfitMap: OutfitMap;
   loading: boolean;
 
-  // Setters / actions
   setSelectedDate: (date: Date) => void;
   setCurrentMonth: (date: Date) => void;
   deleteOutfit: (id: string) => Promise<void>;
@@ -126,7 +104,6 @@ type CalendarContextType = {
 
 const CalendarContext = createContext<CalendarContextType | null>(null);
 
-// ─── PROVIDER ─────────────────────────────────────────────────────────────────
 export function CalendarProvider({ children }: { children: React.ReactNode }) {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -165,7 +142,7 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
       setOutfits((prev) => prev.filter((o) => o._id !== id));
     } catch (e) {
       console.error('Calendar: could not delete outfit');
-      throw e; // rethrow so day.tsx can show an Alert
+      throw e; 
     }
   }
 
@@ -180,16 +157,10 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-// ─── HOOK ─────────────────────────────────────────────────────────────────────
-// Call this in day.tsx and month.tsx to access the shared calendar state
 export function useCalendar() {
   const ctx = useContext(CalendarContext);
   if (!ctx) throw new Error('useCalendar must be used inside CalendarProvider');
   return ctx;
 }
 
-// ─── DEFAULT EXPORT ───────────────────────────────────────────────────────────
-// Expo Router requires every file in a route folder to have a default export.
-// This file is NOT a screen — it's a context/utility file — so we export null.
-// This stops Expo Router from trying to render it as a page.
 export default function CalendarContextFile() { return null; }

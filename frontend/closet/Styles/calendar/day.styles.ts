@@ -1,0 +1,206 @@
+import { Dimensions, StyleSheet } from 'react-native';
+import { COLORS } from '../../app/(tabs)/calendar/calendar-context';
+
+export const { width: SW } = Dimensions.get('window');
+
+const HEADER_H = 150;
+
+export const styles = StyleSheet.create({
+  flex: { flex: 1, backgroundColor: COLORS.white },
+  loadingWrap: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+  },
+  headerBg: {
+    height: HEADER_H,
+    position: 'relative',
+  },
+  headerWave: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: SW,
+    height: HEADER_H,
+    zIndex: 0,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 56,
+    paddingBottom: 8,
+    zIndex: 1,
+  },
+  arrowBtn: { padding: 4 },
+  monthLabel: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#000',
+    letterSpacing: 0.3,
+  },
+  weekStrip: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingHorizontal: 10,
+    paddingBottom: 8,
+    zIndex: 1,
+    marginTop: 35,
+  },
+  dayColumn: {
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 4,
+  },
+  dayName: {
+    fontSize: 14,
+    color: 'rgb(0,0,0)',
+    fontWeight: '600',
+  },
+  dayNameSelected: {
+    color: '#000',
+    fontWeight: '700',
+  },
+  dayBubble: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dayBubbleSelected: {
+    backgroundColor: '#FB92BD',
+  },
+  dayBubbleToday: {
+    borderWidth: 1.5,
+    borderColor: "#F0507B",
+  },
+  dayNumber: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#716767',
+  },
+  dayNumberSelected: {
+    color: '#716767',
+    fontWeight: '500',
+  },
+  dayNumberToday: {
+    color: "#F0507B",
+    fontWeight: '700',
+  },
+  outfitDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.8)',
+  },
+  content: {
+    flexGrow: 1,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 40,
+  },
+  outfitCard: {
+    flex: 1,
+    backgroundColor: COLORS.offWhite,
+    borderRadius: 24,
+    padding: 16,
+    minHeight: 400,
+    alignItems: 'center',
+    position: 'relative',
+  },
+  menuBtn: {
+    position: 'absolute',
+    top: 14,
+    right: 14,
+    padding: 6,
+    zIndex: 10,
+  },
+  outfitImage: {
+    width: '90%',
+    height: 380,
+    marginTop: 20,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  menuPopup: {
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    padding: 8,
+    width: 200,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 12,
+    borderRadius: 10,
+  },
+  menuItemText: {
+    fontSize: 15,
+    color: COLORS.hotPink,
+    fontWeight: '500',
+  },
+  emptyDay: {
+    flex: 1,
+    justifyContent: 'center',
+    gap: 14,
+  },
+  emptyTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: COLORS.text,
+    textAlign: 'center',
+    marginTop: 12,
+  },
+  emptySubtitle: {
+    fontSize: 15,
+    color: COLORS.subText,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  optionsBlock: { gap: 12 },
+  optionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.offWhite,
+    borderRadius: 18,
+    padding: 16,
+    gap: 14,
+  },
+  optionIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: COLORS.white,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: COLORS.hotPink,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  optionTextWrap: { flex: 1 },
+  optionTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: COLORS.text,
+  },
+  optionSub: {
+    fontSize: 12,
+    color: COLORS.subText,
+    marginTop: 2,
+  },
+});

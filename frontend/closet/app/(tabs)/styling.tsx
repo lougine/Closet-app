@@ -1,5 +1,6 @@
 import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import React, { useRef, useState } from "react";
+import { useLocalSearchParams } from "expo-router";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Animated,
   Dimensions,
@@ -125,7 +126,6 @@ function WardrobePanel({
                   ? <Image source={{ uri: item.image }} style={s.panelImg} resizeMode="cover" />
                   : <Text style={s.panelItemEmoji}>👗</Text>
                 }
-                {/* eye + star icons */}
                 <View style={s.panelEye}>
                   <Ionicons name="eye-outline" size={11} color="rgba(255,255,255,0.7)" />
                 </View>
@@ -151,7 +151,16 @@ function WardrobePanel({
 }
 
 export default function StylingScreen() {
-  const [mode, setMode]           = useState<Mode>("Create outfit");
+  const params = useLocalSearchParams<{ mode?: string; date?: string }>();
+
+  // Map incoming route param → tab mode
+  const resolveInitialMode = (): Mode => {
+    if (params.mode === "randomize" || params.mode === "discover") return "Randomize";
+    if (params.mode === "create") return "Create outfit";
+    return "Create outfit";
+  };
+
+  const [mode, setMode]           = useState<Mode>(resolveInitialMode);
   const [panelOpen, setPanelOpen] = useState(false);
   const [selected, setSelected]   = useState<number[]>([]);
   const [eventText, setEventText] = useState("Lara's wedding");
@@ -167,6 +176,13 @@ export default function StylingScreen() {
     const shuffled = [...items].sort(() => Math.random() - 0.5);
     setSelected(shuffled.slice(0, count).map(i => i.id));
   };
+
+  // Auto-randomize if navigated with randomize/discover mode
+  useEffect(() => {
+    if (params.mode === "randomize" || params.mode === "discover") {
+      handleRandomize();
+    }
+  }, []);
 
   const selectedItems = items.filter(i => selected.includes(i.id));
 
