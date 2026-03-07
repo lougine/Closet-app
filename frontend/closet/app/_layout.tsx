@@ -11,8 +11,30 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="(auth)" />
           <Stack.Screen name="modal" />
-          <Stack.Screen name="features/settings"  options={{ animation: "slide_from_right" }} />
-          <Stack.Screen name="features/analytics" options={{ animation: "slide_from_right" }} />
+          <Stack.Screen
+            name="wardrobe/outfit"
+            options={{ animation: "slide_from_right" }}
+          />
+          <Stack.Screen
+            name="wardrobe/lookbook"
+            options={{ animation: "slide_from_right" }}
+          />
+          <Stack.Screen
+            name="wardrobe/add-items"
+            options={{ animation: "slide_from_right" }}
+          />
+          <Stack.Screen
+            name="wardrobe/item-detail"
+            options={{ animation: "slide_from_right" }}
+          />
+          <Stack.Screen
+            name="features/settings"
+            options={{ animation: "slide_from_right" }}
+          />
+          <Stack.Screen
+            name="features/analytics"
+            options={{ animation: "slide_from_right" }}
+          />
           <Stack.Screen name="settings" />
         </Stack>
       </WardrobeProvider>
