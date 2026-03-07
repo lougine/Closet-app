@@ -7,7 +7,10 @@ export const styles = StyleSheet.create({
     alignSelf: "center",
     alignItems: "center",
   },
-  actionWrapper: { position: "absolute", zIndex: 100 },
+  actionWrapper: { 
+    position: "absolute", 
+    zIndex: 100 
+  },
   actionButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -23,7 +26,10 @@ export const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 6,
   },
-  actionText: { color: "#000", fontWeight: "500" },
+  actionText: { 
+    color: "#000", 
+    fontWeight: "500" 
+  },
   floatingButton: {
     width: 60,
     height: 60,
@@ -36,7 +42,12 @@ export const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 6,
   },
-  fabIcon: { width: 37, height: 37, resizeMode: "contain", bottom: 5 },
+  fabIcon: { 
+    width: 37, 
+    height: 37, 
+    resizeMode: 
+    "contain", bottom: 5 
+  },
   sheetOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.45)",
@@ -84,8 +95,24 @@ export const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  sheetBtnLabel: { fontSize: 15, fontWeight: "600", color: "#1a1a1a" },
-  sheetBtnSub: { fontSize: 12, color: "#aaa", marginTop: 2 },
-  cancelBtn: { marginTop: 4, padding: 14, alignItems: "center" },
-  cancelText: { fontSize: 15, color: "#FF4F81", fontWeight: "600" },
+  sheetBtnLabel: { 
+    fontSize: 15, 
+    fontWeight: "600", 
+    color: "#1a1a1a" 
+  },
+  sheetBtnSub: { 
+    fontSize: 12, 
+    color: "#aaa", 
+    marginTop: 2 
+  },
+  cancelBtn: { 
+    marginTop: 4, 
+    padding: 14, 
+    alignItems: "center" 
+  },
+  cancelText: { 
+    fontSize: 15, 
+    color: "#FF4F81", 
+    fontWeight: "600" 
+  },
 });

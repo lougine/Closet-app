@@ -148,7 +148,7 @@ export default function TabLayout() {
           options={{
             tabBarIcon: ({ focused }) => (
               <Image source={require("../../assets/images/calender.png")}
-                style={{ width: 30, height: 30, tintColor: focused ? "#F0507B" : "#fff", top: 12, right: 20 }}
+                style={{ width: 55, height: 55, tintColor: focused ? "#F0507B" : "#fff", top: 10, right: 20 }}
                 resizeMode="contain" />
             ),
           }}
