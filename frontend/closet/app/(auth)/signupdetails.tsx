@@ -1,17 +1,9 @@
-import { Inter_400Regular, useFonts, Inter_700Bold } from '@expo-google-fonts/inter';
+import { Inter_400Regular, Inter_700Bold, useFonts } from '@expo-google-fonts/inter';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useState } from 'react';
-import {
-  Dimensions,
-  Image,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { Dimensions, Image, Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import styles from '../../Styles/auth/signupdetails.styles';
 
 const { width } = Dimensions.get('window');
 
@@ -29,11 +21,10 @@ const OPTIONS = {
 
 export default function ProfileSetupScreen() {
   const router = useRouter();
-  
-  // Loading Inter Regular and Bold
-  const [fontsLoaded] = useFonts({ 
+
+  const [fontsLoaded] = useFonts({
     'Inter-Regular': Inter_400Regular,
-    'Inter-Bold': Inter_700Bold 
+    'Inter-Bold': Inter_700Bold
   });
 
   const [selected, setSelected] = useState<Record<string, string>>({});
@@ -62,7 +53,6 @@ export default function ProfileSetupScreen() {
     <View style={styles.container}>
       <StatusBar style="light" translucent backgroundColor="transparent" />
 
-      {/* TOP WAVE IMAGE */}
       <Image
         source={require('@/assets/images/auth.png')}
         style={styles.topImage}
@@ -74,12 +64,11 @@ export default function ProfileSetupScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Back button */}
+
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <Text style={styles.backText}>‹</Text>
         </TouchableOpacity>
 
-        {/* Form Sections */}
         <Text style={styles.label}>Gender</Text>
         <Dropdown optionKey="gender" />
 
@@ -117,20 +106,18 @@ export default function ProfileSetupScreen() {
         <Text style={styles.label}>How often do you buy new clothes?</Text>
         <Dropdown optionKey="shoppingFrequency" />
 
-        {/* Sign up button */}
         <TouchableOpacity style={styles.signUpButton} onPress={() => router.push('/(tabs)')}>
           <Text style={styles.signUpText}>Sign up</Text>
         </TouchableOpacity>
 
-        {/* BOTTOM LOGO */}
         <Image
           source={require('@/assets/images/logo.png')}
           style={styles.bottomLogo}
           resizeMode="contain"
         />
+
       </ScrollView>
 
-      {/* Selection Modal */}
       <Modal visible={!!modalKey} transparent animationType="fade">
         <TouchableOpacity style={styles.modalOverlay} onPress={closeModal} activeOpacity={1}>
           <View style={styles.modalBox}>
@@ -154,129 +141,7 @@ export default function ProfileSetupScreen() {
           </View>
         </TouchableOpacity>
       </Modal>
+
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#121212',
-  },
-  topImage: {
-    position: 'absolute',
-    top: 0,
-    width: width,
-    height: 140, // Adjusted to match your auth.png curve
-    zIndex: 1,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: 25,
-    paddingTop: 150, // Provides space so back button appears below the wave curve
-    paddingBottom: 40,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    backgroundColor: '#CCCCCC', // Light gray background as seen in your screenshot
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 10,
-    zIndex: 2,
-  },
-  backText: {
-    color: '#000000',
-    fontSize: 28,
-    fontWeight: '300',
-    marginTop: -4, // Centers the arrow visually
-  },
-  label: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontFamily: 'Inter-Regular',
-    marginBottom: 8,
-    marginTop: 12,
-  },
-  dropdown: {
-    backgroundColor: '#000000',
-    borderRadius: 15,
-    paddingVertical: 12,
-    paddingHorizontal: 15,
-    borderWidth: 1,
-    borderColor: '#1f1f1f',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  dropdownText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontFamily: 'Inter-Regular',
-  },
-  placeholder: {
-    color: '#666666',
-  },
-  arrow: {
-    color: '#ccc',
-    fontSize: 10,
-  },
-  row: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  half: {
-    flex: 1,
-  },
-  signUpButton: {
-    backgroundColor: '#FF8CBE', // Pink pulled from your wave asset
-    paddingVertical: 12,
-    paddingHorizontal: 40,
-    borderRadius: 25,
-    alignSelf: 'center',
-    marginTop: 30,
-  },
-  signUpText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontFamily: 'Inter-Bold',
-  },
-  bottomLogo: {
-    width: 260,
-    height: 190,
-    marginTop: 10,
-    alignSelf: 'center',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalBox: {
-    backgroundColor: '#D9D9D9',
-    borderRadius: 20,
-    width: width * 0.8,
-    maxHeight: '60%',
-    overflow: 'hidden',
-  },
-  modalOption: {
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#ccc',
-  },
-  modalOptionText: {
-    color: '#000',
-    fontSize: 16,
-    fontFamily: 'Inter-Regular',
-    textAlign: 'center',
-  },
-  modalOptionSelected: {
-    color: '#E91E63',
-    fontFamily: 'Inter-Bold',
-  },
-});

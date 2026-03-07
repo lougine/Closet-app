@@ -1,10 +1,11 @@
+import { Inter_400Regular, Inter_700Bold, useFonts } from '@expo-google-fonts/inter';
 import * as Google from 'expo-auth-session/providers/google';
-import { Inter_400Regular, useFonts, Inter_700Bold } from '@expo-google-fonts/inter';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as WebBrowser from 'expo-web-browser';
 import React, { useEffect } from 'react';
-import { Dimensions, Image, StyleSheet, Text, TextInput, TouchableOpacity, View, ScrollView } from 'react-native';
+import { Dimensions, Image, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { styles } from '../../Styles/auth/signup.styles';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -24,7 +25,6 @@ export default function SignUpScreen() {
     iosClientId: '441160248309-lo594apa54pj6r70j0od0jete9p0r906.apps.googleusercontent.com',
   });
 
-  // Handle Google Auth Navigation
   useEffect(() => {
     if (response?.type === 'success') {
       const { authentication } = response;
@@ -41,7 +41,6 @@ export default function SignUpScreen() {
       const user = await res.json();
       console.log('Google user:', user);
       
-      // Navigate to setup details after successful Google Login
       router.push('/(auth)/signupdetials'); 
     } catch (e) {
       console.error(e);
@@ -56,7 +55,6 @@ export default function SignUpScreen() {
     <View style={styles.container}>
       <StatusBar style="light" translucent backgroundColor="transparent" />
       
-      {/* 1. WAVE IMAGE (Fixed to top) */}
       <Image
         source={require('@/assets/images/auth.png')}
         style={[styles.topImage, { width, height: topImageHeight }]}
@@ -73,29 +71,22 @@ export default function SignUpScreen() {
             Create an account to join Dribble
           </Text>
 
-          {/* 3. INPUT FIELDS */}
           <InputField label="First Name" placeholder="Enter your first name" />
           <InputField label="Last Name" placeholder="Enter your last name" />
           <InputField label="Email" placeholder="Enter your email" />
           <InputField label="Password" placeholder="Enter your password" secureTextEntry />
           <InputField label="Confirm password" placeholder="Re-enter your password" secureTextEntry />
 
-          {/* 4. MAIN SIGN UP BUTTON (Navigates directly) */}
-          <TouchableOpacity 
-  style={styles.signUpButton} 
-  onPress={() => router.push('/(auth)/signupdetials')}
->
+          <TouchableOpacity style={styles.signUpButton} onPress={() => router.push('/(auth)/signupdetails')} >
             <Text style={styles.signUpButtonText}>Sign up</Text>
           </TouchableOpacity>
 
-          {/* 5. DIVIDER */}
           <View style={styles.dividerContainer}>
             <View style={styles.line} />
             <Text style={styles.orText}>or</Text>
             <View style={styles.line} />
           </View>
 
-          {/* 6. GOOGLE SIGN UP */}
           <TouchableOpacity
             style={styles.googleButton}
             disabled={!request}
@@ -113,14 +104,12 @@ export default function SignUpScreen() {
             </View>
           </TouchableOpacity>
 
-          {/* 7. SIGN IN LINK */}
-          <TouchableOpacity onPress={() => console.log('Go to Login')}>
+          <TouchableOpacity onPress={() => router.push("/login")}>
             <Text style={styles.footerText}>
               Already have an account? <Text style={styles.signInLink}>SIGN IN</Text>
             </Text>
           </TouchableOpacity>
 
-          {/* 8. BOTTOM LOGO */}
           <Image 
             source={require('@/assets/images/logo.png')} 
             style={styles.bottomLogo}
@@ -145,121 +134,3 @@ function InputField({ label, placeholder, secureTextEntry = false }: any) {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#121212',
-  },
-  topImage: {
-    position: 'absolute',
-    top: 0,
-    zIndex: 10,
-  },
-  contentContainer: {
-    paddingHorizontal: 35,
-    alignItems: 'center',
-    paddingBottom: 20,
-  },
-  title: {
-    color: '#FFF',
-    fontSize: 40, 
-    alignSelf: 'flex-start',
-    fontFamily: 'Inter-Bold',
-    marginTop: 10,
-  },
-  subtitle: {
-    color: '#888',
-    fontSize: 15,
-    alignSelf: 'flex-start',
-    fontFamily: 'Inter-Regular',
-    marginBottom: 20,
-  },
-  inputWrapper: {
-    width: '100%',
-    marginBottom: 12,
-  },
-  label: {
-    color: '#FFF',
-    fontSize: 14,
-    fontFamily: 'Inter-Regular',
-    marginBottom: 6,
-  },
-  input: {
-    backgroundColor: '#000',
-    borderRadius: 25,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    color: '#FFF',
-    borderWidth: 1,
-    borderColor: '#1A1A1A',
-    fontFamily: 'Inter-Regular',
-  },
-  signUpButton: {
-    backgroundColor: '#FB92BD',
-    paddingVertical: 14,
-    paddingHorizontal: 50,
-    borderRadius: 25,
-    marginTop: 15,
-  },
-  signUpButtonText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontFamily: 'Inter-Bold',
-  },
-  dividerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 20,
-    width: '100%',
-  },
-  line: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#FB92BD',
-    opacity: 0.3,
-  },
-  orText: {
-    color: '#888',
-    marginHorizontal: 15,
-    fontFamily: 'Inter-Regular',
-  },
-  googleButton: {
-    backgroundColor: '#FB92BD',
-    paddingVertical: 12,
-    width: '100%',
-    borderRadius: 25,
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  googleContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  googleIcon: {
-    width: 20,
-    height: 20,
-    marginRight: 10,
-  },
-  googleButtonText: {
-    color: '#FFF',
-    fontSize: 15,
-    fontFamily: 'Inter-Bold',
-  },
-  footerText: {
-    color: '#888',
-    fontSize: 13,
-    marginBottom: 10,
-    fontFamily: 'Inter-Regular',
-  },
-  signInLink: {
-    color: '#F0507B',
-    fontFamily: 'Inter-Bold',
-  },
-  bottomLogo: {
-    width: 180,
-    height: 180,
-    marginTop: 10,
-    alignSelf: 'center',
-  },
-});

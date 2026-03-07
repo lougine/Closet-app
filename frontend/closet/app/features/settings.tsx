@@ -159,7 +159,7 @@ export default function SettingsScreen() {
         onPress: async () => {
           await SecureStore.deleteItemAsync('userToken');
           // TODO: update path to match your actual login screen route
-          router.replace('/login');
+          router.replace('/(auth)/authentication');
         },
       },
     ]);

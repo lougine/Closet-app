@@ -1,12 +1,8 @@
-// app/(tabs)/index.tsx
 import { Feather, Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
-import {
-  Dimensions, FlatList, Image, Modal, ScrollView,
-  StatusBar, Text, TextInput, TouchableOpacity, View,
-} from "react-native";
+import { Dimensions, FlatList, Image, Modal, ScrollView, StatusBar, Text, TextInput, TouchableOpacity, View } from "react-native";
 import Svg, { Path } from "react-native-svg";
 import { useWardrobe } from "../../context/wardrobeContext";
 import { fc, s } from "../../Styles/index.styles";
@@ -16,14 +12,13 @@ const PINK = "#FF4F81";
 
 const FILTER_TABS = ["All", "Footwear", "Tops", "Bottoms", "Accessories"];
 
-// ─── Filter data ──────────────────────────────────────────────────────────────
 const CATEGORY_TREE: Record<string, string[]> = {
-  Tops:        ["T-Shirt","Blouse","Crop Top","Tank Top","Shirt","Corset","Hoodie","Sweater","Cardigan","Polo"],
-  Bottoms:     ["Jeans","Mini Skirt","Midi Skirt","Maxi Skirt","Shorts","Trousers","Leggings","Cargo Pants","Joggers"],
-  Dresses:     ["Mini Dress","Midi Dress","Maxi Dress","Bodycon","Slip Dress","Wrap Dress","Shirt Dress"],
+  Tops:        ["T-Shirt","Blouse","Crop Top","Tank Top","Shirt","Hoodie","Sweater","Cardigan"],
+  Bottoms:     ["Jeans","Skirt","Shorts","Trousers","Leggings","Cargo Pants","Sweatpants"],
+  Dresses:     ["Mini Dress" , "Bodycon"],
   Outerwear:   ["Jacket","Blazer","Coat","Trench Coat","Puffer","Leather Jacket","Denim Jacket","Vest"],
-  Footwear:    ["Sneakers","Heels","Boots","Sandals","Flats","Loafers","Mules","Platforms","Trainers"],
-  Accessories: ["Bag","Belt","Hat","Sunglasses","Jewellery","Scarf","Watch","Hair Accessory"],
+  Footwear:    ["Sneakers","Heels","Boots","Sandals","Platforms"],
+  Accessories: ["Bag","Belt","Hat","Sunglasses","Jewellery","Scarf","Watch"],
   Bags:        ["Handbag","Tote","Crossbody","Clutch","Backpack","Mini Bag","Shoulder Bag"],
   Swimwear:    ["Bikini","One-Piece","Coverup","Swim Shorts"],
 };
@@ -77,7 +72,6 @@ export default function WardrobeScreen() {
   const [showFilter, setShowFilter]     = useState(false);
   const [filters, setFilters]           = useState<FilterState>(EMPTY_FILTERS);
 
-  // ── Filter helpers ────────────────────────────────────────────────────────
   const setCategory = (cat: string) =>
     setFilters(prev => ({ ...prev, category: prev.category === cat ? "" : cat, subcategories: [] }));
 
@@ -94,7 +88,6 @@ export default function WardrobeScreen() {
     filters.subcategories.length + filters.colors.length +
     filters.seasons.length + filters.sizes.length;
 
-  // ── Image picker ──────────────────────────────────────────────────────────
   const pickImage = async (source: "library"|"camera") => {
     const result = source === "library"
       ? await ImagePicker.launchImageLibraryAsync({ quality: 0.8 })
@@ -106,7 +99,6 @@ export default function WardrobeScreen() {
     setImageMenuFor(null);
   };
 
-  // ── Filtering ─────────────────────────────────────────────────────────────
   const filtered = items.filter(item => {
     if (searchQuery && !item.label.toLowerCase().includes(searchQuery.toLowerCase())) return false;
     if (activeTab !== "All" && !item.category?.includes(activeTab)) return false;
