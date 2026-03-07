@@ -1,0 +1,89 @@
+import { Dimensions, StyleSheet } from 'react-native';
+
+const { width, height } = Dimensions.get('window');
+
+export const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#121212',
+  },
+  topImage: {
+    width: width,
+    height: 160,
+    position: 'absolute',
+    top: 0,
+  },
+  backButton: {
+    width: 36,
+    height: 36,
+    backgroundColor: '#CCCCCC',
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 170,
+    marginLeft: 25,
+  },
+  backText: {
+    color: '#000000',
+    fontSize: 26,
+    fontWeight: '300',
+    marginTop: -3,
+  },
+  contentSection: {
+    paddingHorizontal: 30,
+    marginTop: 20,
+  },
+  title: {
+    color: '#FFFFFF',
+    fontSize: 28,
+    fontFamily: 'Inter-Bold',
+    marginBottom: 8,
+  },
+  subtitle: {
+    color: '#888888',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    marginBottom: 25,
+    lineHeight: 20,
+  },
+  inputWrapper: {
+    width: '100%',
+    marginBottom: 25,
+  },
+  label: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    marginBottom: 8,
+  },
+  input: {
+    backgroundColor: '#000000',
+    borderRadius: 25,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    color: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#1A1A1A',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+  },
+  resetButton: {
+    backgroundColor: '#FB92BD',
+    paddingVertical: 12,
+    paddingHorizontal: 40,
+    borderRadius: 25,
+    alignSelf: 'center',
+  },
+  resetButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
+  },
+  bottomLogo: {
+    width: width * 1.0,
+    height: 220,
+    marginTop: 10,
+    alignSelf: 'center',
+    opacity: 0.9,
+  },
+});
