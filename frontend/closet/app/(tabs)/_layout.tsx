@@ -1,10 +1,7 @@
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { Tabs, useRouter } from "expo-router";
 import React, { useRef, useState } from "react";
-import {
-  Animated, Image, Modal,
-  Text, TouchableOpacity, View
-} from "react-native";
+import { Animated, Image, Modal, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { styles } from "../../Styles/tabs_layout.styles";
 
@@ -173,7 +170,6 @@ export default function TabLayout() {
             ),
           }}
         />
-        <Tabs.Screen name="analytics" options={{ href: null }} />
       </Tabs>
       <ExpandableFAB />
     </>

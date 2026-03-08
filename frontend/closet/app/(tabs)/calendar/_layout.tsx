@@ -8,7 +8,6 @@ export default function CalendarLayout() {
         <Stack.Screen name="calendar-index" />
         <Stack.Screen name="day" />
         <Stack.Screen name="month" />
-        <Stack.Screen name="calendar-context" options={{ href: null } as any} />
       </Stack>
     </CalendarProvider>
   );
