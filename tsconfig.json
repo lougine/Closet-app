@@ -6,7 +6,8 @@
     "allowJs": true,
     "checkJs": false,
     "forceConsistentCasingInFileNames": false,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "outDir": "./dist"
   },
   "include": [
     "src/**/*.js",
