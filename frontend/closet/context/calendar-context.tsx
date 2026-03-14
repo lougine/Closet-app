@@ -1,5 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { buildApiUrl, buildAuthHeaders } from '../app/api';
 
 export const COLORS = {
   white: '#FFFFFF',
@@ -118,9 +119,8 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
     try {
       setLoading(true);
       const token = await SecureStore.getItemAsync('userToken');
-      // TODO: replace with your real API URL
-      const res = await fetch('https://your-api.com/outfits', {
-        headers: { Authorization: `Bearer ${token}` },
+      const res = await fetch(buildApiUrl('/api/outfits'), {
+        headers: buildAuthHeaders(token),
       });
       const data = await res.json();
       setOutfits(data);
@@ -134,10 +134,9 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
   async function deleteOutfit(id: string) {
     try {
       const token = await SecureStore.getItemAsync('userToken');
-      // TODO: replace with your real API URL
-      await fetch(`https://your-api.com/outfits/${id}`, {
+      await fetch(buildApiUrl(`/api/outfits/${id}`), {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: buildAuthHeaders(token),
       });
       setOutfits((prev) => prev.filter((o) => o._id !== id));
     } catch (e) {

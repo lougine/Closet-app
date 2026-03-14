@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
+import { buildApiUrl, buildAuthHeaders } from '../api';
 import React, { useEffect, useState } from 'react';
 import {
   ActionSheetIOS,
@@ -86,9 +87,8 @@ export default function SettingsScreen() {
     try {
       const token = await SecureStore.getItemAsync('userToken');
       if (!token) return;
-      // TODO: replace with your real API URL
-      const res = await fetch("https://your-api.com/users/me", {
-        headers: { Authorization: `Bearer ${token}` },
+      const res = await fetch(buildApiUrl('/api/users/me'), {
+        headers: buildAuthHeaders(token),
       });
       if (!res.ok) return; // silently show placeholder — no toast
       const data = await res.json();
@@ -147,7 +147,7 @@ export default function SettingsScreen() {
     setBannerUri(null);
     setPickerVisible(false);
     // TODO: save preference to backend
-    // await fetch('https://your-api.com/users/me', { method: 'PUT', body: { bannerPreset: id } })
+    // await fetch(buildApiUrl('/api/users/me'), { method: 'PUT', body: { bannerPreset: id } })
   }
 
   // ── Logout ─────────────────────────────────────────────────────────────────
