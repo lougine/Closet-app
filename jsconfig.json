@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "forceConsistentCasingInFileNames": false,
+    "checkJs": false
+  },
+  "exclude": [
+    "node_modules",
+    "frontend/closet/node_modules"
+  ]
+}

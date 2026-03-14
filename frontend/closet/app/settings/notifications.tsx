@@ -17,6 +17,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
+import { buildApiUrl, buildAuthHeaders } from '../../app/api';
 
 const COLORS = {
   white: '#FFFFFF',
@@ -55,9 +56,8 @@ export default function NotificationsScreen() {
   async function fetchSettings() {
     try {
       const token = await SecureStore.getItemAsync('userToken');
-      // TODO: replace with your real API URL
-      const res = await fetch('https://your-api.com/users/me/notifications', {
-        headers: { Authorization: `Bearer ${token}` },
+      const res = await fetch(buildApiUrl('/api/users/me/notifications'), {
+        headers: buildAuthHeaders(token),
       });
       const data = await res.json();
       setSettings(data);
@@ -76,11 +76,10 @@ export default function NotificationsScreen() {
 
     try {
       const token = await SecureStore.getItemAsync('userToken');
-      // TODO: replace with your real API URL
-      await fetch('https://your-api.com/users/me/notifications', {
+      await fetch(buildApiUrl('/api/users/me/notifications'), {
         method: 'PUT',
         headers: {
-          Authorization: `Bearer ${token}`,
+          ...buildAuthHeaders(token),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(updated),

@@ -6,7 +6,7 @@ import {
 import * as Google from "expo-auth-session/providers/google";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Dimensions,
   Image,
@@ -15,7 +15,10 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Alert,
 } from "react-native";
+import * as SecureStore from "expo-secure-store";
+import { buildApiUrl } from "../api";
 import { styles } from "../../Styles/auth/login.styles";
 
 const { width } = Dimensions.get("window");
@@ -28,8 +31,40 @@ export default function LoginScreen() {
     "Inter-Bold": Inter_700Bold,
   });
 
-  const handleLogin = () => {
-    router.replace("/(tabs)");
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleLogin = async () => {
+    if (!email || !password) {
+      Alert.alert('Missing fields', 'Please enter email and password.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const res = await fetch(buildApiUrl('/api/auth/login'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        const message = err?.message || 'Login failed';
+        Alert.alert('Login failed', message);
+        return;
+      }
+
+      const data = await res.json();
+      await SecureStore.setItemAsync('userToken', data.token);
+      router.replace('/(tabs)');
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Login failed', 'Unable to reach the server.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const [request, response, promptAsync] = Google.useAuthRequest({
@@ -106,6 +141,8 @@ export default function LoginScreen() {
             style={styles.input}
             keyboardType="email-address"
             autoCapitalize="none"
+            value={email}
+            onChangeText={setEmail}
           />
         </View>
 
@@ -123,6 +160,8 @@ export default function LoginScreen() {
             placeholderTextColor="#555"
             style={styles.input}
             secureTextEntry
+            value={password}
+            onChangeText={setPassword}
           />
         </View>
 
@@ -140,9 +179,13 @@ export default function LoginScreen() {
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
-          <Text style={[styles.loginButtonText, { fontFamily: "Inter-Bold" }]}>
-            Sign In
+        <TouchableOpacity
+          style={[styles.loginButton, loading && { opacity: 0.6 }]}
+          onPress={handleLogin}
+          disabled={loading}
+        >
+          <Text style={[styles.loginButtonText, { fontFamily: "Inter-Bold" }]}> 
+            {loading ? 'Signing in...' : 'Sign In'}
           </Text>
         </TouchableOpacity>
 

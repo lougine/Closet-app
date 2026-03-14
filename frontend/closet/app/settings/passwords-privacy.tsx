@@ -11,6 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
+import { buildApiUrl, buildAuthHeaders } from '../../app/api';
 
 const COLORS = {
   white: '#FFFFFF', offWhite: '#F6F6F6', lightGray: '#D9D9D9',
@@ -50,11 +51,10 @@ export default function PasswordsPrivacyScreen() {
     setSavingPw(true);
     try {
       const token = await SecureStore.getItemAsync('userToken');
-      // TODO: replace with your real API URL
-      const res = await fetch('https://your-api.com/users/me/password', {
+      const res = await fetch(buildApiUrl('/api/users/me/password'), {
         method: 'PUT',
         headers: {
-          Authorization: `Bearer ${token}`,
+          ...buildAuthHeaders(token),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ currentPassword: currentPw, newPassword: newPw }),
@@ -80,10 +80,9 @@ export default function PasswordsPrivacyScreen() {
 
     try {
       const token = await SecureStore.getItemAsync('userToken');
-      // TODO: replace with your real API URL
-      await fetch('https://your-api.com/users/me/privacy', {
+      await fetch(buildApiUrl('/api/users/me/privacy'), {
         method: 'PUT',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        headers: { ...buildAuthHeaders(token), 'Content-Type': 'application/json' },
         body: JSON.stringify({
           privateProfile: key === 'privateProfile' ? value : privateProfile,
           allowRecommendations: key === 'allowRecommendations' ? value : allowRecommendations,
