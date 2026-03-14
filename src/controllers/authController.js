@@ -19,7 +19,14 @@ exports.register = async (req, res) => {
       password: hashedPassword
     });
 
-    res.status(201).json({ message: "User registered successfully" });
+    // Automatically return a token so the client can log the user in immediately
+    const token = jwt.sign(
+      { userId: user._id },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    res.status(201).json({ message: "User registered successfully", token });
 
   } catch (error) {
     res.status(500).json({ error: error.message });

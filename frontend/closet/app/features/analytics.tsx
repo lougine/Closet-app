@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as SecureStore from 'expo-secure-store';
+import { buildApiUrl, buildAuthHeaders } from '../api';
 import Svg, {
   Circle, G, Path, Text as SvgText,
 } from 'react-native-svg';
@@ -113,24 +114,22 @@ export default function AnalyticsScreen() {
   async function fetchAll() {
     try {
       const token = await SecureStore.getItemAsync('userToken');
-      const headers = { Authorization: `Bearer ${token}` };
-
-      // TODO: replace all URLs below with your real API base URL
+      const headers = buildAuthHeaders(token);
 
       // Fetch all analytics in parallel for speed
       const [overviewRes, catRes, colourRes, mostRes, leastRes, neverRes] = await Promise.all([
         // GET /analytics/overview → { totalItems, wardrobeUsagePercent, outfitsWorn, totalOutfits }
-        fetch('https://your-api.com/analytics/overview', { headers }),
+        fetch(buildApiUrl('/api/analytics/overview'), { headers }),
         // GET /analytics/categories → [{ name, count }] for Tops/Bottoms/etc.
-        fetch('https://your-api.com/analytics/categories', { headers }),
+        fetch(buildApiUrl('/api/analytics/categories'), { headers }),
         // GET /analytics/colours → [{ colour (hex), label, count }]
-        fetch('https://your-api.com/analytics/colours', { headers }),
+        fetch(buildApiUrl('/api/analytics/colours'), { headers }),
         // GET /analytics/most-worn?limit=6 → top 6 items sorted by wearCount desc
-        fetch('https://your-api.com/analytics/most-worn?limit=6', { headers }),
+        fetch(buildApiUrl('/api/analytics/most-worn?limit=6'), { headers }),
         // GET /analytics/least-worn?limit=6 → items with wearCount > 0, sorted asc
-        fetch('https://your-api.com/analytics/least-worn?limit=6', { headers }),
+        fetch(buildApiUrl('/api/analytics/least-worn?limit=6'), { headers }),
         // GET /analytics/never-worn?limit=6 → items where wearCount === 0
-        fetch('https://your-api.com/analytics/never-worn?limit=6', { headers }),
+        fetch(buildApiUrl('/api/analytics/never-worn?limit=6'), { headers }),
       ]);
 
       setOverview(await overviewRes.json());

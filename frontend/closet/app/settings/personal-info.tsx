@@ -17,6 +17,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
+import { buildApiUrl, buildAuthHeaders } from '../../app/api';
 
 const COLORS = {
   white: '#FFFFFF', offWhite: '#F6F6F6', lightGray: '#D9D9D9',
@@ -83,9 +84,8 @@ export default function PersonalInfoScreen() {
       const token = await SecureStore.getItemAsync('userToken');
       if (!token) { setLoading(false); return; }
 
-      // TODO: replace with your real API URL
-      const res = await fetch('https://your-api.com/users/me', {
-        headers: { Authorization: `Bearer ${token}` },
+      const res = await fetch(buildApiUrl('/api/users/me'), {
+        headers: buildAuthHeaders(token),
       });
 
       if (!res.ok) { setLoading(false); return; } // silently show empty form
@@ -119,11 +119,10 @@ export default function PersonalInfoScreen() {
     setSaving(true);
     try {
       const token = await SecureStore.getItemAsync('userToken');
-      // TODO: replace with your real API URL
-      const res = await fetch('https://your-api.com/users/me', {
+      const res = await fetch(buildApiUrl('/api/users/me'), {
         method: 'PUT',
         headers: {
-          Authorization: `Bearer ${token}`,
+          ...buildAuthHeaders(token),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
