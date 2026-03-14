@@ -1,0 +1,54 @@
+{
+  "expo": {
+    "name": "closet",
+    "slug": "closet",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/Icon.jpeg",
+    "scheme": "closet",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.closet"
+    },
+    "ios": {
+      "infoPlist": {
+        "NSCameraUsageDescription": "Used to add clothing photos",
+        "NSPhotoLibraryUsageDescription": "Used to add clothing photos"
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff",
+          "dark": {
+            "backgroundColor": "#000000"
+          }
+        }
+      ],
+      "expo-font",
+      "expo-secure-store",
+      "expo-web-browser"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}
