@@ -13,6 +13,6 @@ export function buildApiUrl(path: string) {
   return `${API_BASE_URL}${normalizedPath}`;
 }
 
-export function buildAuthHeaders(token?: string) {
+export function buildAuthHeaders(token?: string | null): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
