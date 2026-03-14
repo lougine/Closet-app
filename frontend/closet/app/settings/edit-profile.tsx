@@ -21,6 +21,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker'; // lets user pick photo or take one
 import * as SecureStore from 'expo-secure-store';
+import { buildApiUrl, buildAuthHeaders } from '../../app/api';
 
 // ─── COLORS ───────────────────────────────────────────────────────────────────
 const COLORS = {
@@ -50,12 +51,11 @@ export default function EditProfileScreen() {
   async function fetchUser() {
     try {
       const token = await SecureStore.getItemAsync('userToken');
-      // TODO: replace with your real API URL
-      const res = await fetch('https://your-api.com/users/me', {
-        headers: { Authorization: `Bearer ${token}` },
+      const res = await fetch(buildApiUrl('/api/users/me'), {
+        headers: buildAuthHeaders(token),
       });
       const data = await res.json();
-      setUsername(data.username ?? '');
+      setUsername(data.name ?? '');
       setProfilePicture(data.profilePicture ?? null);
     } catch (e) {
       console.error('Failed to load profile:', e);
@@ -133,27 +133,14 @@ export default function EditProfileScreen() {
     try {
       const token = await SecureStore.getItemAsync('userToken');
 
-      // Use FormData to send both the image file and text fields together
-      const formData = new FormData();
-      formData.append('username', username.trim());
-
-      // Only upload image if user picked a new one (local URI, not a remote URL)
-      if (profilePicture && profilePicture.startsWith('file://')) {
-        formData.append('profilePicture', {
-          uri: profilePicture,
-          name: 'profile.jpg',
-          type: 'image/jpeg',
-        } as any);
-      }
-
-      // TODO: replace with your real API URL
-      const res = await fetch('https://your-api.com/users/me', {
+      // Save only the username for now (backend does not support image uploads yet)
+      const res = await fetch(buildApiUrl('/api/users/me'), {
         method: 'PUT',
         headers: {
-          Authorization: `Bearer ${token}`,
-          // Don't set Content-Type manually — FormData sets it with the boundary automatically
+          ...buildAuthHeaders(token),
+          'Content-Type': 'application/json',
         },
-        body: formData,
+        body: JSON.stringify({ name: username.trim() }),
       });
 
       if (!res.ok) throw new Error('Save failed');
