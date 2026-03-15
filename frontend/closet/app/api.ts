@@ -1,7 +1,6 @@
-import { Platform } from 'react-native';
-
 // Local dev server config
-const DEV_HOST = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
+const LAN_IP = '172.17.17.171';
+const DEV_HOST = LAN_IP;
 
 // Update this to your production API when deploying.
 export const API_BASE_URL = __DEV__
