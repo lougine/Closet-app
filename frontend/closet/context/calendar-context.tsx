@@ -1,6 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { buildApiUrl, buildAuthHeaders } from '../app/api';
+import { buildApiUrl, buildAuthHeaders } from '@/constants/api';
 
 export const COLORS = {
   white: '#FFFFFF',

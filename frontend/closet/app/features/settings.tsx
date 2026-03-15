@@ -17,7 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
-import { buildApiUrl, buildAuthHeaders } from '../api';
+import { buildApiUrl, buildAuthHeaders } from '@/constants/api';
 import React, { useEffect, useState } from 'react';
 import {
   ActionSheetIOS,
