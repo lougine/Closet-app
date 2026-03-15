@@ -21,7 +21,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker'; // lets user pick photo or take one
 import * as SecureStore from 'expo-secure-store';
-import { buildApiUrl, buildAuthHeaders } from '../../app/api';
+import { buildApiUrl, buildAuthHeaders } from '@/constants/api';
 
 // ─── COLORS ───────────────────────────────────────────────────────────────────
 const COLORS = {

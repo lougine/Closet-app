@@ -6,7 +6,7 @@ import * as WebBrowser from 'expo-web-browser';
 import React, { useEffect, useState } from 'react';
 import { Alert, Dimensions, Image, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
-import { buildApiUrl } from '../api';
+import { buildApiUrl } from "@/constants/api";
 import { styles } from '../../Styles/auth/signup.styles';
 
 WebBrowser.maybeCompleteAuthSession();
