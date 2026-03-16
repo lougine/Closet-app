@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useState } from "react";
 import { Alert, Dimensions, Image, ScrollView, Share, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import AuthenticatedImage from "../../components/AuthenticatedImage";
 import type { ClothingItem } from "../../context/wardrobeContext";
 import { s } from "../../Styles/wardrobe/item-detail.styles";
 
@@ -78,7 +79,7 @@ export default function ItemDetailScreen() {
 
       <TouchableOpacity style={s.imageWrap} onPress={pickImage} activeOpacity={0.9}>
         {item.image ? (
-          <Image source={{ uri: item.image }} style={s.image} resizeMode="contain" />
+          <AuthenticatedImage source={{ uri: item.image }} style={s.image} resizeMode="contain" />
         ) : (
           <View style={s.imagePlaceholder}>
             <Ionicons name="image-outline" size={64} color="#ccc" />
