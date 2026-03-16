@@ -13,6 +13,12 @@ export function buildApiUrl(path: string) {
   return `${API_BASE_URL}${normalizedPath}`;
 }
 
+export function buildImageUrl(imagePath: string) {
+  // Remove leading slash if present since buildApiUrl adds it
+  const cleanPath = imagePath.startsWith('/') ? imagePath.slice(1) : imagePath;
+  return buildApiUrl(cleanPath);
+}
+
 export function buildAuthHeaders(token?: string | null): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
