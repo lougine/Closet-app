@@ -2,6 +2,7 @@ import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useLocalSearchParams } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import { Animated, Dimensions, FlatList, Image, StatusBar, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from "react-native";
+import AuthenticatedImage from "../../components/AuthenticatedImage";
 import { useWardrobe } from "../../context/wardrobeContext";
 import { PANEL_W, PINK, s } from "../../Styles/styling.styles";
 
@@ -108,7 +109,7 @@ function WardrobePanel({
                 activeOpacity={0.8}
               >
                 {item.image
-                  ? <Image source={{ uri: item.image }} style={s.panelImg} resizeMode="cover" />
+                  ? <AuthenticatedImage source={{ uri: item.image }} style={s.panelImg} resizeMode="cover" />
                   : <Text style={s.panelItemEmoji}>👗</Text>
                 }
                 {isSelected && (

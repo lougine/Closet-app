@@ -8,9 +8,9 @@ import { PINK, s } from "../../Styles/wardrobe/outfit.styles";
 export default function OutfitScreen() {
   const router = useRouter();
   const { items } = useWardrobe();
-  const [selected, setSelected] = useState<number[]>([]);
+  const [selected, setSelected] = useState<string[]>([]);
 
-  const toggle = (id: number) =>
+  const toggle = (id: string) =>
     setSelected((prev) =>
       prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
     );
