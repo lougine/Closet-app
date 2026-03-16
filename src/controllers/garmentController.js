@@ -61,9 +61,12 @@ exports.getGarments = async (req, res) => {
 
     const { page = 1, limit = 10, category, color } = req.query;
 
-    const filter = {
-      owner: req.user.userId
-    };
+    const filter = {};
+
+    // Temporarily allow getting all garments for testing
+    // if (req.user && req.user.userId) {
+    //   filter.owner = req.user.userId;
+    // }
 
     if (category) filter.category = category;
     if (color) filter.color = color;

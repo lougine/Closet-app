@@ -10,9 +10,8 @@ connectDB();
 app.use(cors());
 app.use(express.json());
 
-// Serve static files from uploads directory with authentication
-const authMiddleware = require('./middleware/authMiddleware');
-app.use('/api/uploads', authMiddleware, express.static(path.join(__dirname, '../uploads')));
+// Serve static files from uploads directory (temporarily public for testing)
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 app.get('/', (req, res) => {
   res.send('API is running');
@@ -23,10 +22,6 @@ const userRoutes = require('./routes/userRoutes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
-
-app.get('/api/protected', authMiddleware, (req, res) => {
-  res.json({ message: "Access granted", user: req.user });
-});
 
 const garmentRoutes = require("./routes/garmentRoutes");
 

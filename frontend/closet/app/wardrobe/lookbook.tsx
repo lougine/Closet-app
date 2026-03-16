@@ -14,10 +14,10 @@ export default function LookbookScreen() {
   const { items } = useWardrobe();
 
   const [name, setName] = useState("");
-  const [selected, setSelected] = useState<number[]>([]);
+  const [selected, setSelected] = useState<string[]>([]);
   const [step, setStep] = useState<"name" | "pick">("name");
 
-  const toggle = (id: number) =>
+  const toggle = (id: string) =>
     setSelected((prev) =>
       prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
     );

@@ -2,9 +2,10 @@ import { Feather, Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
-import { Dimensions, Image, Modal, ScrollView, StatusBar, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Dimensions, Image, Modal, ScrollView, StatusBar, Text, TextInput, TouchableOpacity, View, ActivityIndicator } from "react-native";
 import Svg, { Path } from "react-native-svg";
 import { useWardrobe } from "../../context/wardrobeContext";
+import AuthenticatedImage from "../../components/AuthenticatedImage";
 import { fc, s } from "../../Styles/index.styles";
 
 const { width: W } = Dimensions.get("window");
@@ -15,7 +16,7 @@ function GridItem({ item, onPress }: { item: any; onPress: () => void }) {
   return (
     <TouchableOpacity style={s.gridItem} onPress={onPress}>
       {item.image ? (
-        <Image
+        <AuthenticatedImage
           source={{ uri: item.image }}
           style={s.gridImg}
           resizeMode="cover"
@@ -112,7 +113,7 @@ const Chip = ({ label, active, onPress, }: { label: string; active: boolean;onPr
 
 export default function WardrobeScreen() {
   const router = useRouter();
-  const { items, counts } = useWardrobe();
+  const { items, counts, loading } = useWardrobe();
 
   const [profilePic, setProfilePic] = useState<string | null>(null);
   const [bgImage, setBgImage] = useState<string | null>(null);
@@ -382,7 +383,12 @@ export default function WardrobeScreen() {
                   </TouchableOpacity>
                 </ScrollView>
               )}
-              {items.length === 0 ? (
+              {loading ? (
+                <View style={s.emptyState}>
+                  <ActivityIndicator size="large" color="#E91E63" />
+                  <Text style={s.emptyTitle}>Loading your wardrobe...</Text>
+                </View>
+              ) : items.length === 0 ? (
                 <View style={s.emptyState}>
                   <Text style={s.emptyTitle}>Your wardrobe is empty</Text>
                   <Text style={s.emptySubtitle}>
