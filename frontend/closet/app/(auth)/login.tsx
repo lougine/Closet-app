@@ -18,7 +18,7 @@ import {
   Alert,
 } from "react-native";
 import * as SecureStore from "expo-secure-store";
-import { buildApiUrl } from "../api";
+import { buildApiUrl } from "@/constants/api";
 import { styles } from "../../Styles/auth/login.styles";
 
 const { width } = Dimensions.get("window");

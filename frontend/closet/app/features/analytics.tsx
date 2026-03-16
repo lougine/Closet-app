@@ -18,7 +18,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as SecureStore from 'expo-secure-store';
-import { buildApiUrl, buildAuthHeaders } from '../api';
+import { buildApiUrl, buildAuthHeaders } from '@/constants/api';
 import Svg, {
   Circle, G, Path, Text as SvgText,
 } from 'react-native-svg';

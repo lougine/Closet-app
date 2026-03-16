@@ -11,7 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
-import { buildApiUrl, buildAuthHeaders } from '../../app/api';
+import { buildApiUrl, buildAuthHeaders } from '@/constants/api';
 
 const COLORS = {
   white: '#FFFFFF', offWhite: '#F6F6F6', lightGray: '#D9D9D9',
