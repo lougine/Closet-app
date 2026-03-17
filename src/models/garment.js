@@ -19,6 +19,11 @@ const garmentSchema = new mongoose.Schema({
     type: String
   },
 
+  purchasePrice: {
+    type: Number,
+    min: 0
+  },
+
   imageUrl: {
     type: String
   },
