@@ -24,8 +24,10 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 
 const garmentRoutes = require("./routes/garmentRoutes");
+const usageRoutes = require('./routes/usageRoutes');
 
 app.use("/api/garments", garmentRoutes);
+app.use('/api/usage', usageRoutes);
 
 const outfitRoutes = require("./routes/outfitRoutes");
 const analyticsRoutes = require("./routes/analyticsRoutes");
