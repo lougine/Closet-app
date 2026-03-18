@@ -3,15 +3,25 @@ const router = express.Router();
 
 const garmentController = require("../controllers/garmentController");
 const authMiddleware = require("../middleware/authMiddleware");
-
-// Temporarily allow GET without auth for testing
-router.get("/", garmentController.getGarments);
+const { imageUploadErrorHandler } = require("../middleware/imageUploadMiddleware");
 
 router.use(authMiddleware);
 
-router.post("/", garmentController.uploadImage, garmentController.createGarment);
+router.get("/", garmentController.getGarments);
+
+router.post(
+	"/",
+	garmentController.uploadImage,
+	imageUploadErrorHandler,
+	garmentController.createGarment,
+);
 router.get("/:id", garmentController.getGarmentById);
-router.put("/:id", garmentController.uploadImage, garmentController.updateGarment);
+router.put(
+	"/:id",
+	garmentController.uploadImage,
+	imageUploadErrorHandler,
+	garmentController.updateGarment,
+);
 router.delete("/:id", garmentController.deleteGarment);
 
 module.exports = router;

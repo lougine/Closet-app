@@ -14,11 +14,12 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, Image, Dimensions, ActivityIndicator,
+  TouchableOpacity, Dimensions, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as SecureStore from 'expo-secure-store';
-import { buildApiUrl, buildAuthHeaders } from '@/constants/api';
+import AuthenticatedImage from '@/components/AuthenticatedImage';
+import { buildApiUrl, buildAuthHeaders, buildImageUrl } from '@/constants/api';
 import Svg, {
   Circle, G, Path, Text as SvgText,
 } from 'react-native-svg';
@@ -160,6 +161,11 @@ export default function AnalyticsScreen() {
       const token = await SecureStore.getItemAsync('userToken');
       const headers = buildAuthHeaders(token);
 
+      const normalizeItems = (items: WornItem[]) => items.map((item) => ({
+        ...item,
+        imageUrl: item.imageUrl ? buildImageUrl(item.imageUrl) : item.imageUrl,
+      }));
+
       // Fetch all analytics in parallel for speed
       const [overviewRes, catRes, colourRes, mostRes, leastRes, neverRes, costRes, trendsRes] = await Promise.all([
         // GET /analytics/overview → { totalItems, wardrobeUsagePercent, outfitsWorn, totalOutfits }
@@ -183,9 +189,9 @@ export default function AnalyticsScreen() {
       setOverview(await overviewRes.json());
       setCategories(await catRes.json());
       setColours(await colourRes.json());
-      setMostWorn(await mostRes.json());
-      setLeastWorn(await leastRes.json());
-      setNeverWorn(await neverRes.json());
+      setMostWorn(normalizeItems(await mostRes.json()));
+      setLeastWorn(normalizeItems(await leastRes.json()));
+      setNeverWorn(normalizeItems(await neverRes.json()));
       setCostPerWear(await costRes.json());
       setUsageTrends(await trendsRes.json());
     } catch (e) {
@@ -563,7 +569,7 @@ function UsageSection({
           {items.map((item) => (
             <View key={item._id} style={styles.itemCell}>
               {item.imageUrl ? (
-                <Image source={{ uri: item.imageUrl }} style={styles.itemThumb} resizeMode="cover" />
+                <AuthenticatedImage source={{ uri: item.imageUrl }} style={styles.itemThumb} resizeMode="cover" />
               ) : (
                 <View style={[styles.itemThumb, styles.itemThumbEmpty]}>
                   <Ionicons name="shirt-outline" size={22} color={COLORS.lightGray} />

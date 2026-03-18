@@ -1,37 +1,8 @@
 const Garment = require("../models/garment");
-const multer = require("multer");
-const path = require("path");
+const { createImageUpload } = require("../middleware/imageUploadMiddleware");
+const { deleteImageByUrl } = require("../utils/imageFileUtils");
 
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, 'uploads/');
-  },
-  filename: (req, file, cb) => {
-    // Generate unique filename with timestamp
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
-
-// File filter to allow only images
-const fileFilter = (req, file, cb) => {
-  if (file.mimetype.startsWith('image/')) {
-    cb(null, true);
-  } else {
-    cb(new Error('Only image files are allowed!'), false);
-  }
-};
-
-const upload = multer({
-  storage: storage,
-  fileFilter: fileFilter,
-  limits: {
-    fileSize: 5 * 1024 * 1024 // 5MB limit
-  }
-});
-
-exports.uploadImage = upload.single('image');
+exports.uploadImage = createImageUpload("image");
 
 exports.createGarment = async (req, res) => {
   try {
@@ -61,12 +32,7 @@ exports.getGarments = async (req, res) => {
 
     const { page = 1, limit = 10, category, color } = req.query;
 
-    const filter = {};
-
-    // Temporarily allow getting all garments for testing
-    // if (req.user && req.user.userId) {
-    //   filter.owner = req.user.userId;
-    // }
+    const filter = { owner: req.user.userId };
 
     if (category) filter.category = category;
     if (color) filter.color = color;
@@ -105,21 +71,29 @@ exports.getGarmentById = async (req, res) => {
 
 exports.updateGarment = async (req, res) => {
   try {
-    const updateData = { ...req.body };
-
-    // If a new image was uploaded, update the imageUrl
-    if (req.file) {
-      updateData.imageUrl = `/uploads/${req.file.filename}`;
-    }
-
-    const garment = await Garment.findOneAndUpdate(
-      { _id: req.params.id, owner: req.user.userId },
-      updateData,
-      { new: true }
-    );
+    const garment = await Garment.findOne({
+      _id: req.params.id,
+      owner: req.user.userId,
+    });
 
     if (!garment) {
+      if (req.file) {
+        await deleteImageByUrl(`/uploads/${req.file.filename}`);
+      }
       return res.status(404).json({ message: "Garment not found" });
+    }
+
+    const previousImageUrl = garment.imageUrl;
+
+    Object.assign(garment, req.body);
+    if (req.file) {
+      garment.imageUrl = `/uploads/${req.file.filename}`;
+    }
+
+    await garment.save();
+
+    if (req.file && previousImageUrl && previousImageUrl !== garment.imageUrl) {
+      await deleteImageByUrl(previousImageUrl);
     }
 
     res.json(garment);
@@ -141,6 +115,10 @@ exports.deleteGarment = async (req, res) => {
 
     if (!garment) {
       return res.status(404).json({ message: "Garment not found" });
+    }
+
+    if (garment.imageUrl) {
+      await deleteImageByUrl(garment.imageUrl);
     }
 
     res.json({ message: "Garment deleted" });

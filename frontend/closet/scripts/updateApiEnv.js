@@ -3,6 +3,24 @@ const os = require('os');
 const path = require('path');
 
 const envPath = path.resolve(__dirname, '../.env');
+const backendEnvPath = path.resolve(__dirname, '../../../.env');
+
+function readBackendUploadMaxMb() {
+  try {
+    if (!fs.existsSync(backendEnvPath)) return '5';
+
+    const content = fs.readFileSync(backendEnvPath, 'utf8');
+    const match = content.match(/^IMAGE_UPLOAD_MAX_MB\s*=\s*(.+)\s*$/m);
+    if (!match) return '5';
+
+    const raw = String(match[1]).replace(/^"|"$/g, '').replace(/^'|'$/g, '').trim();
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed) || parsed <= 0) return '5';
+    return String(parsed);
+  } catch {
+    return '5';
+  }
+}
 
 function getLocalIp() {
   const nets = os.networkInterfaces();
@@ -51,9 +69,14 @@ function getLocalIp() {
 
 function writeEnv(ip) {
   const url = `http://${ip}:5000`;
-  const content = `EXPO_PUBLIC_API_BASE_URL=${url}\n`;
+  const uploadMaxMb = readBackendUploadMaxMb();
+  const content = [
+    `EXPO_PUBLIC_API_BASE_URL=${url}`,
+    `EXPO_PUBLIC_IMAGE_UPLOAD_MAX_MB=${uploadMaxMb}`,
+    '',
+  ].join('\n');
   fs.writeFileSync(envPath, content, { encoding: 'utf8' });
-  console.log(`Updated ${path.relative(process.cwd(), envPath)} to ${url}`);
+  console.log(`Updated ${path.relative(process.cwd(), envPath)} to ${url} (upload max ${uploadMaxMb}MB)`);
 }
 
 const ip = getLocalIp();

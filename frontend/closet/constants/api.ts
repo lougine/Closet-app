@@ -14,9 +14,34 @@ export function buildApiUrl(path: string) {
 }
 
 export function buildImageUrl(imagePath: string) {
-  // Remove leading slash if present since buildApiUrl adds it
-  const cleanPath = imagePath.startsWith('/') ? imagePath.slice(1) : imagePath;
-  return buildApiUrl(cleanPath);
+  if (!imagePath) return imagePath;
+
+  if (/^https?:\/\//i.test(imagePath)) {
+    const legacyUploadMatch = imagePath.match(/\/uploads\/([^/?#]+)/i);
+    if (legacyUploadMatch?.[1]) {
+      return buildApiUrl(`/api/uploads/${legacyUploadMatch[1]}`);
+    }
+
+    const protectedMatch = imagePath.match(/\/api\/uploads\/([^/?#]+)/i);
+    if (protectedMatch?.[1]) {
+      return buildApiUrl(`/api/uploads/${protectedMatch[1]}`);
+    }
+
+    return imagePath;
+  }
+
+  const normalizedPath = imagePath.startsWith('/') ? imagePath : `/${imagePath}`;
+
+  if (normalizedPath.startsWith('/api/uploads/')) {
+    return buildApiUrl(normalizedPath);
+  }
+
+  if (normalizedPath.startsWith('/uploads/')) {
+    const filename = normalizedPath.split('/').filter(Boolean).pop();
+    return filename ? buildApiUrl(`/api/uploads/${filename}`) : buildApiUrl(normalizedPath);
+  }
+
+  return buildApiUrl(normalizedPath);
 }
 
 export function buildAuthHeaders(token?: string | null): Record<string, string> {

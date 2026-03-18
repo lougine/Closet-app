@@ -2,10 +2,17 @@ import { Feather, Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useState } from "react";
+import * as SecureStore from "expo-secure-store";
 import { Alert, Dimensions, Image, ScrollView, Share, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AuthenticatedImage from "../../components/AuthenticatedImage";
-import type { ClothingItem } from "../../context/wardrobeContext";
+import {
+  IMAGE_UPLOAD_ASPECT,
+  IMAGE_UPLOAD_QUALITY,
+  validateImageFileSize,
+} from "../../constants/imageUpload";
+import { buildApiUrl, buildImageUrl } from "../../constants/api";
+import { useWardrobe, type ClothingItem } from "../../context/wardrobeContext";
 import { s } from "../../Styles/wardrobe/item-detail.styles";
 
 const { width: W } = Dimensions.get("window");
@@ -21,10 +28,11 @@ const ALL_COLORS = [
 export default function ItemDetailScreen() {
   const router = useRouter();
   const { itemJson } = useLocalSearchParams<{ itemJson: string }>();
+  const { updateItem } = useWardrobe();
 
   const initialItem: ClothingItem = itemJson
     ? JSON.parse(itemJson)
-    : { id: 0, label: "Item", bg: "#fce4ec", category: [], colors: [], tags: [], timesWorn: 0, totalCost: 0 };
+    : { id: "0", label: "Item", bg: "#fce4ec", category: [], colors: [], tags: [], timesWorn: 0, totalCost: 0 };
 
   const [item, setItem] = useState<ClothingItem>(initialItem);
   const [activeTab, setActiveTab] = useState("Details");
@@ -35,6 +43,7 @@ export default function ItemDetailScreen() {
   const [editingBrand, setEditingBrand] = useState(false);
   const [sizeVal, setSizeVal] = useState(item.size ?? "");
   const [brandVal, setBrandVal] = useState(item.brand ?? "");
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   const update = (changes: Partial<ClothingItem>) =>
     setItem((prev) => ({ ...prev, ...changes }));
@@ -57,8 +66,62 @@ export default function ItemDetailScreen() {
   const markWorn = () => update({ timesWorn: (item.timesWorn ?? 0) + 1 });
 
   const pickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({ quality: 0.8 });
-    if (!result.canceled && result.assets[0]) update({ image: result.assets[0].uri });
+    const result = await ImagePicker.launchImageLibraryAsync({
+      allowsEditing: true,
+      aspect: IMAGE_UPLOAD_ASPECT.garment,
+      quality: IMAGE_UPLOAD_QUALITY.itemDetail,
+    });
+    if (result.canceled || !result.assets[0]) return;
+
+    const sizeError = validateImageFileSize(result.assets[0].fileSize, "itemDetail");
+    if (sizeError) {
+      Alert.alert(sizeError.title, sizeError.body);
+      return;
+    }
+
+    const localUri = result.assets[0].uri;
+    update({ image: localUri });
+
+    try {
+      const token = await SecureStore.getItemAsync("userToken");
+      if (!token) {
+        Alert.alert("Session expired", "Please log in again.");
+        return;
+      }
+
+      setUploadingImage(true);
+
+      const formData = new FormData();
+      formData.append("image", {
+        uri: localUri,
+        name: `item-${Date.now()}.jpg`,
+        type: "image/jpeg",
+      } as any);
+
+      const response = await fetch(buildApiUrl(`/api/garments/${item.id}`), {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: "Unable to update image" }));
+        throw new Error(errorData.message || "Unable to update image");
+      }
+
+      const updatedGarment = await response.json();
+      const remoteImage = updatedGarment.imageUrl ? buildImageUrl(updatedGarment.imageUrl) : null;
+      const updatedItem = { ...item, image: remoteImage };
+
+      setItem(updatedItem);
+      updateItem(updatedItem);
+    } catch (error: any) {
+      Alert.alert("Upload failed", error.message || "Unable to update image.");
+    } finally {
+      setUploadingImage(false);
+    }
   };
 
   const cpw = (item.timesWorn ?? 0) > 0
@@ -88,6 +151,11 @@ export default function ItemDetailScreen() {
         <View style={s.cpwPill}>
           <Text style={s.cpwText}>cost/wear ${cpw}</Text>
         </View>
+        {uploadingImage ? (
+          <View style={s.cpwPill}>
+            <Text style={s.cpwText}>Uploading image...</Text>
+          </View>
+        ) : null}
         <View style={s.imageActions}>
           <TouchableOpacity onPress={() => Alert.alert("Delete Item", "Remove this item from your wardrobe?", [
             { text: "Cancel", style: "cancel" },

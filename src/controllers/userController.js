@@ -2,16 +2,24 @@
 const User = require('../models/user');
 // @ts-ignore
 const bcrypt = require('bcryptjs');
+const { createImageUpload } = require('../middleware/imageUploadMiddleware');
+const { deleteImageByUrl } = require('../utils/imageFileUtils');
+
+exports.uploadProfileImage = createImageUpload('profileImage');
+exports.uploadBannerImage = createImageUpload('bannerImage');
+
+const toClientUser = (userDoc) => {
+  const payload = userDoc.toObject();
+  payload.username = payload.name;
+  return payload;
+};
 
 exports.getMe = async (req, res) => {
   try {
     const user = await User.findById(req.user.userId).select('-password');
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    const payload = user.toObject();
-    payload.username = payload.name;
-
-    res.json(payload);
+    res.json(toClientUser(user));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -23,6 +31,8 @@ exports.updateMe = async (req, res) => {
 
     // Prevent password updates through this endpoint
     delete updates.password;
+    delete updates.profilePicture;
+    delete updates.bannerImage;
 
     const user = await User.findByIdAndUpdate(req.user.userId, updates, {
       new: true,
@@ -31,7 +41,84 @@ exports.updateMe = async (req, res) => {
     });
 
     if (!user) return res.status(404).json({ message: 'User not found' });
-    res.json(user);
+    res.json(toClientUser(user));
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.updateProfileImage = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'profileImage file is required.' });
+    }
+
+    const user = await User.findById(req.user.userId).select('-password');
+    if (!user) {
+      await deleteImageByUrl(`/uploads/${req.file.filename}`);
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const previousImage = user.profilePicture;
+    user.profilePicture = `/uploads/${req.file.filename}`;
+    await user.save();
+
+    if (previousImage && previousImage !== user.profilePicture) {
+      await deleteImageByUrl(previousImage);
+    }
+
+    res.json(toClientUser(user));
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.updateBannerImage = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'bannerImage file is required.' });
+    }
+
+    const user = await User.findById(req.user.userId).select('-password');
+    if (!user) {
+      await deleteImageByUrl(`/uploads/${req.file.filename}`);
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const previousBanner = user.bannerImage;
+    user.bannerImage = `/uploads/${req.file.filename}`;
+    await user.save();
+
+    if (previousBanner && previousBanner !== user.bannerImage) {
+      await deleteImageByUrl(previousBanner);
+    }
+
+    res.json(toClientUser(user));
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.updateBannerPreset = async (req, res) => {
+  try {
+    const { bannerPreset } = req.body;
+
+    if (!bannerPreset || typeof bannerPreset !== 'string') {
+      return res.status(400).json({ message: 'bannerPreset is required.' });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.user.userId,
+      { bannerPreset },
+      {
+        new: true,
+        runValidators: true,
+        select: '-password',
+      },
+    );
+
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    res.json(toClientUser(user));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
