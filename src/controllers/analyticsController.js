@@ -10,6 +10,48 @@ const parseLimit = (value, fallback = 6, max = 50) => {
   return Math.min(Math.floor(parsed), max);
 };
 
+const getMonthKey = (date) => (
+  `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`
+);
+
+const buildMonthSeries = (months, monthlyRows) => {
+  const now = new Date();
+  const monthStartUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  monthStartUtc.setUTCMonth(monthStartUtc.getUTCMonth() - (months - 1));
+
+  const wearCountByMonth = new Map(monthlyRows.map((row) => [row.month, row.wearCount]));
+  const series = [];
+
+  for (let i = 0; i < months; i += 1) {
+    const cursor = new Date(monthStartUtc);
+    cursor.setUTCMonth(monthStartUtc.getUTCMonth() + i);
+    const month = getMonthKey(cursor);
+    series.push({ month, wearCount: wearCountByMonth.get(month) || 0 });
+  }
+
+  return series;
+};
+
+const buildDayOfWeekSeries = (dayRows) => {
+  const dayNames = {
+    1: 'Monday',
+    2: 'Tuesday',
+    3: 'Wednesday',
+    4: 'Thursday',
+    5: 'Friday',
+    6: 'Saturday',
+    7: 'Sunday',
+  };
+
+  const wearCountByDay = new Map(dayRows.map((row) => [row._id, row.wearCount]));
+
+  return [1, 2, 3, 4, 5, 6, 7].map((dayNumber) => ({
+    day: dayNames[dayNumber],
+    dayNumber,
+    wearCount: wearCountByDay.get(dayNumber) || 0,
+  }));
+};
+
 const buildGarmentWearAggregation = (userObjectId) => ([
   { $match: { owner: userObjectId } },
   {
@@ -285,7 +327,9 @@ exports.getUsageTrends = async (req, res) => {
     const ownerObjectId = new mongoose.Types.ObjectId(req.user.userId);
     const months = parseLimit(req.query.months, 6, 24);
     const fromDate = new Date();
-    fromDate.setMonth(fromDate.getMonth() - months);
+    fromDate.setUTCDate(1);
+    fromDate.setUTCHours(0, 0, 0, 0);
+    fromDate.setUTCMonth(fromDate.getUTCMonth() - (months - 1));
 
     const trends = await Usage.aggregate([
       {
@@ -349,29 +393,27 @@ exports.getUsageTrends = async (req, res) => {
         },
       },
     ]);
-
-    const dayNames = {
-      1: 'Monday',
-      2: 'Tuesday',
-      3: 'Wednesday',
-      4: 'Thursday',
-      5: 'Friday',
-      6: 'Saturday',
-      7: 'Sunday',
-    };
-
     const result = trends[0] || { monthly: [], dayOfWeek: [], byCategory: [] };
-    const dayOfWeek = result.dayOfWeek.map((item) => ({
-      day: dayNames[item._id] || String(item._id),
-      dayNumber: item._id,
-      wearCount: item.wearCount,
-    }));
+    const monthly = buildMonthSeries(months, result.monthly);
+    const dayOfWeek = buildDayOfWeekSeries(result.dayOfWeek);
+    const totalWearEventsInRange = monthly.reduce((sum, item) => sum + item.wearCount, 0);
+    const mostActiveDay = dayOfWeek.reduce((best, day) => {
+      if (!best || day.wearCount > best.wearCount) return day;
+      return best;
+    }, null);
 
     res.json({
       rangeMonths: months,
-      monthly: result.monthly,
+      rangeStart: fromDate,
+      monthly,
       dayOfWeek,
       byCategory: result.byCategory,
+      summary: {
+        totalWearEventsInRange,
+        mostActiveDay: mostActiveDay && mostActiveDay.wearCount > 0
+          ? { day: mostActiveDay.day, dayNumber: mostActiveDay.dayNumber, wearCount: mostActiveDay.wearCount }
+          : null,
+      },
     });
 
   } catch (error) {
