@@ -16,14 +16,25 @@ import { getUploadErrorMessage, uploadMultipartWithRetry } from "../../services/
 import { useWardrobe, type ClothingItem } from "../../context/wardrobeContext";
 import { s } from "../../Styles/wardrobe/item-detail.styles";
 
-const PINK = "#e83d84";
-
 const DETAIL_TABS = ["Details", "Styles", "Stats"];
 
-const ALL_COLORS = [
-  "#c8c0b0","#999","#111","#7ecec4","#fff","#c4b8e0",
-  PINK,"#f4a0b0","#ffd700","#ff6b6b","#6bcbff","#a0e8a0",
+const COLOR_OPTIONS = [
+  { label: "Black", hex: "#111111" }, { label: "White", hex: "#FFFFFF" },
+  { label: "Grey", hex: "#9E9E9E" }, { label: "Brown", hex: "#795548" },
+  { label: "Beige", hex: "#D7C4A3" }, { label: "Red", hex: "#E53935" },
+  { label: "Pink", hex: "#F48FB1" }, { label: "Purple", hex: "#9C27B0" },
+  { label: "Blue", hex: "#1E88E5" }, { label: "Navy", hex: "#1A237E" },
+  { label: "Green", hex: "#43A047" }, { label: "Yellow", hex: "#FDD835" },
+  { label: "Orange", hex: "#FB8C00" }, { label: "Gold", hex: "#FFD700" },
+  { label: "Mint", hex: "#80CBC4" }, { label: "Cream", hex: "#FFF8E1" },
 ];
+
+const COLOR_HEX_BY_LABEL = COLOR_OPTIONS.reduce<Record<string, string>>((acc, option) => {
+  acc[option.label] = option.hex;
+  return acc;
+}, {});
+
+const resolveColorHex = (value: string) => COLOR_HEX_BY_LABEL[value] || value;
 
 export default function ItemDetailScreen() {
   const router = useRouter();
@@ -44,14 +55,53 @@ export default function ItemDetailScreen() {
   const [sizeVal, setSizeVal] = useState(item.size ?? "");
   const [brandVal, setBrandVal] = useState(item.brand ?? "");
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [savingColor, setSavingColor] = useState(false);
   const [markingWorn, setMarkingWorn] = useState(false);
 
   const update = (changes: Partial<ClothingItem>) =>
     setItem((prev) => ({ ...prev, ...changes }));
 
-  const toggleColor = (c: string) => {
-    const colors = item.colors ?? [];
-    update({ colors: colors.includes(c) ? colors.filter((x) => x !== c) : [...colors, c] });
+  const persistColor = async (nextColor: string | undefined) => {
+    const token = await SecureStore.getItemAsync("userToken");
+    if (!token) {
+      throw new Error("Session expired. Please log in again.");
+    }
+
+    const response = await fetch(buildApiUrl(`/api/garments/${item.id}`), {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ color: nextColor ?? null }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ message: "Unable to update color." }));
+      throw new Error(errorData.message || "Unable to update color.");
+    }
+  };
+
+  const toggleColor = async (colorLabel: string) => {
+    const currentColors = item.colors ?? [];
+    const nextColors = currentColors.includes(colorLabel) ? [] : [colorLabel];
+    const previousColors = currentColors;
+
+    const updatedItem = { ...item, colors: nextColors };
+    setItem(updatedItem);
+    updateItem(updatedItem);
+
+    try {
+      setSavingColor(true);
+      await persistColor(nextColors[0]);
+    } catch (error: any) {
+      const revertedItem = { ...item, colors: previousColors };
+      setItem(revertedItem);
+      updateItem(revertedItem);
+      Alert.alert("Color update failed", getUploadErrorMessage(error, "Unable to update color."));
+    } finally {
+      setSavingColor(false);
+    }
   };
 
   const removeTag = (tag: string) =>
@@ -228,15 +278,16 @@ export default function ItemDetailScreen() {
               </View>
               <View style={s.swatches}>
                 {(item.colors ?? []).map((c, i) => (
-                  <View key={i} style={[s.swatch, { backgroundColor: c }, c === "#fff" && s.swatchBorder]} />
+                  <View key={i} style={[s.swatch, { backgroundColor: resolveColorHex(c) }, resolveColorHex(c) === "#FFFFFF" && s.swatchBorder]} />
                 ))}
               </View>
+              {savingColor ? <Text style={{ color: "#777", fontSize: 12 }}>Saving color...</Text> : null}
               {showColorPicker && (
                 <View style={s.colorPicker}>
-                  {ALL_COLORS.map((c) => (
-                    <TouchableOpacity key={c} onPress={() => toggleColor(c)}>
-                      <View style={[s.swatch, { backgroundColor: c }, c === "#fff" && s.swatchBorder,
-                        (item.colors ?? []).includes(c) && s.swatchSelected]} />
+                  {COLOR_OPTIONS.map(({ label, hex }) => (
+                    <TouchableOpacity key={label} onPress={() => toggleColor(label)}>
+                      <View style={[s.swatch, { backgroundColor: hex }, hex === "#FFFFFF" && s.swatchBorder,
+                        (item.colors ?? []).includes(label) && s.swatchSelected]} />
                     </TouchableOpacity>
                   ))}
                 </View>

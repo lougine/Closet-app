@@ -41,14 +41,22 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      const response = await fetch(buildApiUrl('/api/garments?limit=100'), {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+      const [garmentsResponse, outfitsResponse] = await Promise.all([
+        fetch(buildApiUrl('/api/garments?limit=100'), {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        }),
+        fetch(buildApiUrl('/api/outfits'), {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        }),
+      ]);
 
-      if (response.ok) {
-        const garments = await response.json();
+      if (garmentsResponse.ok) {
+        const garments = await garmentsResponse.json();
+        const outfits = outfitsResponse.ok ? await outfitsResponse.json() : [];
         const formattedItems: ClothingItem[] = garments.map((garment: any) => ({
           id: garment._id,
           image: garment.imageUrl ? buildImageUrl(garment.imageUrl) : null,
@@ -65,12 +73,16 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
         }));
 
         setItems(formattedItems);
-        setCounts(prev => ({ ...prev, items: formattedItems.length }));
+        setCounts(prev => ({
+          ...prev,
+          items: formattedItems.length,
+          outfits: Array.isArray(outfits) ? outfits.length : prev.outfits,
+        }));
       } else {
-        const errorPayload = await response.json().catch(() => ({}));
-        console.error('Failed to fetch garments:', response.status, errorPayload);
+        const errorPayload = await garmentsResponse.json().catch(() => ({}));
+        console.error('Failed to fetch garments:', garmentsResponse.status, errorPayload);
         setItems([]);
-        setCounts(prev => ({ ...prev, items: 0 }));
+        setCounts(prev => ({ ...prev, items: 0, outfits: 0 }));
       }
     } catch (error) {
       console.error('Error fetching garments:', error);

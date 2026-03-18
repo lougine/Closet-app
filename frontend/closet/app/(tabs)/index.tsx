@@ -1,6 +1,7 @@
 import { Feather, Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useFocusEffect, useRouter } from "expo-router";
+import * as SecureStore from "expo-secure-store";
 import React, { useCallback, useState } from "react";
 import { Alert, Dimensions, Modal, ScrollView, StatusBar, Text, TextInput, TouchableOpacity, View, ActivityIndicator } from "react-native";
 import Svg, { Path } from "react-native-svg";
@@ -17,6 +18,7 @@ import {
   uploadProfileImage,
 } from "../../services/userProfileService";
 import { getUploadErrorMessage } from "../../services/uploadRequest";
+import { buildApiUrl, buildAuthHeaders, buildImageUrl } from "../../constants/api";
 import { fc, s } from "../../Styles/index.styles";
 
 const { width: W } = Dimensions.get("window");
@@ -93,6 +95,44 @@ interface FilterState {
   seasons: string[];
   sizes: string[];
 }
+
+type OutfitSummary = {
+  _id: string;
+  name?: string;
+  date?: string;
+  previewImage?: string;
+  garmentIds?: string[];
+  garments?: {
+    _id?: string;
+    imageUrl?: string;
+  }[];
+};
+
+const toIdString = (value: any) => {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  if (value._id) return String(value._id);
+  return String(value);
+};
+
+const normalizeOutfit = (raw: any): OutfitSummary => {
+  const garments = Array.isArray(raw?.garments) ? raw.garments : [];
+  const garmentIds = Array.isArray(raw?.garmentIds)
+    ? raw.garmentIds.map(toIdString).filter(Boolean)
+    : garments.map((garment: any) => toIdString(garment)).filter(Boolean);
+
+  const derivedPreviewImage = garments.find((garment: any) => garment?.imageUrl)?.imageUrl;
+
+  return {
+    _id: toIdString(raw?._id),
+    name: raw?.name,
+    date: raw?.date,
+    previewImage: raw?.previewImage || derivedPreviewImage || undefined,
+    garmentIds,
+    garments,
+  };
+};
+
 const EMPTY_FILTERS: FilterState = {
   category: "",
   subcategories: [],
@@ -138,6 +178,8 @@ export default function WardrobeScreen() {
   const [showFilter, setShowFilter] = useState(false);
   const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS);
   const [uploadingHeaderImage, setUploadingHeaderImage] = useState(false);
+  const [outfits, setOutfits] = useState<OutfitSummary[]>([]);
+  const [loadingOutfits, setLoadingOutfits] = useState(false);
 
   const fetchUserHeaderImages = useCallback(async () => {
     try {
@@ -150,10 +192,38 @@ export default function WardrobeScreen() {
     }
   }, []);
 
+  const fetchOutfits = useCallback(async () => {
+    try {
+      setLoadingOutfits(true);
+      const token = await SecureStore.getItemAsync("userToken");
+      if (!token) {
+        setOutfits([]);
+        return;
+      }
+
+      const response = await fetch(buildApiUrl("/api/outfits"), {
+        headers: buildAuthHeaders(token),
+      });
+
+      if (!response.ok) {
+        setOutfits([]);
+        return;
+      }
+
+      const payload = await response.json();
+      setOutfits(Array.isArray(payload) ? payload.map(normalizeOutfit) : []);
+    } catch {
+      setOutfits([]);
+    } finally {
+      setLoadingOutfits(false);
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       fetchUserHeaderImages();
-    }, [fetchUserHeaderImages]),
+      fetchOutfits();
+    }, [fetchOutfits, fetchUserHeaderImages]),
   );
 
   const switchTab = (idx: number) => {
@@ -493,18 +563,74 @@ export default function WardrobeScreen() {
           )}
 
           {activeTopTab === 1 && (
-            <View style={s.emptyState}>
-              <Text style={s.emptyTitle}>No outfits yet</Text>
-              <Text style={s.emptySubtitle}>
-                Use the + button to create your first outfit
-              </Text>
-              <TouchableOpacity
-                style={s.clearBtn}
-                onPress={() => router.push("/wardrobe/outfit" as any)}
-              >
-                <Text style={s.clearBtnTxt}>Create Outfit</Text>
-              </TouchableOpacity>
-            </View>
+            loadingOutfits ? (
+              <View style={s.emptyState}>
+                <ActivityIndicator size="large" color="#E91E63" />
+                <Text style={s.emptyTitle}>Loading outfits...</Text>
+              </View>
+            ) : outfits.length === 0 ? (
+              <View style={s.emptyState}>
+                <Text style={s.emptyTitle}>No outfits yet</Text>
+                <Text style={s.emptySubtitle}>
+                  Use the + button to create your first outfit
+                </Text>
+                <TouchableOpacity
+                  style={s.clearBtn}
+                  onPress={() => router.push("/wardrobe/outfit" as any)}
+                >
+                  <Text style={s.clearBtnTxt}>Create Outfit</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={s.gridContent}>
+                {outfits.map((outfit) => {
+                  const garmentIds = Array.isArray(outfit.garmentIds) ? outfit.garmentIds : [];
+                  const fallbackPreviewImageFromGarments =
+                    Array.isArray(outfit.garments)
+                      ? outfit.garments.find((garment) => garment?.imageUrl)?.imageUrl
+                      : null;
+                  const fallbackPreviewItem = items.find((item) => garmentIds.includes(String(item.id)) && item.image);
+                  const previewUri = outfit.previewImage
+                    ? buildImageUrl(outfit.previewImage)
+                    : (fallbackPreviewImageFromGarments
+                      ? buildImageUrl(fallbackPreviewImageFromGarments)
+                      : (fallbackPreviewItem?.image || null));
+                  const itemCount = garmentIds.length;
+                  const dateLabel = outfit.date
+                    ? new Date(outfit.date).toLocaleDateString()
+                    : "No date";
+
+                  return (
+                    <TouchableOpacity
+                      key={outfit._id}
+                      style={s.gridItem}
+                      onPress={() =>
+                        router.push({
+                          pathname: "/wardrobe/outfit-detail" as any,
+                          params: { outfitJson: JSON.stringify(outfit) },
+                        })
+                      }
+                    >
+                      {previewUri ? (
+                        <AuthenticatedImage
+                          source={{ uri: previewUri }}
+                          style={s.gridImg}
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <View style={s.gridEmpty} />
+                      )}
+                      <Text style={s.gridLabel} numberOfLines={1}>
+                        {outfit.name || `Outfit • ${itemCount} items`}
+                      </Text>
+                      <Text style={{ position: "absolute", bottom: 18, left: 8, fontSize: 9, color: "#bbb" }}>
+                        {dateLabel}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )
           )}
 
           {activeTopTab === 2 && (
