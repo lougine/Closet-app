@@ -1,15 +1,18 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
-import { FlatList, SafeAreaView, StatusBar, Text, TouchableOpacity, View } from "react-native";
+import * as SecureStore from "expo-secure-store";
+import { Alert, FlatList, SafeAreaView, StatusBar, Text, TouchableOpacity, View } from "react-native";
 import AuthenticatedImage from "../../components/AuthenticatedImage";
+import { buildApiUrl, buildAuthHeaders } from "../../constants/api";
 import { useWardrobe } from "../../context/wardrobeContext";
 import { PINK, s } from "../../Styles/wardrobe/outfit.styles";
 
 export default function OutfitScreen() {
   const router = useRouter();
-  const { items } = useWardrobe();
+  const { items, refreshItems } = useWardrobe();
   const [selected, setSelected] = useState<string[]>([]);
+  const [saving, setSaving] = useState(false);
 
   const toggle = (id: string) =>
     setSelected((prev) =>
@@ -17,6 +20,47 @@ export default function OutfitScreen() {
     );
 
   const selectedItems = items.filter((i) => selected.includes(i.id));
+
+  const handleSave = async () => {
+    if (selected.length < 2 || saving) return;
+
+    const token = await SecureStore.getItemAsync("userToken");
+    if (!token) {
+      Alert.alert("Session expired", "Please log in again.");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const response = await fetch(buildApiUrl("/api/outfits"), {
+        method: "POST",
+        headers: {
+          ...buildAuthHeaders(token),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: `Outfit ${new Date().toLocaleDateString()}`,
+          garments: selected,
+          date: new Date().toISOString(),
+        }),
+      });
+
+      if (!response.ok) {
+        const errorPayload = await response.json().catch(() => ({}));
+        throw new Error(errorPayload?.message || "Could not save outfit");
+      }
+
+      await refreshItems();
+
+      Alert.alert("Saved", "Outfit created successfully.", [
+        { text: "OK", onPress: () => router.back() },
+      ]);
+    } catch (error: any) {
+      Alert.alert("Save failed", error?.message || "Could not save outfit.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <SafeAreaView style={s.root}>
@@ -30,13 +74,11 @@ export default function OutfitScreen() {
         <Text style={s.headerTitle}>Create Outfit</Text>
 
         <TouchableOpacity
-          style={[s.saveBtn, selected.length < 2 && { opacity: 0.4 }]}
-          disabled={selected.length < 2}
-          onPress={() => {
-            router.back();
-          }}
+          style={[s.saveBtn, (selected.length < 2 || saving) && { opacity: 0.4 }]}
+          disabled={selected.length < 2 || saving}
+          onPress={handleSave}
         >
-          <Text style={s.saveBtnText}>Save</Text>
+          <Text style={s.saveBtnText}>{saving ? "Saving..." : "Save"}</Text>
         </TouchableOpacity>
       </View>
 
