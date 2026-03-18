@@ -41,7 +41,7 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      const response = await fetch(buildApiUrl('/api/garments'), {
+      const response = await fetch(buildApiUrl('/api/garments?limit=100'), {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -66,6 +66,11 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
 
         setItems(formattedItems);
         setCounts(prev => ({ ...prev, items: formattedItems.length }));
+      } else {
+        const errorPayload = await response.json().catch(() => ({}));
+        console.error('Failed to fetch garments:', response.status, errorPayload);
+        setItems([]);
+        setCounts(prev => ({ ...prev, items: 0 }));
       }
     } catch (error) {
       console.error('Error fetching garments:', error);

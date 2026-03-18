@@ -401,6 +401,11 @@ export default function WardrobeScreen() {
                   )}
                 </TouchableOpacity>
               </View>
+              {!loading && items.length > 0 && (
+                <Text style={s.resultsCountTxt}>
+                  {filtered.length} {filtered.length === 1 ? "result" : "results"}
+                </Text>
+              )}
               {activeFilterCount > 0 && (
                 <ScrollView
                   horizontal
@@ -634,9 +639,9 @@ export default function WardrobeScreen() {
               onPress={() => setShowFilter(false)}
             >
               <Text style={s.applyBtnTxt}>
-                {activeFilterCount === 0
-                  ? "Show All Items"
-                  : `Show Results · ${activeFilterCount} active`}
+                {filtered.length === items.length
+                  ? `Show All Items · ${items.length}`
+                  : `Show Results · ${filtered.length}`}
               </Text>
             </TouchableOpacity>
           </View>

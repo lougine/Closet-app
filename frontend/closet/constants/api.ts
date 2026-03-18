@@ -1,7 +1,9 @@
 import { Platform } from 'react-native';
 
-// Local dev server config
-const DEV_HOST = Platform.OS === 'android' ? '10.0.2.2' : '10.181.7.13';
+// Local dev server config.
+// Override with EXPO_PUBLIC_DEV_HOST for physical devices on LAN.
+const DEV_HOST = process.env.EXPO_PUBLIC_DEV_HOST
+  || (Platform.OS === 'android' ? '10.0.2.2' : '127.0.0.1');
 
 // Update this to your production API when deploying.
 export const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || (__DEV__
