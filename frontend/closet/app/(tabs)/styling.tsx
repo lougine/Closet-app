@@ -30,6 +30,20 @@ type Recommendation = {
   garments: RecommendedGarment[];
 };
 
+const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, timeoutMessage: string): Promise<T> => {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+};
+
 function WardrobePanel({
   visible, onClose, onSelect, selected,
 }: {
@@ -199,9 +213,13 @@ export default function StylingScreen() {
 
     setLoadingRandomize(true);
     try {
-      const response = await fetch(buildApiUrl("/api/outfits/randomize?count=4"), {
-        headers: buildAuthHeaders(token),
-      });
+      const response = await withTimeout(
+        fetch(buildApiUrl("/api/outfits/randomize?count=4"), {
+          headers: buildAuthHeaders(token),
+        }),
+        12000,
+        "Randomize request timed out. Please try again.",
+      );
 
       if (!response.ok) {
         const errorPayload = await response.json().catch(() => ({}));
@@ -225,18 +243,22 @@ export default function StylingScreen() {
     setLoadingAi(true);
     try {
       const eventInput = inputText.trim() || eventText;
-      const response = await fetch(buildApiUrl("/api/outfits/recommendations"), {
-        method: "POST",
-        headers: {
-          ...buildAuthHeaders(token),
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          event: eventInput,
-          temperatureC,
-          count: 3,
+      const response = await withTimeout(
+        fetch(buildApiUrl("/api/outfits/recommendations"), {
+          method: "POST",
+          headers: {
+            ...buildAuthHeaders(token),
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            event: eventInput,
+            temperatureC,
+            count: 3,
+          }),
         }),
-      });
+        12000,
+        "AI recommendation request timed out. Please try again.",
+      );
 
       if (!response.ok) {
         const errorPayload = await response.json().catch(() => ({}));
@@ -266,6 +288,8 @@ export default function StylingScreen() {
   };
 
   const persistCurrentOutfit = async () => {
+    if (savingOutfit) return;
+
     if (selected.length === 0) {
       Alert.alert("No outfit selected", "Generate or select an outfit first.");
       return;
@@ -280,25 +304,33 @@ export default function StylingScreen() {
       const dateValue = params.date ? new Date(params.date) : new Date();
       const safeDate = Number.isNaN(dateValue.getTime()) ? new Date() : dateValue;
 
-      const response = await fetch(buildApiUrl("/api/outfits"), {
-        method: "POST",
-        headers: {
-          ...buildAuthHeaders(token),
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: selectedRecommendation?.name || `${mode} Outfit`,
-          garments: selected,
-          date: safeDate.toISOString(),
+      const response = await withTimeout(
+        fetch(buildApiUrl("/api/outfits"), {
+          method: "POST",
+          headers: {
+            ...buildAuthHeaders(token),
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: selectedRecommendation?.name || `${mode} Outfit`,
+            garments: selected,
+            date: safeDate.toISOString(),
+          }),
         }),
-      });
+        15000,
+        "Save request timed out. Please check your connection and try again.",
+      );
 
       if (!response.ok) {
         const errorPayload = await response.json().catch(() => ({}));
         throw new Error(errorPayload?.message || "Could not save outfit");
       }
 
-      await refetchCalendar();
+      await withTimeout(
+        refetchCalendar(),
+        10000,
+        "Outfit saved, but calendar refresh timed out. Pull to refresh.",
+      );
 
       Alert.alert("Saved", "Outfit has been added to your calendar.");
     } catch (error: any) {
@@ -394,9 +426,6 @@ export default function StylingScreen() {
         {/* Right action buttons (visible in AI mode) */}
         {mode === "AI recommended" && (
           <View style={s.canvasActions}>
-            <TouchableOpacity style={s.actionBtn} onPress={persistCurrentOutfit} disabled={savingOutfit}>
-              <Ionicons name="checkmark" size={18} color="#fff" />
-            </TouchableOpacity>
             <TouchableOpacity style={s.actionBtn} onPress={cycleRecommendation} disabled={recommendations.length === 0 || loadingAi}>
               <MaterialCommunityIcons name="fit-to-screen-outline" size={18} color="#fff" />
             </TouchableOpacity>
@@ -413,6 +442,19 @@ export default function StylingScreen() {
           </TouchableOpacity>
         )}
       </View>
+
+      <TouchableOpacity
+        style={[
+          s.saveOutfitBtn,
+          (selected.length === 0 || savingOutfit || loadingAi || loadingRandomize) && s.saveOutfitBtnDisabled,
+        ]}
+        onPress={persistCurrentOutfit}
+        disabled={selected.length === 0 || savingOutfit || loadingAi || loadingRandomize}
+      >
+        <Text style={s.saveOutfitBtnTxt}>
+          {savingOutfit ? "Saving outfit..." : "Save outfit"}
+        </Text>
+      </TouchableOpacity>
 
       {/* Context card — AI mode only */}
       {mode === "AI recommended" && (

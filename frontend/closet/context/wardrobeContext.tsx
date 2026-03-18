@@ -3,6 +3,7 @@ import * as SecureStore from "expo-secure-store";
 import { buildApiUrl, buildImageUrl } from "../constants/api";
 
 const LOOKBOOK_IDS_KEY = "lookbookIds";
+const GARMENTS_PAGE_SIZE = 100;
 
 const toIdString = (value: any) => {
   if (!value) return "";
@@ -52,6 +53,38 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
   const [counts, setCounts] = useState({ items: 0, outfits: 0, lookbooks: 0 });
   const [loading, setLoading] = useState(true);
 
+  const fetchAllGarments = async (token: string) => {
+    const allGarments: any[] = [];
+    let page = 1;
+
+    while (true) {
+      const response = await fetch(buildApiUrl(`/api/garments?page=${page}&limit=${GARMENTS_PAGE_SIZE}`), {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        return { ok: false as const, response, garments: [] as any[] };
+      }
+
+      const batch = await response.json();
+      if (!Array.isArray(batch) || batch.length === 0) {
+        break;
+      }
+
+      allGarments.push(...batch);
+
+      if (batch.length < GARMENTS_PAGE_SIZE) {
+        break;
+      }
+
+      page += 1;
+    }
+
+    return { ok: true as const, garments: allGarments };
+  };
+
   const fetchItems = async () => {
     try {
       const token = await SecureStore.getItemAsync('userToken');
@@ -60,12 +93,8 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      const [garmentsResponse, outfitsResponse] = await Promise.all([
-        fetch(buildApiUrl('/api/garments?limit=100'), {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        }),
+      const [garmentsResult, outfitsResponse] = await Promise.all([
+        fetchAllGarments(token),
         fetch(buildApiUrl('/api/outfits'), {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -73,8 +102,8 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
         }),
       ]);
 
-      if (garmentsResponse.ok) {
-        const garments = await garmentsResponse.json();
+      if (garmentsResult.ok) {
+        const garments = garmentsResult.garments;
         const outfits = outfitsResponse.ok ? await outfitsResponse.json() : [];
         const storedLookbookIds = new Set(
           parseStoredLookbookIds(await SecureStore.getItemAsync(LOOKBOOK_IDS_KEY)),
@@ -89,8 +118,8 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
           size: garment.size,
           brand: garment.brand,
           tags: garment.tags || [],
-          timesWorn: 0, // Could be added to backend later
-          totalCost: garment.cost || 0,
+          timesWorn: Number(garment.wearCount) || 0,
+          totalCost: Number(garment.purchasePrice) || 0,
           dateAdded: garment.createdAt ? new Date(garment.createdAt).toLocaleDateString("en-US", { month: "short", year: "numeric" }) : undefined,
         }));
 
@@ -115,8 +144,8 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
           lookbooks: lookbookCount,
         }));
       } else {
-        const errorPayload = await garmentsResponse.json().catch(() => ({}));
-        console.error('Failed to fetch garments:', garmentsResponse.status, errorPayload);
+        const errorPayload = await garmentsResult.response.json().catch(() => ({}));
+        console.error('Failed to fetch garments:', garmentsResult.response.status, errorPayload);
         setItems([]);
         setCounts(prev => ({ ...prev, items: 0, outfits: 0, lookbooks: 0 }));
       }

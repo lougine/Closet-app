@@ -1,16 +1,19 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useMemo } from "react";
+import * as SecureStore from "expo-secure-store";
+import React, { useMemo, useState } from "react";
 import {
+  Alert,
   FlatList,
   SafeAreaView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import AuthenticatedImage from "../../components/AuthenticatedImage";
-import { buildImageUrl } from "../../constants/api";
+import { buildApiUrl, buildAuthHeaders, buildImageUrl } from "../../constants/api";
 import { useWardrobe } from "../../context/wardrobeContext";
 
 type OutfitSummary = {
@@ -42,7 +45,11 @@ const formatCategory = (category: unknown) => {
 export default function OutfitDetailScreen() {
   const router = useRouter();
   const { outfitJson } = useLocalSearchParams<{ outfitJson: string }>();
-  const { items } = useWardrobe();
+  const { items, refreshItems } = useWardrobe();
+  const [editingName, setEditingName] = useState(false);
+  const [nameValue, setNameValue] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const outfit: OutfitSummary | null = useMemo(() => {
     if (!outfitJson) return null;
@@ -86,14 +93,132 @@ export default function OutfitDetailScreen() {
     ? new Date(outfit.date).toLocaleDateString()
     : "No date";
 
+  const saveName = async () => {
+    if (!outfit?._id || saving) return;
+    const trimmed = nameValue.trim();
+    if (!trimmed) {
+      Alert.alert("Missing name", "Please enter a name for this outfit.");
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const token = await SecureStore.getItemAsync("userToken");
+      if (!token) {
+        Alert.alert("Session expired", "Please log in again.");
+        return;
+      }
+
+      const response = await fetch(buildApiUrl(`/api/outfits/${outfit._id}`), {
+        method: "PUT",
+        headers: {
+          ...buildAuthHeaders(token),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ name: trimmed }),
+      });
+
+      if (!response.ok) {
+        const errorPayload = await response.json().catch(() => ({}));
+        throw new Error(errorPayload?.message || "Unable to update outfit name.");
+      }
+
+      await refreshItems();
+      setEditingName(false);
+      router.setParams({
+        outfitJson: JSON.stringify({ ...outfit, name: trimmed }),
+      });
+    } catch (error: any) {
+      Alert.alert("Save failed", error?.message || "Unable to update outfit name.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const confirmDelete = () => {
+    if (!outfit?._id || deleting) return;
+    Alert.alert("Delete Outfit", "This outfit will be permanently removed.", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            setDeleting(true);
+            const token = await SecureStore.getItemAsync("userToken");
+            if (!token) {
+              Alert.alert("Session expired", "Please log in again.");
+              return;
+            }
+
+            const response = await fetch(buildApiUrl(`/api/outfits/${outfit._id}`), {
+              method: "DELETE",
+              headers: buildAuthHeaders(token),
+            });
+
+            if (!response.ok) {
+              const errorPayload = await response.json().catch(() => ({}));
+              throw new Error(errorPayload?.message || "Unable to delete outfit.");
+            }
+
+            await refreshItems();
+            router.back();
+          } catch (error: any) {
+            Alert.alert("Delete failed", error?.message || "Unable to delete outfit.");
+          } finally {
+            setDeleting(false);
+          }
+        },
+      },
+    ]);
+  };
+
   return (
     <SafeAreaView style={styles.root}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={22} color="#1a1a1a" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>{title}</Text>
-        <View style={{ width: 36 }} />
+        {editingName ? (
+          <TextInput
+            style={styles.nameInput}
+            value={nameValue}
+            onChangeText={setNameValue}
+            placeholder="Outfit name"
+            placeholderTextColor="#aaa"
+            autoFocus
+          />
+        ) : (
+          <Text style={styles.headerTitle} numberOfLines={1}>{title}</Text>
+        )}
+        {editingName ? (
+          <TouchableOpacity
+            style={[styles.actionBtn, saving && { opacity: 0.6 }]}
+            onPress={saveName}
+            disabled={saving}
+          >
+            <Ionicons name="checkmark" size={18} color="#1a1a1a" />
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              style={styles.actionBtn}
+              onPress={() => {
+                setNameValue(title);
+                setEditingName(true);
+              }}
+            >
+              <Ionicons name="create-outline" size={18} color="#1a1a1a" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionBtn, deleting && { opacity: 0.6 }]}
+              onPress={confirmDelete}
+              disabled={deleting}
+            >
+              <Ionicons name="trash-outline" size={18} color="#1a1a1a" />
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
       <View style={styles.metaCard}>
@@ -163,6 +288,31 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#1a1a1a",
     textAlign: "center",
+  },
+  headerActions: {
+    width: 72,
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 8,
+  },
+  actionBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  nameInput: {
+    flex: 1,
+    marginHorizontal: 10,
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    height: 36,
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#1a1a1a",
   },
   metaCard: {
     marginHorizontal: 16,

@@ -1,7 +1,7 @@
 import { Feather, Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import * as SecureStore from "expo-secure-store";
 import { Alert, ScrollView, Share, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -39,7 +39,7 @@ const resolveColorHex = (value: string) => COLOR_HEX_BY_LABEL[value] || value;
 export default function ItemDetailScreen() {
   const router = useRouter();
   const { itemJson } = useLocalSearchParams<{ itemJson: string }>();
-  const { updateItem } = useWardrobe();
+  const { updateItem, refreshItems } = useWardrobe();
 
   const initialItem: ClothingItem = itemJson
     ? JSON.parse(itemJson)
@@ -50,13 +50,47 @@ export default function ItemDetailScreen() {
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [showTagInput, setShowTagInput] = useState(false);
   const [newTag, setNewTag] = useState("");
+  const [editingName, setEditingName] = useState(false);
+  const [nameVal, setNameVal] = useState(item.label ?? "");
   const [editingSize, setEditingSize] = useState(false);
   const [editingBrand, setEditingBrand] = useState(false);
   const [sizeVal, setSizeVal] = useState(item.size ?? "");
   const [brandVal, setBrandVal] = useState(item.brand ?? "");
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [savingDetails, setSavingDetails] = useState(false);
   const [savingColor, setSavingColor] = useState(false);
+  const [deletingItem, setDeletingItem] = useState(false);
   const [markingWorn, setMarkingWorn] = useState(false);
+
+  const fetchTimesWorn = async () => {
+    try {
+      const token = await SecureStore.getItemAsync("userToken");
+      if (!token) return;
+
+      const response = await fetch(
+        buildApiUrl(`/api/usage/history?garmentId=${item.id}&page=1&limit=1`),
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+
+      if (!response.ok) return;
+
+      const payload = await response.json();
+      const totalWears = Number(payload?.pagination?.total) || 0;
+      const nextItem = { ...item, timesWorn: totalWears };
+      setItem(nextItem);
+      updateItem(nextItem);
+    } catch {
+      // Keep UI functional if usage stats cannot be fetched.
+    }
+  };
+
+  useEffect(() => {
+    fetchTimesWorn();
+  }, [item.id]);
 
   const update = (changes: Partial<ClothingItem>) =>
     setItem((prev) => ({ ...prev, ...changes }));
@@ -114,6 +148,93 @@ export default function ItemDetailScreen() {
     setShowTagInput(false);
   };
 
+  const persistItemDetails = async () => {
+    const token = await SecureStore.getItemAsync("userToken");
+    if (!token) {
+      throw new Error("Session expired. Please log in again.");
+    }
+
+    const response = await fetch(buildApiUrl(`/api/garments/${item.id}`), {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name: item.label,
+        size: item.size ?? null,
+        brand: item.brand ?? null,
+        tags: item.tags ?? [],
+        color: item.colors?.[0] ?? null,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ message: "Unable to save item changes." }));
+      throw new Error(errorData.message || "Unable to save item changes.");
+    }
+
+    const garment = await response.json();
+    const updatedItem = {
+      ...item,
+      label: garment.name ?? item.label,
+      size: garment.size ?? undefined,
+      brand: garment.brand ?? undefined,
+      tags: Array.isArray(garment.tags) ? garment.tags : (item.tags ?? []),
+      colors: garment.color ? [garment.color] : [],
+    };
+
+    setItem(updatedItem);
+    updateItem(updatedItem);
+  };
+
+  const saveItemDetails = async () => {
+    if (savingDetails) return;
+    try {
+      setSavingDetails(true);
+      await persistItemDetails();
+      await refreshItems();
+      Alert.alert("Saved", "Item changes were updated.");
+    } catch (error: any) {
+      Alert.alert("Save failed", getUploadErrorMessage(error, "Unable to save item changes."));
+    } finally {
+      setSavingDetails(false);
+    }
+  };
+
+  const deleteItem = async () => {
+    if (deletingItem) return;
+    try {
+      const token = await SecureStore.getItemAsync("userToken");
+      if (!token) {
+        Alert.alert("Session expired", "Please log in again.");
+        return;
+      }
+
+      setDeletingItem(true);
+      const response = await fetch(buildApiUrl(`/api/garments/${item.id}`), {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: "Unable to delete item." }));
+        throw new Error(errorData.message || "Unable to delete item.");
+      }
+
+      await refreshItems();
+      Alert.alert("Deleted", "Item removed from your wardrobe.", [
+        { text: "OK", onPress: () => router.back() },
+      ]);
+    } catch (error: any) {
+      Alert.alert("Delete failed", getUploadErrorMessage(error, "Unable to delete item."));
+    } finally {
+      setDeletingItem(false);
+    }
+  };
+
   const markWorn = async () => {
     try {
       const token = await SecureStore.getItemAsync("userToken");
@@ -141,6 +262,7 @@ export default function ItemDetailScreen() {
       const updatedItem = { ...item, timesWorn: (item.timesWorn ?? 0) + 1 };
       setItem(updatedItem);
       updateItem(updatedItem);
+      await fetchTimesWorn();
     } catch (error: any) {
       Alert.alert('Could not mark as worn', error.message || 'Please try again.');
     } finally {
@@ -237,7 +359,7 @@ export default function ItemDetailScreen() {
         <View style={s.imageActions}>
           <TouchableOpacity onPress={() => Alert.alert("Delete Item", "Remove this item from your wardrobe?", [
             { text: "Cancel", style: "cancel" },
-            { text: "Delete", style: "destructive", onPress: () => router.back() },
+            { text: "Delete", style: "destructive", onPress: deleteItem },
           ])}>
             <Ionicons name="trash-outline" size={22} color="#666" />
           </TouchableOpacity>
@@ -259,6 +381,38 @@ export default function ItemDetailScreen() {
       <ScrollView style={s.content} showsVerticalScrollIndicator={false}>
         {activeTab === "Details" && (
           <View>
+            <View style={s.row}>
+              <Text style={s.rowLabel}>Name</Text>
+              {editingName ? (
+                <View style={s.inlineRow}>
+                  <TextInput
+                    autoFocus
+                    style={s.inlineInput}
+                    value={nameVal}
+                    onChangeText={setNameVal}
+                    placeholder="Item name"
+                    placeholderTextColor="#bbb"
+                  />
+                  <TouchableOpacity
+                    style={s.inlineSave}
+                    onPress={() => {
+                      const trimmed = nameVal.trim();
+                      update({ label: trimmed || item.label });
+                      setNameVal(trimmed || item.label);
+                      setEditingName(false);
+                    }}
+                  >
+                    <Text style={s.inlineSaveText}>Save</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity style={s.addBtn} onPress={() => setEditingName(true)}>
+                  <Text style={s.addBtnText}>{item.label || "ADD"}</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            <View style={s.divider} />
+
             <View style={s.row}>
               <Text style={s.rowLabel}>Category</Text>
               <View style={s.categoryPill}>
@@ -359,6 +513,15 @@ export default function ItemDetailScreen() {
                 )}
               </View>
             </View>
+            <View style={s.divider} />
+
+            <TouchableOpacity
+              style={[s.pinkBtn, { marginHorizontal: 20, opacity: (savingDetails || deletingItem) ? 0.7 : 1 }]}
+              onPress={saveItemDetails}
+              disabled={savingDetails || deletingItem}
+            >
+              <Text style={s.pinkBtnText}>{savingDetails ? "Saving..." : "Save Item Changes"}</Text>
+            </TouchableOpacity>
             <View style={s.divider} />
           </View>
         )}

@@ -2,6 +2,7 @@ const express = require('express');
 const fs = require('fs/promises');
 
 const Garment = require('../models/garment');
+const Outfit = require('../models/outfit');
 const User = require('../models/user');
 const authMiddleware = require('../middleware/authMiddleware');
 const { isSafeFilename, resolveUploadPath } = require('../utils/imageFileUtils');
@@ -25,15 +26,16 @@ router.get('/:filename', async (req, res) => {
       return res.status(401).json({ message: 'Invalid token payload.' });
     }
 
-    const [garmentExists, userImageExists] = await Promise.all([
+    const [garmentExists, userImageExists, outfitImageExists] = await Promise.all([
       Garment.exists({ owner: ownerId, imageUrl }),
       User.exists({
         _id: ownerId,
         $or: [{ profilePicture: imageUrl }, { bannerImage: imageUrl }],
       }),
+      Outfit.exists({ owner: ownerId, previewImage: imageUrl }),
     ]);
 
-    if (!garmentExists && !userImageExists) {
+    if (!garmentExists && !userImageExists && !outfitImageExists) {
       return res.status(404).json({ message: 'Image not found.' });
     }
 
