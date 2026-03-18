@@ -44,6 +44,7 @@ export default function ItemDetailScreen() {
   const [sizeVal, setSizeVal] = useState(item.size ?? "");
   const [brandVal, setBrandVal] = useState(item.brand ?? "");
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [markingWorn, setMarkingWorn] = useState(false);
 
   const update = (changes: Partial<ClothingItem>) =>
     setItem((prev) => ({ ...prev, ...changes }));
@@ -63,7 +64,39 @@ export default function ItemDetailScreen() {
     setShowTagInput(false);
   };
 
-  const markWorn = () => update({ timesWorn: (item.timesWorn ?? 0) + 1 });
+  const markWorn = async () => {
+    try {
+      const token = await SecureStore.getItemAsync("userToken");
+      if (!token) {
+        Alert.alert("Session expired", "Please log in again.");
+        return;
+      }
+
+      setMarkingWorn(true);
+
+      const response = await fetch(buildApiUrl('/api/usage/log'), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ garmentId: item.id }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Unable to log wear event' }));
+        throw new Error(errorData.message || 'Unable to log wear event');
+      }
+
+      const updatedItem = { ...item, timesWorn: (item.timesWorn ?? 0) + 1 };
+      setItem(updatedItem);
+      updateItem(updatedItem);
+    } catch (error: any) {
+      Alert.alert('Could not mark as worn', error.message || 'Please try again.');
+    } finally {
+      setMarkingWorn(false);
+    }
+  };
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -314,8 +347,12 @@ export default function ItemDetailScreen() {
                 <Text style={s.statLbl}>Date Added</Text>
               </View>
             </View>
-            <TouchableOpacity style={[s.pinkBtn, { marginTop: 16 }]} onPress={markWorn}>
-              <Text style={s.pinkBtnText}>+ Mark as Worn Today</Text>
+            <TouchableOpacity
+              style={[s.pinkBtn, { marginTop: 16, opacity: markingWorn ? 0.7 : 1 }]}
+              onPress={markWorn}
+              disabled={markingWorn}
+            >
+              <Text style={s.pinkBtnText}>{markingWorn ? 'Saving...' : '+ Mark as Worn Today'}</Text>
             </TouchableOpacity>
           </View>
         )}

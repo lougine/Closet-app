@@ -17,6 +17,7 @@ import {
   TouchableOpacity, Dimensions, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import * as SecureStore from 'expo-secure-store';
 import AuthenticatedImage from '@/components/AuthenticatedImage';
 import { buildApiUrl, buildAuthHeaders, buildImageUrl } from '@/constants/api';
@@ -43,6 +44,9 @@ const CHART_COLORS = [
 ];
 
 const { width: SW } = Dimensions.get('window');
+const TREND_RANGE_OPTIONS = [3, 6, 12] as const;
+type TrendRangeMonths = (typeof TREND_RANGE_OPTIONS)[number];
+const ANALYTICS_TREND_RANGE_KEY = 'analyticsTrendRangeMonths';
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
@@ -113,10 +117,29 @@ type CategoryTrend = {
 
 type UsageTrendsResponse = {
   rangeMonths: number;
+  rangeStart?: string;
   monthly: MonthlyTrend[];
   dayOfWeek: DayTrend[];
   byCategory: CategoryTrend[];
+  summary?: {
+    totalWearEventsInRange: number;
+    mostActiveDay: {
+      day: string;
+      dayNumber: number;
+      wearCount: number;
+    } | null;
+  };
 };
+
+function formatTrendMonth(monthKey: string) {
+  const [year, month] = monthKey.split('-').map(Number);
+  if (!year || !month) return monthKey;
+  return new Date(Date.UTC(year, month - 1, 1)).toLocaleDateString(undefined, {
+    month: 'short',
+    year: '2-digit',
+    timeZone: 'UTC',
+  });
+}
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 
@@ -150,13 +173,79 @@ export default function AnalyticsScreen() {
   const [neverWorn, setNeverWorn] = useState<WornItem[]>([]);
   const [costPerWear, setCostPerWear] = useState<CostPerWearResponse | null>(null);
   const [usageTrends, setUsageTrends] = useState<UsageTrendsResponse | null>(null);
+  const [selectedTrendMonths, setSelectedTrendMonths] = useState<TrendRangeMonths>(6);
+  const [trendLoading, setTrendLoading] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const [wardrobeExpanded, setWardrobeExpanded] = useState(true);
   const [usageExpanded, setUsageExpanded] = useState(true);
 
-  useEffect(() => { fetchAll(); }, []);
+  useEffect(() => {
+    async function initializeAnalytics() {
+      let initialTrendMonths: TrendRangeMonths = 6;
 
-  async function fetchAll() {
+      try {
+        const savedRange = await SecureStore.getItemAsync(ANALYTICS_TREND_RANGE_KEY);
+        const parsed = Number(savedRange);
+        if (TREND_RANGE_OPTIONS.includes(parsed as TrendRangeMonths)) {
+          initialTrendMonths = parsed as TrendRangeMonths;
+          setSelectedTrendMonths(initialTrendMonths);
+        }
+      } catch (error) {
+        console.warn('Failed to load saved trend range:', error);
+      }
+
+      await fetchAll(initialTrendMonths);
+      setInitialLoadComplete(true);
+    }
+
+    initializeAnalytics();
+  }, []);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      if (!initialLoadComplete) return;
+      fetchAll(selectedTrendMonths);
+    }, [initialLoadComplete, selectedTrendMonths])
+  );
+
+  const parseJsonOrThrow = async (res: Response, label: string) => {
+    if (!res.ok) {
+      throw new Error(`${label} request failed (${res.status})`);
+    }
+    return res.json();
+  };
+
+  async function fetchUsageTrends(
+    months: TrendRangeMonths,
+    options: { persistSelection?: boolean; showLoading?: boolean } = {}
+  ) {
+    const { persistSelection = true, showLoading = true } = options;
+
+    try {
+      if (showLoading) {
+        setTrendLoading(true);
+      }
+
+      const token = await SecureStore.getItemAsync('userToken');
+      const headers = buildAuthHeaders(token);
+      const trendsRes = await fetch(buildApiUrl(`/api/analytics/usage-trends?months=${months}`), { headers });
+      setUsageTrends(await parseJsonOrThrow(trendsRes, 'Usage trends'));
+      setSelectedTrendMonths(months);
+
+      if (persistSelection) {
+        await SecureStore.setItemAsync(ANALYTICS_TREND_RANGE_KEY, String(months));
+      }
+    } catch (e) {
+      console.error('Failed to load usage trends:', e);
+    } finally {
+      if (showLoading) {
+        setTrendLoading(false);
+      }
+    }
+  }
+
+  async function fetchAll(initialTrendMonths: TrendRangeMonths = selectedTrendMonths) {
     try {
       const token = await SecureStore.getItemAsync('userToken');
       const headers = buildAuthHeaders(token);
@@ -167,7 +256,7 @@ export default function AnalyticsScreen() {
       }));
 
       // Fetch all analytics in parallel for speed
-      const [overviewRes, catRes, colourRes, mostRes, leastRes, neverRes, costRes, trendsRes] = await Promise.all([
+      const [overviewRes, catRes, colourRes, mostRes, leastRes, neverRes, costRes] = await Promise.all([
         // GET /analytics/overview → { totalItems, wardrobeUsagePercent, outfitsWorn, totalOutfits }
         fetch(buildApiUrl('/api/analytics/overview'), { headers }),
         // GET /analytics/categories → [{ name, count }] for Tops/Bottoms/etc.
@@ -182,18 +271,16 @@ export default function AnalyticsScreen() {
         fetch(buildApiUrl('/api/analytics/never-worn?limit=6'), { headers }),
         // GET /analytics/cost-per-wear?limit=20
         fetch(buildApiUrl('/api/analytics/cost-per-wear?limit=20'), { headers }),
-        // GET /analytics/usage-trends?months=6
-        fetch(buildApiUrl('/api/analytics/usage-trends?months=6'), { headers }),
       ]);
 
-      setOverview(await overviewRes.json());
-      setCategories(await catRes.json());
-      setColours(await colourRes.json());
-      setMostWorn(normalizeItems(await mostRes.json()));
-      setLeastWorn(normalizeItems(await leastRes.json()));
-      setNeverWorn(normalizeItems(await neverRes.json()));
-      setCostPerWear(await costRes.json());
-      setUsageTrends(await trendsRes.json());
+      setOverview(await parseJsonOrThrow(overviewRes, 'Overview'));
+      setCategories(await parseJsonOrThrow(catRes, 'Categories'));
+      setColours(await parseJsonOrThrow(colourRes, 'Colours'));
+      setMostWorn(normalizeItems(await parseJsonOrThrow(mostRes, 'Most worn')));
+      setLeastWorn(normalizeItems(await parseJsonOrThrow(leastRes, 'Least worn')));
+      setNeverWorn(normalizeItems(await parseJsonOrThrow(neverRes, 'Never worn')));
+      setCostPerWear(await parseJsonOrThrow(costRes, 'Cost per wear'));
+      await fetchUsageTrends(initialTrendMonths, { persistSelection: false, showLoading: false });
     } catch (e) {
       console.error('Failed to load analytics:', e);
     } finally {
@@ -221,6 +308,8 @@ export default function AnalyticsScreen() {
   const monthlyTrends = usageTrends?.monthly ?? [];
   const dayOfWeekTrends = usageTrends?.dayOfWeek ?? [];
   const maxMonthlyWear = monthlyTrends.reduce((max, entry) => Math.max(max, entry.wearCount), 0);
+  const trendSummary = usageTrends?.summary;
+  const mostActiveDay = trendSummary?.mostActiveDay;
 
   const costSummary = costPerWear?.summary;
   const costItems = costPerWear?.items ?? [];
@@ -502,14 +591,38 @@ export default function AnalyticsScreen() {
 
           {/* ── Usage trends ── */}
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>Usage Trends 📈</Text>
+            <View style={styles.trendHeaderRow}>
+              <Text style={styles.cardTitle}>Usage Trends 📈</Text>
+              <View style={styles.trendSelectorWrap}>
+                {TREND_RANGE_OPTIONS.map((months) => {
+                  const selected = months === selectedTrendMonths;
+                  return (
+                    <TouchableOpacity
+                      key={months}
+                      style={[styles.trendSelectorPill, selected && styles.trendSelectorPillActive]}
+                      onPress={() => { fetchUsageTrends(months); }}
+                      activeOpacity={0.8}
+                      disabled={trendLoading}
+                    >
+                      <Text style={[styles.trendSelectorText, selected && styles.trendSelectorTextActive]}>{months}m</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+            {trendLoading && (
+              <View style={styles.trendLoadingRow}>
+                <ActivityIndicator size="small" color={COLORS.hotPink} />
+                <Text style={styles.secondarySub}>Updating trends...</Text>
+              </View>
+            )}
             {monthlyTrends.length > 0 ? (
               <>
                 {monthlyTrends.map((entry) => {
                   const width = maxMonthlyWear > 0 ? `${Math.round((entry.wearCount / maxMonthlyWear) * 100)}%` : '0%';
                   return (
                     <View key={entry.month} style={styles.trendRow}>
-                      <Text style={styles.trendLabel}>{entry.month}</Text>
+                      <Text style={styles.trendLabel}>{formatTrendMonth(entry.month)}</Text>
                       <View style={styles.trendTrack}>
                         <View style={[styles.trendFill, { width }]} />
                       </View>
@@ -517,6 +630,15 @@ export default function AnalyticsScreen() {
                     </View>
                   );
                 })}
+
+                <Text style={styles.insightBody}>
+                  Last {usageTrends?.rangeMonths ?? 6} months: {trendSummary?.totalWearEventsInRange ?? 0} wear events
+                </Text>
+                {mostActiveDay && (
+                  <Text style={styles.insightBody}>
+                    Most active day: {mostActiveDay.day} ({mostActiveDay.wearCount} wears)
+                  </Text>
+                )}
 
                 <Text style={styles.trendTitle}>Most active days</Text>
                 <View style={styles.dayTrendWrap}>
@@ -768,6 +890,41 @@ const styles = StyleSheet.create({
   insightBody: { fontSize: 13, color: COLORS.subText, marginTop: 2, lineHeight: 20 },
 
   // ── Trend styles ──────────────────────────────────────────────────────────
+  trendHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  trendSelectorWrap: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  trendSelectorPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: COLORS.offWhite,
+    borderWidth: 1,
+    borderColor: COLORS.lightGray,
+  },
+  trendSelectorPillActive: {
+    backgroundColor: COLORS.hotPink,
+    borderColor: COLORS.hotPink,
+  },
+  trendSelectorText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.subText,
+  },
+  trendSelectorTextActive: {
+    color: COLORS.white,
+  },
+  trendLoadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   trendTitle: { fontSize: 13, fontWeight: '700', color: COLORS.text, marginTop: 8 },
   trendRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   trendLabel: { width: 56, fontSize: 12, color: COLORS.subText },
