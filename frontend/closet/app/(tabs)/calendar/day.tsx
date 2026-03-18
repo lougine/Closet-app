@@ -2,8 +2,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { ActivityIndicator, Alert, Image, Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import OutfitPreviewCollage from '../../../components/OutfitPreviewCollage';
 import { styles } from '../../../Styles/calendar/day.styles';
-import { COLORS, DAYS_SHORT, getWeekDays, isSameDay, MONTHS, OutfitEntry, toDateKey, useCalendar } from '../../../context/calendar-context';
+import { COLORS, DAYS_SHORT, getOutfitForDate, getWeekDays, isSameDay, MONTHS, OutfitEntry, toDateKey, useCalendar } from '../../../context/calendar-context';
 
 export default function DayScreen() {
   const router = useRouter();
@@ -19,7 +20,7 @@ export default function DayScreen() {
 
   const [menuVisible, setMenuVisible] = useState(false);
 
-  const selectedOutfit = outfitMap[toDateKey(selectedDate)];
+  const selectedOutfit = getOutfitForDate(outfitMap, selectedDate);
   const weekDays = getWeekDays(selectedDate);
 
   function prevWeek() {
@@ -39,13 +40,6 @@ export default function DayScreen() {
       new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1)
     );
     router.push('/(tabs)/calendar/month');
-  }
-
-  function goToIndex(mode: 'wardrobe') {
-    router.push({
-      pathname: '/(tabs)',
-      params: { mode, date: toDateKey(selectedDate), tab: 'outfits' },
-    });
   }
 
   function goToStyling(mode: 'create' | 'discover' | 'randomize') {
@@ -104,7 +98,7 @@ export default function DayScreen() {
           {weekDays.map((day, i) => {
             const isSelected = isSameDay(day, selectedDate);
             const isToday = isSameDay(day, new Date());
-            const hasOutfit = !!outfitMap[toDateKey(day)];
+            const hasOutfit = !!getOutfitForDate(outfitMap, day);
 
             return (
               <TouchableOpacity
@@ -172,11 +166,14 @@ export default function DayScreen() {
           />
         </TouchableOpacity>
 
-        <Image
-          source={{ uri: selectedOutfit!.previewImage }}
-          style={styles.outfitImage}
-          resizeMode="contain"
-        />
+        {selectedOutfit?.previewImage || selectedOutfit?.garments?.some((garment) => garment?.imageUrl) ? (
+          <OutfitPreviewCollage outfit={selectedOutfit} style={styles.outfitImage} />
+        ) : (
+          <View style={[styles.outfitImage, { alignItems: 'center', justifyContent: 'center' }]}>
+            <Ionicons name="shirt-outline" size={48} color={COLORS.lightGray} />
+            <Text style={{ marginTop: 8, color: COLORS.subText, fontSize: 12 }}>Outfit saved</Text>
+          </View>
+        )}
 
         <Modal
           transparent
@@ -255,7 +252,7 @@ export default function DayScreen() {
               key={mode}
               style={styles.optionBtn}
               onPress={() => {
-                if (mode === 'wardrobe') goToIndex('wardrobe');
+                if (mode === 'wardrobe') goToStyling('create');
                 else if (mode === 'discover') goToStyling('randomize');
                 else goToStyling(mode);
               }}

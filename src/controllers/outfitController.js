@@ -1,6 +1,9 @@
 const Outfit = require("../models/outfit");
 const Garment = require('../models/garment');
+const User = require('../models/user');
 const Usage = require('../models/usage');
+const { createImageUpload } = require('../middleware/imageUploadMiddleware');
+const { deleteImageByUrl } = require('../utils/imageFileUtils');
 
 const DEFAULT_RANDOMIZE_COUNT = 4;
 const MAX_STYLING_COUNT = 8;
@@ -33,7 +36,7 @@ const mapOutfitForCalendar = (outfitDoc) => {
     ...source,
     userId: toObjectIdString(source.owner),
     garmentIds,
-    previewImage: previewGarment?.imageUrl || '',
+    previewImage: source.previewImage || previewGarment?.imageUrl || '',
   };
 };
 
@@ -130,24 +133,47 @@ const mapGarment = (garment) => ({
   imageUrl: garment.imageUrl,
 });
 
+exports.uploadCoverImage = createImageUpload('coverImage');
+
+const cleanupReplacedPreviewImage = async (owner, previousPreviewImage, nextPreviewImage) => {
+  if (!previousPreviewImage || previousPreviewImage === nextPreviewImage) return;
+
+  const [isGarmentImage, isUserProfileImage] = await Promise.all([
+    Garment.exists({ owner, imageUrl: previousPreviewImage }),
+    User.exists({
+      _id: owner,
+      $or: [{ profilePicture: previousPreviewImage }, { bannerImage: previousPreviewImage }],
+    }),
+  ]);
+
+  // Only delete files that are not referenced by garments/profile images.
+  if (!isGarmentImage && !isUserProfileImage) {
+    await deleteImageByUrl(previousPreviewImage);
+  }
+};
+
 exports.createOutfit = async (req, res) => {
   try {
     const owner = req.user.userId;
     const garments = Array.isArray(req.body.garments) ? req.body.garments : [];
+    let defaultPreviewImage = '';
 
     if (garments.length > 0) {
       const ownedGarments = await Garment.find({
         _id: { $in: garments },
         owner,
-      }).select('_id');
+      }).select('_id imageUrl');
 
       if (ownedGarments.length !== garments.length) {
         return res.status(400).json({ message: 'One or more garments are invalid for this user' });
       }
+
+      defaultPreviewImage = ownedGarments.find((garment) => garment.imageUrl)?.imageUrl || '';
     }
 
     const outfit = new Outfit({
       ...req.body,
+      previewImage: req.body.previewImage || defaultPreviewImage,
       owner
     });
 
@@ -208,6 +234,118 @@ exports.getOutfitsByDate = async (req, res) => {
 
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+};
+
+
+exports.updateOutfit = async (req, res) => {
+  try {
+    const owner = req.user.userId;
+    const hasGarmentsUpdate = Object.prototype.hasOwnProperty.call(req.body || {}, 'garments');
+
+    if (hasGarmentsUpdate && !Array.isArray(req.body.garments)) {
+      return res.status(400).json({ message: 'garments must be an array of garment ids' });
+    }
+
+    const nextGarments = hasGarmentsUpdate ? req.body.garments : [];
+    if (hasGarmentsUpdate && nextGarments.length > 0) {
+      const ownedGarments = await Garment.find({
+        _id: { $in: nextGarments },
+        owner,
+      }).select('_id');
+
+      if (ownedGarments.length !== nextGarments.length) {
+        return res.status(400).json({ message: 'One or more garments are invalid for this user' });
+      }
+    }
+
+    const outfit = await Outfit.findOne({
+      _id: req.params.id,
+      owner,
+    });
+
+    if (!outfit) {
+      if (req.file) {
+        await deleteImageByUrl(`/uploads/${req.file.filename}`);
+      }
+      return res.status(404).json({ message: 'Outfit not found' });
+    }
+
+    const oldPreviewImage = outfit.previewImage;
+
+    Object.assign(outfit, req.body);
+    if (req.file) {
+      outfit.previewImage = `/uploads/${req.file.filename}`;
+    }
+    await outfit.save();
+
+    if (req.file) {
+      await cleanupReplacedPreviewImage(owner, oldPreviewImage, outfit.previewImage);
+    }
+
+    if (hasGarmentsUpdate) {
+      await Usage.deleteMany({
+        user: owner,
+        outfit: outfit._id,
+      });
+
+      if (nextGarments.length > 0) {
+        const wornDate = outfit.date || new Date();
+        const usageDocs = nextGarments.map((garmentId) => ({
+          user: owner,
+          garment: garmentId,
+          outfit: outfit._id,
+          wornDate,
+        }));
+        await Usage.insertMany(usageDocs);
+      }
+    }
+
+    const populated = await Outfit.findById(outfit._id)
+      .populate('garments', '_id imageUrl name category color season');
+
+    return res.json(mapOutfitForCalendar(populated));
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+};
+
+exports.updateOutfitCover = async (req, res) => {
+  try {
+    const owner = req.user.userId;
+
+    const outfit = await Outfit.findOne({
+      _id: req.params.id,
+      owner,
+    });
+
+    if (!outfit) {
+      if (req.file) {
+        await deleteImageByUrl(`/uploads/${req.file.filename}`);
+      }
+      return res.status(404).json({ message: 'Outfit not found' });
+    }
+
+    const previousPreviewImage = outfit.previewImage;
+
+    if (req.file) {
+      outfit.previewImage = `/uploads/${req.file.filename}`;
+    } else if (Object.prototype.hasOwnProperty.call(req.body || {}, 'previewImage')) {
+      outfit.previewImage = req.body.previewImage || '';
+    }
+
+    await outfit.save();
+
+    if (req.file) {
+      await cleanupReplacedPreviewImage(owner, previousPreviewImage, outfit.previewImage);
+    }
+
+    const populated = await Outfit.findById(outfit._id)
+      .populate('garments', '_id imageUrl name category color season');
+
+    return res.json(mapOutfitForCalendar(populated));
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
   }
 };
 

@@ -17,6 +17,11 @@ const outfitSchema = new mongoose.Schema({
     type: Date
   },
 
+  previewImage: {
+    type: String,
+    default: "",
+  },
+
   isLookbook: {
     type: Boolean,
     default: false,

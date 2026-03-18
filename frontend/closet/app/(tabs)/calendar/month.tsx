@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import OutfitPreviewCollage from '../../../components/OutfitPreviewCollage';
 import { styles, SW } from '../../../Styles/calendar/month.styles';
-import { COLORS, DAYS_SHORT, getMonthGrid, getMostWornThisMonth, getStreak, isSameDay, MONTHS, toDateKey, useCalendar } from '../../../context/calendar-context';
+import { COLORS, DAYS_SHORT, getMonthGrid, getMostWornThisMonth, getOutfitForDate, getStreak, isSameDay, MONTHS, toDateKey, useCalendar } from '../../../context/calendar-context';
 
 export default function MonthScreen() {
   const router = useRouter();
@@ -76,7 +77,7 @@ export default function MonthScreen() {
             );
 
           const key = toDateKey(day);
-          const outfit = outfitMap[key];
+          const outfit = getOutfitForDate(outfitMap, day);
           const isToday = isSameDay(day, today);
           const isSelected = isSameDay(day, selectedDate);
 
@@ -108,13 +109,12 @@ export default function MonthScreen() {
               </View>
 
               {outfit && (
-                <Image
-                  source={{ uri: outfit.previewImage }}
+                <OutfitPreviewCollage
+                  outfit={outfit}
                   style={[
                     styles.gridThumb,
                     { width: cellSize - 8, height: cellSize - 8 },
                   ]}
-                  resizeMode="cover"
                 />
               )}
             </TouchableOpacity>
@@ -127,11 +127,7 @@ export default function MonthScreen() {
 
         <View style={styles.analyticsCard}>
           {mostWorn ? (
-            <Image
-              source={{ uri: mostWorn.previewImage }}
-              style={styles.analyticsThumb}
-              resizeMode="cover"
-            />
+            <OutfitPreviewCollage outfit={mostWorn.outfit} style={styles.analyticsThumb} />
           ) : (
             <View style={styles.analyticsThumbEmpty}>
               <Ionicons name="shirt-outline" size={22} color={COLORS.lightGray} />

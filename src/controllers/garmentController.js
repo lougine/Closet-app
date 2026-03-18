@@ -1,4 +1,6 @@
+const mongoose = require('mongoose');
 const Garment = require("../models/garment");
+const Usage = require('../models/usage');
 const { createImageUpload } = require("../middleware/imageUploadMiddleware");
 const { deleteImageByUrl } = require("../utils/imageFileUtils");
 
@@ -37,11 +39,43 @@ exports.getGarments = async (req, res) => {
     if (category) filter.category = category;
     if (color) filter.color = color;
 
+    const ownerObjectId = new mongoose.Types.ObjectId(req.user.userId);
+
     const garments = await Garment.find(filter)
       .skip((page - 1) * limit)
-      .limit(Number(limit));
+      .limit(Number(limit))
+      .lean();
 
-    res.json(garments);
+    const garmentIds = garments.map((garment) => garment._id);
+    let wearCountsByGarmentId = new Map();
+
+    if (garmentIds.length > 0) {
+      const usageCounts = await Usage.aggregate([
+        {
+          $match: {
+            user: ownerObjectId,
+            garment: { $in: garmentIds },
+          },
+        },
+        {
+          $group: {
+            _id: '$garment',
+            count: { $sum: 1 },
+          },
+        },
+      ]);
+
+      wearCountsByGarmentId = new Map(
+        usageCounts.map((row) => [String(row._id), row.count])
+      );
+    }
+
+    const garmentsWithWearCount = garments.map((garment) => ({
+      ...garment,
+      wearCount: wearCountsByGarmentId.get(String(garment._id)) || 0,
+    }));
+
+    res.json(garmentsWithWearCount);
 
   } catch (error) {
     res.status(500).json({ error: error.message });

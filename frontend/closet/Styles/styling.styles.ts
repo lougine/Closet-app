@@ -69,6 +69,25 @@ export const s = StyleSheet.create({
     zIndex: 5,
     ...SHADOW.card,
   },
+  saveOutfitBtn: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    backgroundColor: COLORS.pink,
+    borderRadius: RADIUS.full,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+    zIndex: 6,
+    ...SHADOW.subtle,
+  },
+  saveOutfitBtnDisabled: {
+    opacity: 0.5,
+  },
+  saveOutfitBtnTxt: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "700",
+  },
   canvasEmpty:{
     flex: 1, 
     alignItems: "center", 
