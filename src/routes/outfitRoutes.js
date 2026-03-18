@@ -10,6 +10,8 @@ const {
 
 router.use(authMiddleware);
 
+router.get('/randomize', outfitController.getRandomizedOutfit);
+router.post('/recommendations', outfitController.getAiRecommendations);
 router.post("/", outfitController.createOutfit);
 router.get("/", outfitController.getOutfits);
 router.get('/date/:date', validateDateField({ source: 'params', field: 'date', required: true }), outfitController.getOutfitsByDate);

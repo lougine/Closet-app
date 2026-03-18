@@ -1,4 +1,4 @@
-r// @ts-ignore
+// @ts-ignore
 const User = require('../models/user');
 // @ts-ignore
 const bcrypt = require('bcryptjs');
