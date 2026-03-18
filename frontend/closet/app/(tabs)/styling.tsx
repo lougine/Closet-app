@@ -320,6 +320,7 @@ export default function StylingScreen() {
   }, [mode]);
 
   const selectedItems = items.filter(i => selected.includes(String(i.id)));
+  const selectedGridColumns = Math.min(2, selectedItems.length);
 
   return (
     <View style={s.root}>
@@ -366,8 +367,8 @@ export default function StylingScreen() {
         ) : (
           <FlatList
             data={selectedItems}
-            numColumns={selectedItems.length > 2 ? 2 : selectedItems.length}
-            key={selectedItems.length > 2 ? "2col" : "1col"}
+            numColumns={selectedGridColumns}
+            key={`selected-grid-${selectedGridColumns}`}
             keyExtractor={i => String(i.id)}
             contentContainerStyle={{ padding: 8, gap: 6 }}
             columnWrapperStyle={selectedItems.length > 1 ? { gap: 6 } : undefined}
