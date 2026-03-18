@@ -17,12 +17,22 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
-import { buildApiUrl, buildAuthHeaders } from '@/constants/api';
+import AuthenticatedImage from '@/components/AuthenticatedImage';
+import {
+  IMAGE_UPLOAD_ASPECT,
+  IMAGE_UPLOAD_QUALITY,
+  validateImageFileSize,
+} from '@/constants/imageUpload';
+import {
+  fetchCurrentUserProfile,
+  saveBannerPreset,
+  type UserProfile,
+  uploadBannerImage,
+} from '@/services/userProfileService';
 import React, { useEffect, useState } from 'react';
 import {
   ActionSheetIOS,
   Alert,
-  Image,
   Linking,
   Modal, Platform,
   ScrollView,
@@ -60,14 +70,6 @@ const BANNER_PRESETS = [
   { id: 'charcoal', label: 'Charcoal',  colors: ['#888888', '#2C2C2C'] },
 ];
 
-type UserProfile = {
-  _id: string;
-  username: string;
-  profilePicture: string;
-  bannerImage?: string;   // URL of a user-uploaded banner photo
-  bannerPreset?: string;  // id of a chosen preset (e.g. 'pink')
-};
-
 // ─── COMPONENT ────────────────────────────────────────────────────────────────
 export default function SettingsScreen() {
   const router = useRouter();
@@ -85,20 +87,27 @@ export default function SettingsScreen() {
 
   async function fetchUser() {
     try {
-      const token = await SecureStore.getItemAsync('userToken');
-      if (!token) return;
-      const res = await fetch(buildApiUrl('/api/users/me'), {
-        headers: buildAuthHeaders(token),
-      });
-      if (!res.ok) return; // silently show placeholder — no toast
-      const data = await res.json();
-      setUser(data);
-      if (data.bannerImage) setBannerUri(data.bannerImage);
-      if (data.bannerPreset) setBannerPreset(data.bannerPreset);
+      const profile = await fetchCurrentUserProfile();
+      setUser(profile);
+      if (profile.bannerImage) setBannerUri(profile.bannerImage);
+      if (profile.bannerPreset) setBannerPreset(profile.bannerPreset);
     } catch {
       // Network error — silently degrade, no toast
       console.warn('Settings: could not load user (offline?)');
     }
+  }
+
+  async function uploadBannerPhoto(uri: string) {
+    const updated = await uploadBannerImage(uri);
+    const updatedBanner = updated.bannerImage;
+    const updatedProfile = updated.profilePicture;
+
+    setUser((prev) => (prev ? {
+      ...prev,
+      bannerImage: updatedBanner ?? undefined,
+      profilePicture: updatedProfile ?? prev.profilePicture,
+    } : prev));
+    setBannerUri(updatedBanner);
   }
 
   // ── Banner tap — shows action sheet with preset vs upload options ──────────
@@ -130,24 +139,38 @@ export default function SettingsScreen() {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
-      aspect: [16, 7],
-      quality: 0.85,
+      aspect: IMAGE_UPLOAD_ASPECT.banner,
+      quality: IMAGE_UPLOAD_QUALITY.banner,
     });
     if (!result.canceled) {
-      setBannerUri(result.assets[0].uri);
-      setBannerPreset('');
-      // TODO: upload banner photo to backend
-      // await uploadBanner(result.assets[0].uri);
+      const sizeError = validateImageFileSize(result.assets[0].fileSize, 'banner');
+      if (sizeError) {
+        Alert.alert(sizeError.title, sizeError.body);
+        return;
+      }
+
+      try {
+        setBannerUri(result.assets[0].uri);
+        setBannerPreset('');
+        await uploadBannerPhoto(result.assets[0].uri);
+      } catch (error: any) {
+        Alert.alert('Upload failed', error.message || 'Unable to upload banner image.');
+      }
     }
   }
 
   // Selects a preset and clears any custom photo
-  function selectPreset(id: string) {
+  async function selectPreset(id: string) {
     setBannerPreset(id);
     setBannerUri(null);
     setPickerVisible(false);
-    // TODO: save preference to backend
-    // await fetch(buildApiUrl('/api/users/me'), { method: 'PUT', body: { bannerPreset: id } })
+
+    try {
+      const updated = await saveBannerPreset(id);
+      setUser((prev) => (prev ? { ...prev, bannerPreset: updated.bannerPreset } : prev));
+    } catch (error: any) {
+      Alert.alert('Save failed', error.message || 'Unable to save banner preset.');
+    }
   }
 
   // ── Logout ─────────────────────────────────────────────────────────────────
@@ -229,7 +252,7 @@ export default function SettingsScreen() {
         >
           {bannerUri ? (
             // Custom uploaded photo
-            <Image source={{ uri: bannerUri }} style={styles.bannerImg} resizeMode="cover" />
+            <AuthenticatedImage source={{ uri: bannerUri }} style={styles.bannerImg} resizeMode="cover" />
           ) : (
             // Two-tone preset color (top color + bottom color faking a gradient)
             // Swap for LinearGradient if expo-linear-gradient is installed
@@ -248,7 +271,7 @@ export default function SettingsScreen() {
         <View style={styles.avatarRow}>
           <View style={styles.avatarBorder}>
             {user?.profilePicture ? (
-              <Image source={{ uri: user.profilePicture }} style={styles.avatar} />
+              <AuthenticatedImage source={{ uri: user.profilePicture }} style={styles.avatar} />
             ) : (
               <View style={styles.avatarPlaceholder}>
                 <Ionicons name="person" size={30} color={COLORS.white} />

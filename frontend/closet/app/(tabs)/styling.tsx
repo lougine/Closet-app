@@ -228,7 +228,7 @@ export default function StylingScreen() {
                 onPress={() => toggleItem(String(item.id))}
               >
                 {item.image
-                  ? <Image source={{ uri: item.image }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+                  ? <AuthenticatedImage source={{ uri: item.image }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
                   : <Text style={{ fontSize: 40 }}>👗</Text>
                 }
               </TouchableOpacity>

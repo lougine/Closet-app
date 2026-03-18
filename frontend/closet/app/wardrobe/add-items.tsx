@@ -8,7 +8,12 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as SecureStore from "expo-secure-store";
-import { buildApiUrl } from "../../constants/api";
+import {
+  IMAGE_UPLOAD_ASPECT,
+  IMAGE_UPLOAD_QUALITY,
+  validateImageFileSize,
+} from "../../constants/imageUpload";
+import { buildApiUrl, buildImageUrl } from "../../constants/api";
 import { useWardrobe } from "../../context/wardrobeContext";
 import { s } from "../../Styles/wardrobe/add-items.styles";
 
@@ -45,6 +50,7 @@ export default function AddItemsScreen() {
   const { image: imageParam, source } = useLocalSearchParams<{ image: string; source: string }>();
 
   const [image, setImage] = useState<string | null>(imageParam ?? null);
+  const [imageFileSize, setImageFileSize] = useState<number | null>(null);
   const [form, setForm] = useState<ItemForm>({
     name: "", category: "", colors: [], brand: "",
     size: "", tags: [], cost: "", datePurchased: "",
@@ -58,13 +64,27 @@ export default function AddItemsScreen() {
       if (source === "camera") {
         const { status } = await ImagePicker.requestCameraPermissionsAsync();
         if (status !== "granted") { Alert.alert("Permission denied", "Camera permission is required."); return; }
-        const result = await ImagePicker.launchCameraAsync({ quality: 0.7 });
-        if (!result.canceled) setImage(result.assets[0].uri);
+        const result = await ImagePicker.launchCameraAsync({
+          allowsEditing: true,
+          aspect: IMAGE_UPLOAD_ASPECT.garment,
+          quality: IMAGE_UPLOAD_QUALITY.garment,
+        });
+        if (!result.canceled) {
+          setImage(result.assets[0].uri);
+          setImageFileSize(result.assets[0].fileSize ?? null);
+        }
       } else if (source === "gallery") {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== "granted") { Alert.alert("Permission denied", "Gallery permission is required."); return; }
-        const result = await ImagePicker.launchImageLibraryAsync({ quality: 0.7 });
-        if (!result.canceled) setImage(result.assets[0].uri);
+        const result = await ImagePicker.launchImageLibraryAsync({
+          allowsEditing: true,
+          aspect: IMAGE_UPLOAD_ASPECT.garment,
+          quality: IMAGE_UPLOAD_QUALITY.garment,
+        });
+        if (!result.canceled) {
+          setImage(result.assets[0].uri);
+          setImageFileSize(result.assets[0].fileSize ?? null);
+        }
       }
     }, 400);
     return () => clearTimeout(timer);
@@ -94,6 +114,12 @@ export default function AddItemsScreen() {
   const handleSave = async () => {
     if (!form.name.trim()) { Alert.alert("Missing name", "Please give this item a name."); return; }
     if (!form.category) { Alert.alert("Missing category", "Please select a category."); return; }
+
+    const sizeError = validateImageFileSize(imageFileSize, "garment");
+    if (image && sizeError) {
+      Alert.alert(sizeError.title, sizeError.body);
+      return;
+    }
 
     try {
       setSaving(true);
@@ -163,7 +189,7 @@ export default function AddItemsScreen() {
       // Update local state with the saved garment
       addItem({
         id: savedGarment._id, // MongoDB _id is a string
-        image: savedGarment.imageUrl ? buildApiUrl(savedGarment.imageUrl) : null,
+        image: savedGarment.imageUrl ? buildImageUrl(savedGarment.imageUrl) : null,
         label: savedGarment.name,
         bg: CATEGORY_BG[form.category] ?? "#fce4ec",
         category: [form.category],

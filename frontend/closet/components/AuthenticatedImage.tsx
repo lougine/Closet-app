@@ -1,5 +1,6 @@
-import React from 'react';
-import { Image } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Image, View } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
 
 interface AuthenticatedImageProps {
   source: { uri: string };
@@ -14,16 +15,54 @@ export default function AuthenticatedImage({
   resizeMode = 'cover',
   placeholder
 }: AuthenticatedImageProps) {
-  // Temporarily just use regular Image component for testing
-  console.log('AuthenticatedImage: Using source URI directly:', source.uri);
+  const [token, setToken] = useState<string | null>(null);
+  const [tokenLoaded, setTokenLoaded] = useState(false);
+  const requiresAuth = source.uri.includes('/api/uploads/');
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadToken = async () => {
+      const authToken = await SecureStore.getItemAsync('userToken');
+      if (mounted) {
+        setToken(authToken);
+        setTokenLoaded(true);
+      }
+    };
+
+    loadToken();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const resolvedSource = useMemo(() => {
+    if (!requiresAuth || !token) {
+      return source;
+    }
+
+    return {
+      uri: source.uri,
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    };
+  }, [source, token]);
+
+  if (requiresAuth && !tokenLoaded) {
+    return (
+      <View style={[style, { alignItems: 'center', justifyContent: 'center' }]}>
+        {placeholder || <ActivityIndicator size="small" color="#E91E63" />}
+      </View>
+    );
+  }
+
   return (
     <Image
-      source={source}
+      source={resolvedSource}
       style={style}
       resizeMode={resizeMode}
-      onLoadStart={() => console.log('Image load started')}
-      onLoad={() => console.log('Image loaded successfully')}
-      onError={(error) => console.log('Image load error:', error)}
     />
   );
 }

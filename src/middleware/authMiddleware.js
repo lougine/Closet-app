@@ -8,13 +8,26 @@ module.exports = (req, res, next) => {
     return res.status(401).json({ message: "No token provided" });
   }
 
-  const token = authHeader.split(" ")[1];
+  const parts = authHeader.split(" ");
+  if (parts.length < 2 || !parts[1]) {
+    return res.status(401).json({ message: "Invalid authorization header" });
+  }
+
+  const token = parts[1];
 
   try {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    req.user = decoded;
+    const normalizedUserId = decoded.userId || decoded.id || decoded._id;
+    if (!normalizedUserId) {
+      return res.status(401).json({ message: "Invalid token payload" });
+    }
+
+    req.user = {
+      ...decoded,
+      userId: String(normalizedUserId),
+    };
 
     next();
 

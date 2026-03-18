@@ -5,6 +5,9 @@ const userSchema = new mongoose.Schema({
   required: true, unique: true, index: true},
   email: { type: String, required: true, unique: true, index: true },
   password: { type: String, required: true },
+  profilePicture: { type: String, default: null },
+  bannerImage: { type: String, default: null },
+  bannerPreset: { type: String, default: 'pink' },
 
   preferences: {
     style: [String],
