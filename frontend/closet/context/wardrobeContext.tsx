@@ -2,6 +2,25 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 import * as SecureStore from "expo-secure-store";
 import { buildApiUrl, buildImageUrl } from "../constants/api";
 
+const LOOKBOOK_IDS_KEY = "lookbookIds";
+
+const toIdString = (value: any) => {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  if (value._id) return String(value._id);
+  return String(value);
+};
+
+const parseStoredLookbookIds = (rawValue: string | null) => {
+  if (!rawValue) return [] as string[];
+  try {
+    const parsed = JSON.parse(rawValue);
+    return Array.isArray(parsed) ? parsed.map((value) => String(value)) : [];
+  } catch {
+    return [] as string[];
+  }
+};
+
 export interface ClothingItem {
   id: string; // Changed from number to string to match MongoDB _id
   image?: string | null;
@@ -57,6 +76,9 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
       if (garmentsResponse.ok) {
         const garments = await garmentsResponse.json();
         const outfits = outfitsResponse.ok ? await outfitsResponse.json() : [];
+        const storedLookbookIds = new Set(
+          parseStoredLookbookIds(await SecureStore.getItemAsync(LOOKBOOK_IDS_KEY)),
+        );
         const formattedItems: ClothingItem[] = garments.map((garment: any) => ({
           id: garment._id,
           image: garment.imageUrl ? buildImageUrl(garment.imageUrl) : null,
@@ -72,17 +94,31 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
           dateAdded: garment.createdAt ? new Date(garment.createdAt).toLocaleDateString("en-US", { month: "short", year: "numeric" }) : undefined,
         }));
 
+        const outfitList = Array.isArray(outfits) ? outfits : [];
+        const lookbookCount = outfitList.filter((entry: any) => {
+          const rawFlag = entry?.isLookbook;
+          const entryId = toIdString(entry?._id);
+          return (
+            rawFlag === true ||
+            rawFlag === "true" ||
+            rawFlag === 1 ||
+            storedLookbookIds.has(entryId)
+          );
+        }).length;
+        const outfitCount = outfitList.length - lookbookCount;
+
         setItems(formattedItems);
         setCounts(prev => ({
           ...prev,
           items: formattedItems.length,
-          outfits: Array.isArray(outfits) ? outfits.length : prev.outfits,
+          outfits: outfitCount,
+          lookbooks: lookbookCount,
         }));
       } else {
         const errorPayload = await garmentsResponse.json().catch(() => ({}));
         console.error('Failed to fetch garments:', garmentsResponse.status, errorPayload);
         setItems([]);
-        setCounts(prev => ({ ...prev, items: 0, outfits: 0 }));
+        setCounts(prev => ({ ...prev, items: 0, outfits: 0, lookbooks: 0 }));
       }
     } catch (error) {
       console.error('Error fetching garments:', error);
