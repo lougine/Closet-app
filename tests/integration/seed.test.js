@@ -7,6 +7,7 @@ const User = require('../../src/models/user');
 const Garment = require('../../src/models/garment');
 const Outfit = require('../../src/models/outfit');
 const Usage = require('../../src/models/usage');
+const { cleanupOrphanedUserData } = require('../../src/utils/orphanCleanup');
 
 let mongoServer;
 let app;
@@ -63,6 +64,126 @@ afterAll(async () => {
 });
 
 describe('Seed endpoint', () => {
+  test('deleting a user cascades to garments, outfits, and usage analytics', async () => {
+    const user = await User.create({
+      name: `cascade-${Date.now()}-${Math.random()}`,
+      email: `cascade-${Date.now()}-${Math.random()}@test.com`,
+      password: 'hashed-password',
+    });
+
+    const garment = await Garment.create({
+      name: 'Cascade Garment',
+      category: 'tops',
+      owner: user._id,
+    });
+
+    const outfit = await Outfit.create({
+      name: 'Cascade Outfit',
+      garments: [],
+      owner: user._id,
+    });
+
+    await Usage.create({
+      user: user._id,
+      garment: garment._id,
+      outfit: outfit._id,
+    });
+
+    await User.deleteOne({ _id: user._id });
+
+    const [garmentCount, outfitCount, usageCount] = await Promise.all([
+      Garment.countDocuments({ owner: user._id }),
+      Outfit.countDocuments({ owner: user._id }),
+      Usage.countDocuments({ user: user._id }),
+    ]);
+
+    expect(garmentCount).toBe(0);
+    expect(outfitCount).toBe(0);
+    expect(usageCount).toBe(0);
+  });
+
+  test('findOneAndDelete on a user cascades to garments, outfits, and usage analytics', async () => {
+    const user = await User.create({
+      name: `cascade-findone-${Date.now()}-${Math.random()}`,
+      email: `cascade-findone-${Date.now()}-${Math.random()}@test.com`,
+      password: 'hashed-password',
+    });
+
+    const garment = await Garment.create({
+      name: 'Cascade FindOne Garment',
+      category: 'tops',
+      owner: user._id,
+    });
+
+    const outfit = await Outfit.create({
+      name: 'Cascade FindOne Outfit',
+      garments: [],
+      owner: user._id,
+    });
+
+    await Usage.create({
+      user: user._id,
+      garment: garment._id,
+      outfit: outfit._id,
+    });
+
+    await User.findOneAndDelete({ _id: user._id });
+
+    const [garmentCount, outfitCount, usageCount] = await Promise.all([
+      Garment.countDocuments({ owner: user._id }),
+      Outfit.countDocuments({ owner: user._id }),
+      Usage.countDocuments({ user: user._id }),
+    ]);
+
+    expect(garmentCount).toBe(0);
+    expect(outfitCount).toBe(0);
+    expect(usageCount).toBe(0);
+  });
+
+  test('orphan cleanup removes garments, outfits, and usage records for missing users', async () => {
+    const user = await User.create({
+      name: `orphan-${Date.now()}-${Math.random()}`,
+      email: `orphan-${Date.now()}-${Math.random()}@test.com`,
+      password: 'hashed-password',
+    });
+
+    const garment = await Garment.create({
+      name: 'Orphan Garment',
+      category: 'tops',
+      owner: user._id,
+    });
+
+    const outfit = await Outfit.create({
+      name: 'Orphan Outfit',
+      garments: [garment._id],
+      owner: user._id,
+    });
+
+    await Usage.create({
+      user: user._id,
+      garment: garment._id,
+      outfit: outfit._id,
+    });
+
+    // Bypass Mongoose middleware to simulate an out-of-band user delete.
+    await User.collection.deleteOne({ _id: user._id });
+
+    const summary = await cleanupOrphanedUserData();
+
+    const [garmentCount, outfitCount, usageCount] = await Promise.all([
+      Garment.countDocuments({ owner: user._id }),
+      Outfit.countDocuments({ owner: user._id }),
+      Usage.countDocuments({ user: user._id }),
+    ]);
+
+    expect(summary.garmentsDeleted).toBeGreaterThanOrEqual(1);
+    expect(summary.outfitsDeleted).toBeGreaterThanOrEqual(1);
+    expect(summary.usageDeleted).toBeGreaterThanOrEqual(1);
+    expect(garmentCount).toBe(0);
+    expect(outfitCount).toBe(0);
+    expect(usageCount).toBe(0);
+  });
+
   test('POST /api/seed/generate-user creates linked data for a generated user', async () => {
     const requester = await createRequester();
 
