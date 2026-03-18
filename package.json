@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "jest --runInBand"
+    "test": "jest --runInBand",
+    "cleanup:orphans": "node scripts/cleanup-orphaned-user-data.js"
   },
   "keywords": [],
   "author": "",
