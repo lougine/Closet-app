@@ -60,6 +60,9 @@ type CommunityComment = {
 
 const FEED_PAGE_SIZE = 20;
 
+const COMMUNITY_BASE = '/api/community';
+const LEGACY_COMMUNITY_BASE = '/community';
+
 const CommunityScreen: React.FC = () => {
   const closetItems = [
     require("../../assets/images/favicon.png"),
@@ -98,6 +101,18 @@ const CommunityScreen: React.FC = () => {
     return res.json();
   };
 
+  const communityFetch = async (path: string, init?: RequestInit) => {
+    const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+    const primary = await fetch(buildApiUrl(`${COMMUNITY_BASE}${normalizedPath}`), init);
+
+    // Fallback for environments where backend is mounted at /community instead of /api/community.
+    if (primary.status === 404) {
+      return fetch(buildApiUrl(`${LEGACY_COMMUNITY_BASE}${normalizedPath}`), init);
+    }
+
+    return primary;
+  };
+
   const fetchFeed = useCallback(async (options?: { silent?: boolean; append?: boolean; pageOverride?: number }) => {
     const silent = options?.silent || false;
     const append = options?.append || false;
@@ -117,7 +132,7 @@ const CommunityScreen: React.FC = () => {
         params.append("search", searchQuery.trim());
       }
 
-      const response = await fetch(buildApiUrl(`/api/community/feed?${params.toString()}`), {
+      const response = await communityFetch(`/feed?${params.toString()}`, {
         headers: buildAuthHeaders(token),
       });
 
@@ -178,7 +193,7 @@ const CommunityScreen: React.FC = () => {
   const toggleLike = async (postId: string) => {
     try {
       const token = await SecureStore.getItemAsync("userToken");
-      const response = await fetch(buildApiUrl(`/api/community/posts/${postId}/like`), {
+      const response = await communityFetch(`/posts/${postId}/like`, {
         method: "POST",
         headers: buildAuthHeaders(token),
       });
@@ -193,7 +208,7 @@ const CommunityScreen: React.FC = () => {
   const voteOnPoll = async (postId: string, optionIndex: number) => {
     try {
       const token = await SecureStore.getItemAsync("userToken");
-      const response = await fetch(buildApiUrl(`/api/community/posts/${postId}/vote`), {
+      const response = await communityFetch(`/posts/${postId}/vote`, {
         method: "POST",
         headers: {
           ...buildAuthHeaders(token),
@@ -218,7 +233,7 @@ const CommunityScreen: React.FC = () => {
     try {
       setLoadingCommentsByPost((prev) => ({ ...prev, [postId]: true }));
       const token = await SecureStore.getItemAsync("userToken");
-      const response = await fetch(buildApiUrl(`/api/community/posts/${postId}/comments?limit=20`), {
+      const response = await communityFetch(`/posts/${postId}/comments?limit=20`, {
         headers: buildAuthHeaders(token),
       });
       const data = await parseJsonOrThrow(response, "Load comments");
@@ -237,7 +252,7 @@ const CommunityScreen: React.FC = () => {
     try {
       setSubmittingCommentFor(postId);
       const token = await SecureStore.getItemAsync("userToken");
-      const response = await fetch(buildApiUrl(`/api/community/posts/${postId}/comments`), {
+      const response = await communityFetch(`/posts/${postId}/comments`, {
         method: "POST",
         headers: {
           ...buildAuthHeaders(token),
