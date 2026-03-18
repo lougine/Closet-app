@@ -16,6 +16,7 @@ import {
   uploadBannerImage,
   uploadProfileImage,
 } from "../../services/userProfileService";
+import { getUploadErrorMessage } from "../../services/uploadRequest";
 import { fc, s } from "../../Styles/index.styles";
 
 const { width: W } = Dimensions.get("window");
@@ -136,6 +137,7 @@ export default function WardrobeScreen() {
   );
   const [showFilter, setShowFilter] = useState(false);
   const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS);
+  const [uploadingHeaderImage, setUploadingHeaderImage] = useState(false);
 
   const fetchUserHeaderImages = useCallback(async () => {
     try {
@@ -214,6 +216,7 @@ export default function WardrobeScreen() {
         if (isProfile) setProfilePic(selectedUri);
         else setBgImage(selectedUri);
 
+        setUploadingHeaderImage(true);
         const updatedUser = isProfile
           ? await uploadProfileImage(selectedUri)
           : await uploadBannerImage(selectedUri);
@@ -222,8 +225,9 @@ export default function WardrobeScreen() {
         setBgImage(updatedUser.bannerImage ?? null);
       }
     } catch (error: any) {
-      Alert.alert("Upload failed", error.message || "Unable to update image.");
+      Alert.alert("Upload failed", getUploadErrorMessage(error, "Unable to update image."));
     } finally {
+      setUploadingHeaderImage(false);
       setImageMenuFor(null);
     }
   };
@@ -316,6 +320,9 @@ export default function WardrobeScreen() {
             <Text style={s.analyticsLink}>Style Analytics ›</Text>
           </TouchableOpacity>
         </View>
+        {uploadingHeaderImage ? (
+          <Text style={{ color: "#777", marginBottom: 8 }}>Uploading image...</Text>
+        ) : null}
 
         <View style={s.statsCard}>
           <TouchableOpacity style={s.statItem} onPress={() => switchTab(0)}>

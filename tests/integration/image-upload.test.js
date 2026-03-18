@@ -8,6 +8,7 @@ const { MongoMemoryServer } = require('mongodb-memory-server');
 const User = require('../../src/models/user');
 const Garment = require('../../src/models/garment');
 const { uploadsRoot, extractFilenameFromImageUrl } = require('../../src/utils/imageFileUtils');
+const { cleanupOrphanedUploadFiles } = require('../../src/utils/orphanCleanup');
 
 let mongoServer;
 let app;
@@ -36,7 +37,8 @@ const createUser = async () => User.create({
   password: 'hashed-password',
 });
 
-const imageBuffer = () => Buffer.from('fake-image-binary');
+const VALID_PNG_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAOQf2F8AAAAASUVORK5CYII=';
+const imageBuffer = () => Buffer.from(VALID_PNG_BASE64, 'base64');
 
 const trackImageFromResponse = (response) => {
   const imageUrl = response?.body?.imageUrl;
@@ -123,6 +125,20 @@ describe('Image upload endpoints', () => {
     expect(response.body.message).toMatch(/image/i);
   });
 
+  test('POST /api/garments rejects spoofed image content', async () => {
+    const user = await createUser();
+
+    const response = await request(app)
+      .post('/api/garments')
+      .set(authHeader(user._id.toString()))
+      .field('name', 'Spoofed Image')
+      .field('category', 'Tops')
+      .attach('image', Buffer.from('not-an-image'), { filename: 'spoofed.jpg', contentType: 'image/jpeg' });
+
+    expect(response.status).toBe(400);
+    expect(response.body.message).toMatch(/valid image/i);
+  });
+
   test('POST /api/garments rejects files over 5MB', async () => {
     const user = await createUser();
     const oversizedBuffer = Buffer.alloc(5 * 1024 * 1024 + 1, 1);
@@ -168,6 +184,17 @@ describe('Image upload endpoints', () => {
       .set(authHeader(owner._id.toString()));
 
     expect(ownerResponse.status).toBe(200);
+  });
+
+  test('GET /api/uploads/:filename rejects invalid filenames', async () => {
+    const user = await createUser();
+
+    const response = await request(app)
+      .get('/api/uploads/..%5Cprivate.txt')
+      .set(authHeader(user._id.toString()));
+
+    expect(response.status).toBe(400);
+    expect(response.body.message).toMatch(/invalid filename/i);
   });
 
   test('PUT /api/garments/:id replaces image and removes old file', async () => {
@@ -257,5 +284,33 @@ describe('Image upload endpoints', () => {
 
     expect(presetResponse.status).toBe(200);
     expect(presetResponse.body.bannerPreset).toBe('mint');
+  });
+
+  test('cleanupOrphanedUploadFiles removes only orphaned files outside retention window', async () => {
+    const user = await createUser();
+
+    const createResponse = await request(app)
+      .post('/api/garments')
+      .set(authHeader(user._id.toString()))
+      .field('name', 'Orphan Candidate')
+      .field('category', 'Tops')
+      .attach('image', imageBuffer(), { filename: 'orphan.png', contentType: 'image/png' });
+
+    expect(createResponse.status).toBe(201);
+    const orphanFilename = trackImageFromResponse(createResponse);
+    expect(await fileExists(orphanFilename)).toBe(true);
+
+    await Garment.deleteOne({ _id: createResponse.body._id });
+
+    const dryRunSummary = await cleanupOrphanedUploadFiles({ dryRun: true, retentionDays: 0 });
+    expect(dryRunSummary.orphanFiles).toContain(orphanFilename);
+    expect(dryRunSummary.orphanFilesDeleted).toBe(0);
+
+    const cleanupSummary = await cleanupOrphanedUploadFiles({ dryRun: false, retentionDays: 0 });
+    expect(cleanupSummary.orphanFiles).toContain(orphanFilename);
+    expect(cleanupSummary.orphanFilesDeleted).toBeGreaterThanOrEqual(1);
+    expect(await fileExists(orphanFilename)).toBe(false);
+
+    createdFilenames.delete(orphanFilename);
   });
 });

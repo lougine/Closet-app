@@ -14,6 +14,7 @@ import {
   validateImageFileSize,
 } from "../../constants/imageUpload";
 import { buildApiUrl, buildImageUrl } from "../../constants/api";
+import { getUploadErrorMessage, uploadMultipartWithRetry } from "../../services/uploadRequest";
 import { useWardrobe } from "../../context/wardrobeContext";
 import { s } from "../../Styles/wardrobe/add-items.styles";
 
@@ -57,6 +58,7 @@ export default function AddItemsScreen() {
   });
   const [tagInput, setTagInput] = useState("");
   const [saving, setSaving] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState<string | null>(null);
 
   useEffect(() => {
     if (!source) return;
@@ -135,6 +137,7 @@ export default function AddItemsScreen() {
       let res;
 
       if (image) {
+        setUploadStatus("Uploading image...");
         // If there's an image, send as FormData
         const formData = new FormData();
 
@@ -152,15 +155,22 @@ export default function AddItemsScreen() {
           formData.append('color', form.colors[0]);
         }
 
-        res = await fetch(buildApiUrl('/api/garments'), {
+        const payload = await uploadMultipartWithRetry<any>({
+          endpoint: '/api/garments',
           method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            // Don't set Content-Type for FormData - it will be set automatically
-          },
-          body: formData,
+          token,
+          formData,
+          timeoutMs: 25000,
+          retries: 1,
+          fallbackMessage: 'Unable to upload image.',
         });
+
+        res = {
+          ok: true,
+          json: async () => payload,
+        } as any;
       } else {
+        setUploadStatus(null);
         // No image, send as JSON
         const garmentData = {
           name: form.name.trim(),
@@ -207,8 +217,9 @@ export default function AddItemsScreen() {
 
     } catch (error) {
       console.error('Save error:', error);
-      Alert.alert("Save Failed", "Unable to save item. Please try again.");
+      Alert.alert("Save Failed", getUploadErrorMessage(error, "Unable to save item. Please try again."));
     } finally {
+      setUploadStatus(null);
       setSaving(false);
     }
   };
@@ -224,6 +235,8 @@ export default function AddItemsScreen() {
           {saving ? <ActivityIndicator size="small" color="#fff" /> : <Text style={s.saveBtnText}>Save</Text>}
         </TouchableOpacity>
       </View>
+
+      {uploadStatus ? <Text style={{ textAlign: "center", color: "#666", marginTop: 6 }}>{uploadStatus}</Text> : null}
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <ScrollView style={s.scroll} contentContainerStyle={s.scrollContent}

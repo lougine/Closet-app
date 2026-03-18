@@ -3,7 +3,7 @@ import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useState } from "react";
 import * as SecureStore from "expo-secure-store";
-import { Alert, Dimensions, Image, ScrollView, Share, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Alert, ScrollView, Share, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AuthenticatedImage from "../../components/AuthenticatedImage";
 import {
@@ -12,10 +12,10 @@ import {
   validateImageFileSize,
 } from "../../constants/imageUpload";
 import { buildApiUrl, buildImageUrl } from "../../constants/api";
+import { getUploadErrorMessage, uploadMultipartWithRetry } from "../../services/uploadRequest";
 import { useWardrobe, type ClothingItem } from "../../context/wardrobeContext";
 import { s } from "../../Styles/wardrobe/item-detail.styles";
 
-const { width: W } = Dimensions.get("window");
 const PINK = "#e83d84";
 
 const DETAIL_TABS = ["Details", "Styles", "Stats"];
@@ -131,27 +131,22 @@ export default function ItemDetailScreen() {
         type: "image/jpeg",
       } as any);
 
-      const response = await fetch(buildApiUrl(`/api/garments/${item.id}`), {
-        method: "PUT",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: formData,
+      const updatedGarment = await uploadMultipartWithRetry<any>({
+        endpoint: `/api/garments/${item.id}`,
+        method: 'PUT',
+        token,
+        formData,
+        timeoutMs: 25000,
+        retries: 1,
+        fallbackMessage: 'Unable to update image.',
       });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: "Unable to update image" }));
-        throw new Error(errorData.message || "Unable to update image");
-      }
-
-      const updatedGarment = await response.json();
       const remoteImage = updatedGarment.imageUrl ? buildImageUrl(updatedGarment.imageUrl) : null;
       const updatedItem = { ...item, image: remoteImage };
 
       setItem(updatedItem);
       updateItem(updatedItem);
     } catch (error: any) {
-      Alert.alert("Upload failed", error.message || "Unable to update image.");
+      Alert.alert("Upload failed", getUploadErrorMessage(error, "Unable to update image."));
     } finally {
       setUploadingImage(false);
     }
