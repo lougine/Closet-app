@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
-import { Dimensions, FlatList, Image, SafeAreaView, StatusBar, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Dimensions, FlatList, SafeAreaView, StatusBar, Text, TextInput, TouchableOpacity, View } from "react-native";
+import AuthenticatedImage from "../../components/AuthenticatedImage";
 import { useWardrobe } from "../../context/wardrobeContext";
 import { s, s2 } from "../../Styles/wardrobe/lookbook.styles";
 
@@ -131,7 +132,7 @@ export default function LookbookScreen() {
                     activeOpacity={0.75}
                   >
                     {item.image ? (
-                      <Image
+                      <AuthenticatedImage
                         source={{ uri: item.image }}
                         style={s.gridImg}
                         resizeMode="cover"

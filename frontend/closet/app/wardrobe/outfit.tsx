@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
-import { FlatList, Image, SafeAreaView, StatusBar, Text, TouchableOpacity, View } from "react-native";
+import { FlatList, SafeAreaView, StatusBar, Text, TouchableOpacity, View } from "react-native";
+import AuthenticatedImage from "../../components/AuthenticatedImage";
 import { useWardrobe } from "../../context/wardrobeContext";
 import { PINK, s } from "../../Styles/wardrobe/outfit.styles";
 
@@ -61,7 +62,7 @@ export default function OutfitScreen() {
                 onPress={() => toggle(item.id)}
               >
                 {item.image ? (
-                  <Image
+                  <AuthenticatedImage
                     source={{ uri: item.image }}
                     style={s.previewImg}
                     resizeMode="cover"
@@ -132,7 +133,7 @@ export default function OutfitScreen() {
                 activeOpacity={0.75}
               >
                 {item.image ? (
-                  <Image
+                  <AuthenticatedImage
                     source={{ uri: item.image }}
                     style={s.gridImg}
                     resizeMode="cover"

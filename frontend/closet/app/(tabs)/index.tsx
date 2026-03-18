@@ -1,11 +1,21 @@
 import { Feather, Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
-import { useRouter } from "expo-router";
-import React, { useState } from "react";
-import { Dimensions, Image, Modal, ScrollView, StatusBar, Text, TextInput, TouchableOpacity, View, ActivityIndicator } from "react-native";
+import { useFocusEffect, useRouter } from "expo-router";
+import React, { useCallback, useState } from "react";
+import { Alert, Dimensions, Modal, ScrollView, StatusBar, Text, TextInput, TouchableOpacity, View, ActivityIndicator } from "react-native";
 import Svg, { Path } from "react-native-svg";
 import { useWardrobe } from "../../context/wardrobeContext";
 import AuthenticatedImage from "../../components/AuthenticatedImage";
+import {
+  IMAGE_UPLOAD_ASPECT,
+  IMAGE_UPLOAD_QUALITY,
+  validateImageFileSize,
+} from "../../constants/imageUpload";
+import {
+  fetchCurrentUserProfile,
+  uploadBannerImage,
+  uploadProfileImage,
+} from "../../services/userProfileService";
 import { fc, s } from "../../Styles/index.styles";
 
 const { width: W } = Dimensions.get("window");
@@ -117,6 +127,7 @@ export default function WardrobeScreen() {
 
   const [profilePic, setProfilePic] = useState<string | null>(null);
   const [bgImage, setBgImage] = useState<string | null>(null);
+  const [username, setUsername] = useState("wizliz");
   const [activeTopTab, setActiveTopTab] = useState(0);
   const [activeFilter, setActiveFilter] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
@@ -125,6 +136,23 @@ export default function WardrobeScreen() {
   );
   const [showFilter, setShowFilter] = useState(false);
   const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS);
+
+  const fetchUserHeaderImages = useCallback(async () => {
+    try {
+      const profile = await fetchCurrentUserProfile();
+      setUsername(profile.username || profile.name || "wizliz");
+      setProfilePic(profile.profilePicture ?? null);
+      setBgImage(profile.bannerImage ?? null);
+    } catch (error) {
+      console.warn("Failed to load header images:", error);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchUserHeaderImages();
+    }, [fetchUserHeaderImages]),
+  );
 
   const switchTab = (idx: number) => {
     setActiveTopTab(idx);
@@ -158,15 +186,46 @@ export default function WardrobeScreen() {
     filters.sizes.length;
 
   const pickImage = async (source: "library" | "camera") => {
-    const result =
-      source === "library"
-        ? await ImagePicker.launchImageLibraryAsync({ quality: 0.8 })
-        : await ImagePicker.launchCameraAsync({ quality: 0.8 });
-    if (!result.canceled && result.assets[0]) {
-      if (imageMenuFor === "profile") setProfilePic(result.assets[0].uri);
-      else setBgImage(result.assets[0].uri);
+    try {
+      const isProfile = imageMenuFor === "profile";
+      const pickerOptions: ImagePicker.ImagePickerOptions = {
+        allowsEditing: true,
+        aspect: isProfile ? IMAGE_UPLOAD_ASPECT.profile : IMAGE_UPLOAD_ASPECT.banner,
+        quality: isProfile ? IMAGE_UPLOAD_QUALITY.profile : IMAGE_UPLOAD_QUALITY.banner,
+      };
+
+      const result =
+        source === "library"
+          ? await ImagePicker.launchImageLibraryAsync(pickerOptions)
+          : await ImagePicker.launchCameraAsync(pickerOptions);
+
+      if (!result.canceled && result.assets[0]) {
+        const selectedUri = result.assets[0].uri;
+        const sizeError = validateImageFileSize(
+          result.assets[0].fileSize,
+          isProfile ? "profile" : "banner",
+        );
+
+        if (sizeError) {
+          Alert.alert(sizeError.title, sizeError.body);
+          return;
+        }
+
+        if (isProfile) setProfilePic(selectedUri);
+        else setBgImage(selectedUri);
+
+        const updatedUser = isProfile
+          ? await uploadProfileImage(selectedUri)
+          : await uploadBannerImage(selectedUri);
+
+        setProfilePic(updatedUser.profilePicture ?? null);
+        setBgImage(updatedUser.bannerImage ?? null);
+      }
+    } catch (error: any) {
+      Alert.alert("Upload failed", error.message || "Unable to update image.");
+    } finally {
+      setImageMenuFor(null);
     }
-    setImageMenuFor(null);
   };
 
   const filtered = items.filter((item) => {
@@ -219,7 +278,7 @@ export default function WardrobeScreen() {
           activeOpacity={0.9}
         >
           {bgImage ? (
-            <Image source={{ uri: bgImage }} style={s.bgImage} />
+            <AuthenticatedImage source={{ uri: bgImage }} style={s.bgImage} />
           ) : (
             <View style={s.headerDefault} />
           )}
@@ -238,7 +297,7 @@ export default function WardrobeScreen() {
           onPress={() => setImageMenuFor("profile")}
         >
           {profilePic ? (
-            <Image source={{ uri: profilePic }} style={s.profilePic} />
+            <AuthenticatedImage source={{ uri: profilePic }} style={s.profilePic} />
           ) : (
             <View style={[s.profilePic, s.profilePlaceholder]}>
               <Ionicons name="person" size={36} color="#fff" />
@@ -250,7 +309,7 @@ export default function WardrobeScreen() {
       {/* ── Body — sits on top of header ── */}
       <View style={s.body}>
         <View style={s.usernameRow}>
-          <Text style={s.username}>@wizliz</Text>
+          <Text style={s.username}>@{username}</Text>
           <TouchableOpacity
             onPress={() => router.push("/features/analytics" as any)}
           >
