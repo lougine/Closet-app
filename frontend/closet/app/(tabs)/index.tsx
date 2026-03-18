@@ -1,7 +1,8 @@
 import { Feather, Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useFocusEffect, useRouter } from "expo-router";
-import React, { useCallback, useState } from "react";
+import * as SecureStore from "expo-secure-store";
+import React, { useCallback, useEffect, useState } from "react";
 import { Alert, Dimensions, Modal, ScrollView, StatusBar, Text, TextInput, TouchableOpacity, View, ActivityIndicator } from "react-native";
 import Svg, { Path } from "react-native-svg";
 import { useWardrobe } from "../../context/wardrobeContext";
@@ -16,6 +17,8 @@ import {
   uploadBannerImage,
   uploadProfileImage,
 } from "../../services/userProfileService";
+import { getUploadErrorMessage } from "../../services/uploadRequest";
+import { buildApiUrl, buildAuthHeaders, buildImageUrl } from "../../constants/api";
 import { fc, s } from "../../Styles/index.styles";
 
 const { width: W } = Dimensions.get("window");
@@ -92,6 +95,64 @@ interface FilterState {
   seasons: string[];
   sizes: string[];
 }
+
+type OutfitSummary = {
+  _id: string;
+  name?: string;
+  date?: string;
+  isLookbook?: boolean;
+  previewImage?: string;
+  garmentIds?: string[];
+  garments?: {
+    _id?: string;
+    imageUrl?: string;
+  }[];
+};
+
+const LOOKBOOK_IDS_KEY = "lookbookIds";
+
+const toIdString = (value: any) => {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  if (value._id) return String(value._id);
+  return String(value);
+};
+
+const normalizeOutfit = (raw: any, localLookbookIds: Set<string>): OutfitSummary => {
+  const garments = Array.isArray(raw?.garments) ? raw.garments : [];
+  const lookbookFlag = raw?.isLookbook;
+  const rawId = toIdString(raw?._id);
+  const garmentIds = Array.isArray(raw?.garmentIds)
+    ? raw.garmentIds.map(toIdString).filter(Boolean)
+    : garments.map((garment: any) => toIdString(garment)).filter(Boolean);
+
+  const derivedPreviewImage = garments.find((garment: any) => garment?.imageUrl)?.imageUrl;
+
+  return {
+    _id: rawId,
+    name: raw?.name,
+    date: raw?.date,
+    isLookbook:
+      lookbookFlag === true ||
+      lookbookFlag === "true" ||
+      lookbookFlag === 1 ||
+      localLookbookIds.has(rawId),
+    previewImage: raw?.previewImage || derivedPreviewImage || undefined,
+    garmentIds,
+    garments,
+  };
+};
+
+const parseStoredLookbookIds = (rawValue: string | null) => {
+  if (!rawValue) return [] as string[];
+  try {
+    const parsed = JSON.parse(rawValue);
+    return Array.isArray(parsed) ? parsed.map((value) => String(value)) : [];
+  } catch {
+    return [] as string[];
+  }
+};
+
 const EMPTY_FILTERS: FilterState = {
   category: "",
   subcategories: [],
@@ -136,6 +197,9 @@ export default function WardrobeScreen() {
   );
   const [showFilter, setShowFilter] = useState(false);
   const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS);
+  const [uploadingHeaderImage, setUploadingHeaderImage] = useState(false);
+  const [outfits, setOutfits] = useState<OutfitSummary[]>([]);
+  const [loadingOutfits, setLoadingOutfits] = useState(false);
 
   const fetchUserHeaderImages = useCallback(async () => {
     try {
@@ -148,11 +212,57 @@ export default function WardrobeScreen() {
     }
   }, []);
 
+  const fetchOutfits = useCallback(async () => {
+    try {
+      setLoadingOutfits(true);
+      const token = await SecureStore.getItemAsync("userToken");
+      if (!token) {
+        setOutfits([]);
+        return;
+      }
+
+      const [response, storedIdsRaw] = await Promise.all([
+        fetch(buildApiUrl("/api/outfits"), {
+          headers: buildAuthHeaders(token),
+        }),
+        SecureStore.getItemAsync(LOOKBOOK_IDS_KEY),
+      ]);
+
+      const localLookbookIds = new Set(parseStoredLookbookIds(storedIdsRaw));
+
+      if (!response.ok) {
+        setOutfits([]);
+        return;
+      }
+
+      const payload = await response.json();
+      setOutfits(
+        Array.isArray(payload)
+          ? payload.map((entry) => normalizeOutfit(entry, localLookbookIds))
+          : [],
+      );
+    } catch {
+      setOutfits([]);
+    } finally {
+      setLoadingOutfits(false);
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       fetchUserHeaderImages();
-    }, [fetchUserHeaderImages]),
+      fetchOutfits();
+    }, [fetchOutfits, fetchUserHeaderImages]),
   );
+
+  useEffect(() => {
+    if (activeTopTab === 1 || activeTopTab === 2) {
+      fetchOutfits();
+    }
+  }, [activeTopTab, counts.outfits, counts.lookbooks, fetchOutfits]);
+
+  const savedOutfits = outfits.filter((outfit) => !outfit.isLookbook);
+  const savedLookbooks = outfits.filter((outfit) => outfit.isLookbook);
 
   const switchTab = (idx: number) => {
     setActiveTopTab(idx);
@@ -214,6 +324,7 @@ export default function WardrobeScreen() {
         if (isProfile) setProfilePic(selectedUri);
         else setBgImage(selectedUri);
 
+        setUploadingHeaderImage(true);
         const updatedUser = isProfile
           ? await uploadProfileImage(selectedUri)
           : await uploadBannerImage(selectedUri);
@@ -222,8 +333,9 @@ export default function WardrobeScreen() {
         setBgImage(updatedUser.bannerImage ?? null);
       }
     } catch (error: any) {
-      Alert.alert("Upload failed", error.message || "Unable to update image.");
+      Alert.alert("Upload failed", getUploadErrorMessage(error, "Unable to update image."));
     } finally {
+      setUploadingHeaderImage(false);
       setImageMenuFor(null);
     }
   };
@@ -316,6 +428,9 @@ export default function WardrobeScreen() {
             <Text style={s.analyticsLink}>Style Analytics ›</Text>
           </TouchableOpacity>
         </View>
+        {uploadingHeaderImage ? (
+          <Text style={{ color: "#777", marginBottom: 8 }}>Uploading image...</Text>
+        ) : null}
 
         <View style={s.statsCard}>
           <TouchableOpacity style={s.statItem} onPress={() => switchTab(0)}>
@@ -401,6 +516,11 @@ export default function WardrobeScreen() {
                   )}
                 </TouchableOpacity>
               </View>
+              {!loading && items.length > 0 && (
+                <Text style={s.resultsCountTxt}>
+                  {filtered.length} {filtered.length === 1 ? "result" : "results"}
+                </Text>
+              )}
               {activeFilterCount > 0 && (
                 <ScrollView
                   horizontal
@@ -481,33 +601,164 @@ export default function WardrobeScreen() {
           )}
 
           {activeTopTab === 1 && (
-            <View style={s.emptyState}>
-              <Text style={s.emptyTitle}>No outfits yet</Text>
-              <Text style={s.emptySubtitle}>
-                Use the + button to create your first outfit
-              </Text>
-              <TouchableOpacity
-                style={s.clearBtn}
-                onPress={() => router.push("/wardrobe/outfit" as any)}
-              >
-                <Text style={s.clearBtnTxt}>Create Outfit</Text>
-              </TouchableOpacity>
-            </View>
+            loadingOutfits ? (
+              <View style={s.emptyState}>
+                <ActivityIndicator size="large" color="#E91E63" />
+                <Text style={s.emptyTitle}>Loading outfits...</Text>
+              </View>
+            ) : savedOutfits.length === 0 ? (
+              <View style={s.emptyState}>
+                <Text style={s.emptyTitle}>No outfits yet</Text>
+                <Text style={s.emptySubtitle}>
+                  Use the + button to create your first outfit
+                </Text>
+                <TouchableOpacity
+                  style={s.clearBtn}
+                  onPress={() => router.push("/wardrobe/outfit" as any)}
+                >
+                  <Text style={s.clearBtnTxt}>Create Outfit</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={s.gridContent}>
+                {savedOutfits.map((outfit) => {
+                  const garmentIds = Array.isArray(outfit.garmentIds) ? outfit.garmentIds : [];
+                  const fallbackPreviewImageFromGarments =
+                    Array.isArray(outfit.garments)
+                      ? outfit.garments.find((garment) => garment?.imageUrl)?.imageUrl
+                      : null;
+                  const fallbackPreviewItem = items.find((item) => garmentIds.includes(String(item.id)) && item.image);
+                  const previewUri = outfit.previewImage
+                    ? buildImageUrl(outfit.previewImage)
+                    : (fallbackPreviewImageFromGarments
+                      ? buildImageUrl(fallbackPreviewImageFromGarments)
+                      : (fallbackPreviewItem?.image || null));
+                  const itemCount = garmentIds.length;
+                  const dateLabel = outfit.date
+                    ? new Date(outfit.date).toLocaleDateString()
+                    : "No date";
+
+                  return (
+                    <TouchableOpacity
+                      key={outfit._id}
+                      style={s.gridItem}
+                      onPress={() =>
+                        router.push({
+                          pathname: "/wardrobe/lookbook-detail" as any,
+                          params: { lookbookJson: JSON.stringify(outfit) },
+                        })
+                      }
+                    >
+                      {previewUri ? (
+                        <AuthenticatedImage
+                          source={{ uri: previewUri }}
+                          style={s.gridImg}
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <View style={s.gridEmpty} />
+                      )}
+                      <Text style={s.gridLabel} numberOfLines={1}>
+                        {outfit.name || `Outfit • ${itemCount} items`}
+                      </Text>
+                      <Text style={{ position: "absolute", bottom: 18, left: 8, fontSize: 9, color: "#bbb" }}>
+                        {dateLabel}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )
           )}
 
           {activeTopTab === 2 && (
-            <View style={s.emptyState}>
-              <Text style={s.emptyTitle}>No lookbooks yet</Text>
-              <Text style={s.emptySubtitle}>
-                Use the + button to create your first lookbook
-              </Text>
-              <TouchableOpacity
-                style={s.clearBtn}
-                onPress={() => router.push("/wardrobe/lookbook" as any)}
-              >
-                <Text style={s.clearBtnTxt}>Create Lookbook</Text>
-              </TouchableOpacity>
-            </View>
+            loadingOutfits ? (
+              <View style={s.emptyState}>
+                <ActivityIndicator size="large" color="#E91E63" />
+                <Text style={s.emptyTitle}>Loading lookbooks...</Text>
+              </View>
+            ) : savedLookbooks.length === 0 ? (
+              <View style={s.emptyState}>
+                <Text style={s.emptyTitle}>No lookbooks yet</Text>
+                <Text style={s.emptySubtitle}>
+                  Use the + button to create your first lookbook
+                </Text>
+                <TouchableOpacity
+                  style={s.clearBtn}
+                  onPress={() => router.push("/wardrobe/lookbook" as any)}
+                >
+                  <Text style={s.clearBtnTxt}>Create Lookbook</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={s.gridContent}>
+                {savedLookbooks.map((outfit) => {
+                  const garmentIds = Array.isArray(outfit.garmentIds) ? outfit.garmentIds : [];
+                  const fallbackPreviewImageFromGarments =
+                    Array.isArray(outfit.garments)
+                      ? outfit.garments.find((garment) => garment?.imageUrl)?.imageUrl
+                      : null;
+                  const fallbackPreviewItem = items.find((item) => garmentIds.includes(String(item.id)) && item.image);
+                  const previewUri = outfit.previewImage
+                    ? buildImageUrl(outfit.previewImage)
+                    : (fallbackPreviewImageFromGarments
+                      ? buildImageUrl(fallbackPreviewImageFromGarments)
+                      : (fallbackPreviewItem?.image || null));
+                  const itemCount = garmentIds.length;
+                  const displayName = (outfit.name || "").trim() || "Untitled Lookbook";
+                  const dateLabel = outfit.date
+                    ? new Date(outfit.date).toLocaleDateString()
+                    : "No date";
+
+                  return (
+                    <TouchableOpacity
+                      key={outfit._id}
+                      style={s.gridItem}
+                      onPress={() =>
+                        router.push({
+                          pathname: "/wardrobe/lookbook-detail" as any,
+                          params: { lookbookJson: JSON.stringify(outfit) },
+                        })
+                      }
+                    >
+                      {previewUri ? (
+                        <AuthenticatedImage
+                          source={{ uri: previewUri }}
+                          style={s.gridImg}
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <View style={s.gridEmpty} />
+                      )}
+                      <Text
+                        style={{
+                          position: "absolute",
+                          top: 8,
+                          left: 8,
+                          right: 8,
+                          fontSize: 10,
+                          fontWeight: "700",
+                          color: "#1a1a1a",
+                          backgroundColor: "rgba(255,255,255,0.92)",
+                          borderRadius: 8,
+                          paddingHorizontal: 6,
+                          paddingVertical: 3,
+                        }}
+                        numberOfLines={1}
+                      >
+                        {displayName}
+                      </Text>
+                      <Text style={{ position: "absolute", bottom: 18, left: 8, fontSize: 9, color: "#888" }}>
+                        {itemCount} item{itemCount === 1 ? "" : "s"}
+                      </Text>
+                      <Text style={{ position: "absolute", bottom: 4, left: 8, fontSize: 9, color: "#bbb" }}>
+                        {dateLabel}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )
           )}
         </ScrollView>
       </View>
@@ -634,9 +885,9 @@ export default function WardrobeScreen() {
               onPress={() => setShowFilter(false)}
             >
               <Text style={s.applyBtnTxt}>
-                {activeFilterCount === 0
-                  ? "Show All Items"
-                  : `Show Results · ${activeFilterCount} active`}
+                {filtered.length === items.length
+                  ? `Show All Items · ${items.length}`
+                  : `Show Results · ${filtered.length}`}
               </Text>
             </TouchableOpacity>
           </View>

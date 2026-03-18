@@ -29,6 +29,7 @@ import {
   type UserProfile,
   uploadBannerImage,
 } from '@/services/userProfileService';
+import { getUploadErrorMessage } from '@/services/uploadRequest';
 import React, { useEffect, useState } from 'react';
 import {
   ActionSheetIOS,
@@ -80,6 +81,7 @@ export default function SettingsScreen() {
   const [bannerUri, setBannerUri] = useState<string | null>(null);
   const [bannerPreset, setBannerPreset] = useState<string>('pink');
   const [pickerVisible, setPickerVisible] = useState(false);
+  const [uploadingBanner, setUploadingBanner] = useState(false);
 
   useEffect(() => {
     fetchUser();
@@ -98,6 +100,7 @@ export default function SettingsScreen() {
   }
 
   async function uploadBannerPhoto(uri: string) {
+    setUploadingBanner(true);
     const updated = await uploadBannerImage(uri);
     const updatedBanner = updated.bannerImage;
     const updatedProfile = updated.profilePicture;
@@ -108,6 +111,7 @@ export default function SettingsScreen() {
       profilePicture: updatedProfile ?? prev.profilePicture,
     } : prev));
     setBannerUri(updatedBanner);
+    setUploadingBanner(false);
   }
 
   // ── Banner tap — shows action sheet with preset vs upload options ──────────
@@ -154,7 +158,8 @@ export default function SettingsScreen() {
         setBannerPreset('');
         await uploadBannerPhoto(result.assets[0].uri);
       } catch (error: any) {
-        Alert.alert('Upload failed', error.message || 'Unable to upload banner image.');
+        setUploadingBanner(false);
+        Alert.alert('Upload failed', getUploadErrorMessage(error, 'Unable to upload banner image.'));
       }
     }
   }
@@ -286,6 +291,7 @@ export default function SettingsScreen() {
           <TouchableOpacity onPress={() => router.push('/settings/edit-profile')}>
             <Text style={styles.editLink}>Edit profile</Text>
           </TouchableOpacity>
+          {uploadingBanner ? <Text style={styles.bannerUploadStatus}>Uploading banner image...</Text> : null}
         </View>
       </View>
 
@@ -463,6 +469,7 @@ const styles = StyleSheet.create({
   },
   username: { fontSize: 16, fontWeight: '700', color: COLORS.text },
   editLink: { fontSize: 13, color: COLORS.hotPink, fontWeight: '500' },
+  bannerUploadStatus: { fontSize: 12, color: COLORS.subText },
 
   // ── Section label ──────────────────────────────────────────────────────────
   sectionLabel: {

@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "jest --runInBand"
+    "test": "jest --runInBand",
+    "cleanup:orphans": "node scripts/cleanup-orphaned-user-data.js"
   },
   "keywords": [],
   "author": "",
@@ -15,7 +16,9 @@
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
+    "file-type": "^16.5.4",
     "form-data": "^4.0.5",
+    "image-size": "^1.1.1",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.2.3",
     "multer": "^2.1.1"

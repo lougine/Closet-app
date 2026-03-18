@@ -30,6 +30,7 @@ import {
   updateDisplayName,
   uploadProfileImage,
 } from '@/services/userProfileService';
+import { getUploadErrorMessage } from '@/services/uploadRequest';
 
 // ─── COLORS ───────────────────────────────────────────────────────────────────
 const COLORS = {
@@ -50,6 +51,7 @@ export default function EditProfileScreen() {
   const [profilePicture, setProfilePicture] = useState<string | null>(null); // current pfp URL or local URI
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
 
   // Load current user data on mount
   useEffect(() => {
@@ -148,6 +150,7 @@ export default function EditProfileScreen() {
       await updateDisplayName(username.trim());
 
       if (profilePicture && (profilePicture.startsWith('file:') || profilePicture.startsWith('content:'))) {
+        setUploadingProfileImage(true);
         const updatedUser = await uploadProfileImage(profilePicture);
         setProfilePicture(updatedUser.profilePicture ?? null);
       }
@@ -157,8 +160,9 @@ export default function EditProfileScreen() {
       ]);
     } catch (e) {
       console.error('Save error:', e);
-      Alert.alert('Error', 'Could not save changes. Please try again.');
+      Alert.alert('Error', getUploadErrorMessage(e, 'Could not save changes. Please try again.'));
     } finally {
+      setUploadingProfileImage(false);
       setSaving(false);
     }
   }
@@ -233,6 +237,10 @@ export default function EditProfileScreen() {
           <Text style={styles.saveBtnText}>Save changes</Text>
         )}
       </TouchableOpacity>
+
+      {uploadingProfileImage ? (
+        <Text style={styles.uploadStatus}>Uploading profile image...</Text>
+      ) : null}
     </ScrollView>
   );
 }
@@ -319,4 +327,5 @@ const styles = StyleSheet.create({
   },
   saveBtnDisabled: { opacity: 0.6 },
   saveBtnText: { fontSize: 16, fontWeight: '700', color: COLORS.white },
+  uploadStatus: { textAlign: 'center', color: COLORS.subText, fontSize: 13 },
 });

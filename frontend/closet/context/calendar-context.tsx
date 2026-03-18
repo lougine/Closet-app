@@ -100,7 +100,7 @@ type CalendarContextType = {
   setSelectedDate: (date: Date) => void;
   setCurrentMonth: (date: Date) => void;
   deleteOutfit: (id: string) => Promise<void>;
-  refetch: () => void;
+  refetch: () => Promise<void>;
 };
 
 const CalendarContext = createContext<CalendarContextType | null>(null);

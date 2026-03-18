@@ -29,8 +29,12 @@ app.use('/api/usage', usageRoutes);
 
 const outfitRoutes = require("./routes/outfitRoutes");
 const analyticsRoutes = require("./routes/analyticsRoutes");
+const communityRoutes = require('./routes/communityRoutes');
+const seedRoutes = require('./routes/seedRoutes');
 
 app.use("/api/outfits", outfitRoutes);
 app.use("/api/analytics", analyticsRoutes);
+app.use('/api/community', communityRoutes);
+app.use('/api/seed', seedRoutes);
 
 module.exports = app;

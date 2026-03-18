@@ -156,10 +156,15 @@ describe('Analytics endpoints', () => {
       purchasePrice: 40,
     });
 
+    const now = new Date();
+    const thisMonthDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 10));
+    const previousMonthDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 12));
+    const twoMonthsAgoDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 2, 18));
+
     await Usage.insertMany([
-      { user: user._id, garment: garment._id, wornDate: new Date('2026-01-06') },
-      { user: user._id, garment: garment._id, wornDate: new Date('2026-01-20') },
-      { user: user._id, garment: garment._id, wornDate: new Date('2026-02-10') },
+      { user: user._id, garment: garment._id, wornDate: twoMonthsAgoDate },
+      { user: user._id, garment: garment._id, wornDate: previousMonthDate },
+      { user: user._id, garment: garment._id, wornDate: thisMonthDate },
     ]);
 
     const response = await request(app)
@@ -170,6 +175,9 @@ describe('Analytics endpoints', () => {
     expect(Array.isArray(response.body.monthly)).toBe(true);
     expect(Array.isArray(response.body.dayOfWeek)).toBe(true);
     expect(Array.isArray(response.body.byCategory)).toBe(true);
+    expect(response.body.monthly).toHaveLength(12);
+    expect(response.body.dayOfWeek).toHaveLength(7);
+    expect(response.body.summary.totalWearEventsInRange).toBe(3);
     expect(response.body.byCategory[0].category).toBe('Tops');
   });
 
