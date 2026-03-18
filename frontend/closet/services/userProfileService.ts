@@ -1,5 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 import { buildApiUrl, buildAuthHeaders, buildImageUrl } from '@/constants/api';
+import { uploadMultipartWithRetry } from '@/services/uploadRequest';
 
 export type UserProfile = {
   _id: string;
@@ -81,13 +82,15 @@ async function uploadImage(
     type: 'image/jpeg',
   } as any);
 
-  const res = await fetch(buildApiUrl(endpoint), {
+  const payload = await uploadMultipartWithRetry<any>({
+    endpoint,
+    token,
+    formData,
     method: 'PUT',
-    headers: buildAuthHeaders(token),
-    body: formData,
+    timeoutMs: 25000,
+    retries: 1,
+    fallbackMessage: 'Image upload failed.',
   });
-
-  const payload = await parseResponse(res, 'Image upload failed.');
   return normalizeUserProfile(payload);
 }
 
