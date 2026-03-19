@@ -39,19 +39,6 @@ export default function DayScreen() {
     setCurrentMonth(new Date(d.getFullYear(), d.getMonth(), 1));
   }
 
-  function jumpToDay(offset: number) {
-    const d = new Date(selectedDate);
-    d.setDate(d.getDate() + offset);
-    setSelectedDate(d);
-    setCurrentMonth(new Date(d.getFullYear(), d.getMonth(), 1));
-  }
-
-  function jumpToToday() {
-    const today = new Date();
-    setSelectedDate(today);
-    setCurrentMonth(new Date(today.getFullYear(), today.getMonth(), 1));
-  }
-
   function goToNearestOutfit(direction: 'next' | 'prev') {
     const step = direction === 'next' ? 1 : -1;
     const probe = new Date(selectedDate);
@@ -221,23 +208,6 @@ export default function DayScreen() {
           <RefreshControl refreshing={loading} onRefresh={refetch} tintColor={COLORS.hotPink} />
         }
       >
-        <View style={styles.quickActionRow}>
-          <TouchableOpacity style={styles.quickActionBtn} onPress={() => jumpToDay(-1)}>
-            <Ionicons name="arrow-back-outline" size={14} color={COLORS.hotPink} />
-            <Text style={styles.quickActionText}>Yesterday</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.quickActionBtn} onPress={jumpToToday}>
-            <Ionicons name="today-outline" size={14} color={COLORS.hotPink} />
-            <Text style={styles.quickActionText}>Today</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.quickActionBtn} onPress={() => jumpToDay(1)}>
-            <Text style={styles.quickActionText}>Tomorrow</Text>
-            <Ionicons name="arrow-forward-outline" size={14} color={COLORS.hotPink} />
-          </TouchableOpacity>
-        </View>
-
         <View style={styles.quickActionRow}>
           <TouchableOpacity style={styles.secondaryQuickBtn} onPress={() => goToNearestOutfit('prev')}>
             <Ionicons name="chevron-back-circle-outline" size={14} color={COLORS.subText} />

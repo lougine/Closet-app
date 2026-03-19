@@ -5,7 +5,6 @@ import * as SecureStore from "expo-secure-store";
 import { Alert, Animated, Dimensions, FlatList, Image, StatusBar, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from "react-native";
 import AuthenticatedImage from "../../components/AuthenticatedImage";
 import { buildApiUrl, buildAuthHeaders } from "../../constants/api";
-import { useCalendar } from "../../context/calendar-context";
 import { useWardrobe } from "../../context/wardrobeContext";
 import { PANEL_W, PINK, s } from "../../Styles/styling.styles";
 
@@ -194,7 +193,6 @@ export default function StylingScreen() {
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [activeRecommendation, setActiveRecommendation] = useState(0);
   const { items } = useWardrobe();
-  const { refetch: refetchCalendar } = useCalendar();
 
   const toggleItem = (id: string) =>
     setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
@@ -310,8 +308,6 @@ export default function StylingScreen() {
     setSavingOutfit(true);
     try {
       const selectedRecommendation = recommendations[activeRecommendation];
-      const dateValue = params.date ? new Date(params.date) : new Date();
-      const safeDate = Number.isNaN(dateValue.getTime()) ? new Date() : dateValue;
 
       const response = await withTimeout(
         fetch(buildApiUrl("/api/outfits"), {
@@ -323,7 +319,6 @@ export default function StylingScreen() {
           body: JSON.stringify({
             name: selectedRecommendation?.name || `${mode} Outfit`,
             garments: selected,
-            date: safeDate.toISOString(),
           }),
         }),
         15000,
@@ -335,13 +330,7 @@ export default function StylingScreen() {
         throw new Error(errorPayload?.message || "Could not save outfit");
       }
 
-      await withTimeout(
-        refetchCalendar(),
-        10000,
-        "Outfit saved, but calendar refresh timed out. Pull to refresh.",
-      );
-
-      Alert.alert("Saved", "Outfit has been added to your calendar.");
+      Alert.alert("Saved", "Outfit has been saved.");
     } catch (error: any) {
       Alert.alert("Save failed", error?.message || "Could not save this outfit.");
     } finally {
