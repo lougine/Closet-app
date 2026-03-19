@@ -5,7 +5,8 @@ const Garment = require('../models/garment');
 const Outfit = require('../models/outfit');
 const User = require('../models/user');
 const authMiddleware = require('../middleware/authMiddleware');
-const { isSafeFilename, resolveUploadPath } = require('../utils/imageFileUtils');
+const { isSafeFilename } = require('../utils/imageFileUtils');
+const { getReadableLocalPath } = require('../services/storage');
 
 const router = express.Router();
 
@@ -39,9 +40,9 @@ router.get('/:filename', async (req, res) => {
       return res.status(404).json({ message: 'Image not found.' });
     }
 
-    const fullPath = resolveUploadPath(filename);
+    const fullPath = await getReadableLocalPath(filename);
     if (!fullPath) {
-      return res.status(400).json({ message: 'Invalid filename.' });
+      return res.status(404).json({ message: 'Image not found.' });
     }
 
     try {

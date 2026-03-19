@@ -88,6 +88,27 @@ export const s = StyleSheet.create({
     fontSize: 15,
     fontWeight: "700",
   },
+  randomizeBtn: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    backgroundColor: "#1a1a2e",
+    borderRadius: RADIUS.full,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
+    paddingVertical: 11,
+    zIndex: 6,
+    ...SHADOW.subtle,
+  },
+  randomizeBtnDisabled: {
+    opacity: 0.5,
+  },
+  randomizeBtnTxt: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "700",
+  },
   canvasEmpty:{
     flex: 1, 
     alignItems: "center", 

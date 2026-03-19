@@ -309,7 +309,7 @@ const Chip = ({ label, active, onPress, }: { label: string; active: boolean;onPr
 
 export default function WardrobeScreen() {
   const router = useRouter();
-  const { items, counts, loading } = useWardrobe();
+  const { items, counts, loading, refreshItems } = useWardrobe();
 
   const [profilePic, setProfilePic] = useState<string | null>(null);
   const [bgImage, setBgImage] = useState<string | null>(null);
@@ -375,9 +375,10 @@ export default function WardrobeScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      refreshItems();
       fetchUserHeaderImages();
       fetchOutfits();
-    }, [fetchOutfits, fetchUserHeaderImages]),
+    }, [fetchOutfits, fetchUserHeaderImages, refreshItems]),
   );
 
   useEffect(() => {

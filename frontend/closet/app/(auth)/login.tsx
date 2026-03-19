@@ -17,14 +17,19 @@ import {
   View,
   Alert,
 } from "react-native";
-import * as SecureStore from "expo-secure-store";
 import { buildApiUrl } from "@/constants/api";
+import { useWardrobe } from "../../context/wardrobeContext";
+import {
+  exchangeGoogleAccessTokenForAppToken,
+  persistAuthTokenAndHydrateWardrobe,
+} from "../../services/authSession";
 import { styles } from "../../Styles/auth/login.styles";
 
 const { width } = Dimensions.get("window");
 
 export default function LoginScreen() {
   const router = useRouter();
+  const { refreshItems } = useWardrobe();
 
   const [fontsLoaded] = useFonts({
     "Inter-Regular": Inter_400Regular,
@@ -57,7 +62,7 @@ export default function LoginScreen() {
       }
 
       const data = await res.json();
-      await SecureStore.setItemAsync('userToken', data.token);
+      await persistAuthTokenAndHydrateWardrobe(data.token, refreshItems);
       router.replace('/(tabs)');
     } catch (e) {
       console.error(e);
@@ -79,22 +84,23 @@ export default function LoginScreen() {
   useEffect(() => {
     if (response?.type === "success") {
       const { authentication } = response;
-      fetchUserInfo(authentication?.accessToken);
+      handleGoogleAuthSuccess(authentication?.accessToken);
     }
   }, [response]);
 
-  const fetchUserInfo = async (token: string | undefined) => {
-    if (!token) return;
-    try {
-      const res = await fetch("https://www.googleapis.com/userinfo/v2/me", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const user = await res.json();
-      console.log("Google user:", user);
+  const handleGoogleAuthSuccess = async (accessToken: string | undefined) => {
+    if (!accessToken) return;
 
-      router.push("/(auth)/signupdetails");
+    try {
+      setLoading(true);
+      const appToken = await exchangeGoogleAccessTokenForAppToken(accessToken);
+      await persistAuthTokenAndHydrateWardrobe(appToken, refreshItems);
+      router.replace('/(tabs)');
     } catch (e) {
       console.error(e);
+      Alert.alert('Google sign in failed', 'Unable to sign in with Google right now.');
+    } finally {
+      setLoading(false);
     }
   };
 

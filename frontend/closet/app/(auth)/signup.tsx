@@ -5,8 +5,12 @@ import { StatusBar } from 'expo-status-bar';
 import * as WebBrowser from 'expo-web-browser';
 import React, { useEffect, useState } from 'react';
 import { Alert, Dimensions, Image, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import * as SecureStore from 'expo-secure-store';
 import { buildApiUrl } from "@/constants/api";
+import { useWardrobe } from '../../context/wardrobeContext';
+import {
+  exchangeGoogleAccessTokenForAppToken,
+  persistAuthTokenAndHydrateWardrobe,
+} from '../../services/authSession';
 import { styles } from '../../Styles/auth/signup.styles';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -15,6 +19,7 @@ const { width } = Dimensions.get('window');
 
 export default function SignUpScreen() {
   const router = useRouter();
+  const { refreshItems } = useWardrobe();
   
   const [fontsLoaded] = useFonts({
     'Inter-Regular': Inter_400Regular,
@@ -37,22 +42,23 @@ export default function SignUpScreen() {
   useEffect(() => {
     if (response?.type === 'success') {
       const { authentication } = response;
-      fetchUserInfo(authentication?.accessToken);
+      handleGoogleAuthSuccess(authentication?.accessToken);
     }
   }, [response]);
 
-  const fetchUserInfo = async (token: string | undefined) => {
-    if (!token) return;
+  const handleGoogleAuthSuccess = async (accessToken: string | undefined) => {
+    if (!accessToken) return;
+
     try {
-      const res = await fetch('https://www.googleapis.com/userinfo/v2/me', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const user = await res.json();
-      console.log('Google user:', user);
-      
-      router.push('/(auth)/signupdetails'); 
+      setLoading(true);
+      const appToken = await exchangeGoogleAccessTokenForAppToken(accessToken);
+      await persistAuthTokenAndHydrateWardrobe(appToken, refreshItems);
+      router.replace('/(tabs)');
     } catch (e) {
       console.error(e);
+      Alert.alert('Google sign up failed', 'Unable to sign up with Google right now.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -87,7 +93,7 @@ export default function SignUpScreen() {
       // If the backend returns a token, store it and move into the app.
       const data = await res.json().catch(() => null);
       if (data?.token) {
-        await SecureStore.setItemAsync('userToken', data.token);
+        await persistAuthTokenAndHydrateWardrobe(data.token, refreshItems);
         router.replace('/(tabs)');
       } else {
         router.push('/(auth)/login');
