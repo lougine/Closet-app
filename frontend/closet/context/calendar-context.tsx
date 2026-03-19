@@ -139,6 +139,7 @@ type CalendarContextType = {
 
   setSelectedDate: (date: Date) => void;
   setCurrentMonth: (date: Date) => void;
+  saveOutfitForDate: (payload: { garmentIds: string[]; date: Date; name?: string }) => Promise<void>;
   deleteOutfit: (id: string) => Promise<void>;
   refetch: () => Promise<void>;
 };
@@ -204,10 +205,34 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  async function saveOutfitForDate(payload: { garmentIds: string[]; date: Date; name?: string }) {
+    const { garmentIds, date, name } = payload;
+    const token = await SecureStore.getItemAsync('userToken');
+    const res = await fetch(buildApiUrl('/api/outfits'), {
+      method: 'POST',
+      headers: {
+        ...buildAuthHeaders(token),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        name: name || 'Outfit',
+        garments: garmentIds,
+        date: date.toISOString(),
+      }),
+    });
+
+    if (!res.ok) {
+      throw new Error('Could not save outfit');
+    }
+
+    await fetchOutfits();
+  }
+
   return (
     <CalendarContext.Provider value={{
       selectedDate, currentMonth, outfits, outfitMap, loading,
       setSelectedDate, setCurrentMonth,
+      saveOutfitForDate,
       deleteOutfit, refetch: fetchOutfits,
     }}>
       {children}
