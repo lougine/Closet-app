@@ -443,6 +443,22 @@ export default function StylingScreen() {
         )}
       </View>
 
+      {mode === "Randomize" && (
+        <TouchableOpacity
+          style={[
+            s.randomizeBtn,
+            (loadingRandomize || loadingAi || savingOutfit) && s.randomizeBtnDisabled,
+          ]}
+          onPress={loadRandomizedOutfit}
+          disabled={loadingRandomize || loadingAi || savingOutfit}
+        >
+          <MaterialCommunityIcons name="shuffle-variant" size={16} color="#fff" />
+          <Text style={s.randomizeBtnTxt}>
+            {loadingRandomize ? "Randomizing..." : "Randomize outfit"}
+          </Text>
+        </TouchableOpacity>
+      )}
+
       <TouchableOpacity
         style={[
           s.saveOutfitBtn,

@@ -1,7 +1,8 @@
-const fs = require('fs/promises');
 const path = require('path');
+const { DEFAULT_UPLOADS_ROOT } = require('../services/storage/drivers/localStorageDriver');
+const { deleteManagedFile, listManagedFiles } = require('../services/storage');
 
-const uploadsRoot = path.join(__dirname, '../../uploads');
+const uploadsRoot = path.resolve(DEFAULT_UPLOADS_ROOT);
 
 const UPLOADS_URL_PREFIX = '/uploads/';
 
@@ -48,34 +49,11 @@ const deleteImageByUrl = async (imageUrl) => {
   const filename = extractFilenameFromImageUrl(imageUrl);
   if (!filename) return false;
 
-  const fullPath = resolveUploadPath(filename);
-  if (!fullPath) return false;
-
-  try {
-    await fs.unlink(fullPath);
-    return true;
-  } catch (error) {
-    if (error.code === 'ENOENT') {
-      return false;
-    }
-
-    throw error;
-  }
+  return deleteManagedFile(filename);
 };
 
 const listUploadedFiles = async () => {
-  try {
-    const entries = await fs.readdir(uploadsRoot, { withFileTypes: true });
-    return entries
-      .filter((entry) => entry.isFile() && isSafeFilename(entry.name))
-      .map((entry) => entry.name);
-  } catch (error) {
-    if (error.code === 'ENOENT') {
-      return [];
-    }
-
-    throw error;
-  }
+  return listManagedFiles();
 };
 
 module.exports = {

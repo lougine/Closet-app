@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import * as SecureStore from "expo-secure-store";
 import { buildApiUrl, buildImageUrl } from "../constants/api";
 
@@ -53,7 +53,7 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
   const [counts, setCounts] = useState({ items: 0, outfits: 0, lookbooks: 0 });
   const [loading, setLoading] = useState(true);
 
-  const fetchAllGarments = async (token: string) => {
+  const fetchAllGarments = useCallback(async (token: string) => {
     const allGarments: any[] = [];
     let page = 1;
 
@@ -83,9 +83,9 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
     }
 
     return { ok: true as const, garments: allGarments };
-  };
+  }, []);
 
-  const fetchItems = async () => {
+  const fetchItems = useCallback(async () => {
     try {
       const token = await SecureStore.getItemAsync('userToken');
       if (!token) {
@@ -154,7 +154,7 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [fetchAllGarments]);
 
   const getCategoryBg = (category: string) => {
     const bgMap: Record<string, string> = {
@@ -170,23 +170,23 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
     return bgMap[category] || "#fce4ec";
   };
 
-  const addItem = (item: ClothingItem) => {
+  const addItem = useCallback((item: ClothingItem) => {
     setItems((prev) => [item, ...prev]);
     setCounts((prev) => ({ ...prev, items: prev.items + 1 }));
-  };
+  }, []);
 
-  const updateItem = (updated: ClothingItem) => {
+  const updateItem = useCallback((updated: ClothingItem) => {
     setItems((prev) => prev.map((i) => (i.id === updated.id ? updated : i)));
-  };
+  }, []);
 
-  const refreshItems = async () => {
+  const refreshItems = useCallback(async () => {
     setLoading(true);
     await fetchItems();
-  };
+  }, [fetchItems]);
 
   useEffect(() => {
     fetchItems();
-  }, []);
+  }, [fetchItems]);
 
   return (
     <WardrobeContext.Provider value={{ items, counts, addItem, updateItem, refreshItems, loading }}>
