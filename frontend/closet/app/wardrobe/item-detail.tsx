@@ -104,8 +104,12 @@ export default function ItemDetailScreen() {
   const [nameVal, setNameVal] = useState(item.label ?? "");
   const [editingSize, setEditingSize] = useState(false);
   const [editingBrand, setEditingBrand] = useState(false);
+  const [editingPrice, setEditingPrice] = useState(false);
   const [sizeVal, setSizeVal] = useState(item.size ?? "");
   const [brandVal, setBrandVal] = useState(item.brand ?? "");
+  const [priceVal, setPriceVal] = useState(
+    item.totalCost !== undefined && item.totalCost !== null ? String(item.totalCost) : ""
+  );
   const [uploadingImage, setUploadingImage] = useState(false);
   const [savingDetails, setSavingDetails] = useState(false);
   const [savingColor, setSavingColor] = useState(false);
@@ -182,6 +186,13 @@ export default function ItemDetailScreen() {
   const update = (changes: Partial<ClothingItem>) =>
     setItem((prev) => ({ ...prev, ...changes }));
 
+  const sanitizePriceInput = (value: string) => {
+    const cleaned = value.replace(/[^0-9.]/g, "");
+    const [whole = "", ...fractionParts] = cleaned.split(".");
+    const fraction = fractionParts.join("");
+    return fractionParts.length > 0 ? `${whole}.${fraction}` : whole;
+  };
+
   const persistColor = async (nextColor: string | undefined) => {
     const token = await SecureStore.getItemAsync("userToken");
     if (!token) {
@@ -251,6 +262,7 @@ export default function ItemDetailScreen() {
         name: item.label,
         size: item.size ?? null,
         brand: item.brand ?? null,
+        purchasePrice: typeof item.totalCost === "number" ? item.totalCost : null,
         tags: item.tags ?? [],
         color: item.colors?.[0] ?? null,
       }),
@@ -269,6 +281,7 @@ export default function ItemDetailScreen() {
       brand: garment.brand ?? undefined,
       tags: Array.isArray(garment.tags) ? garment.tags : (item.tags ?? []),
       colors: garment.color ? [garment.color] : [],
+      totalCost: Number(garment.purchasePrice ?? item.totalCost ?? 0),
     };
 
     setItem(updatedItem);
@@ -567,6 +580,57 @@ export default function ItemDetailScreen() {
               ) : (
                 <TouchableOpacity style={s.addBtn} onPress={() => setEditingBrand(true)}>
                   <Text style={s.addBtnText}>{item.brand || "ADD"}</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            <View style={s.divider} />
+
+            <View style={s.row}>
+              <Text style={s.rowLabel}>Price</Text>
+              {editingPrice ? (
+                <View style={s.inlineRow}>
+                  <TextInput
+                    autoFocus
+                    style={s.inlineInput}
+                    value={priceVal}
+                    onChangeText={(val) => setPriceVal(sanitizePriceInput(val))}
+                    placeholder="0.00"
+                    placeholderTextColor="#bbb"
+                    keyboardType="decimal-pad"
+                  />
+                  <TouchableOpacity
+                    style={s.inlineSave}
+                    onPress={() => {
+                      const cleaned = sanitizePriceInput(priceVal).trim();
+                      if (!cleaned) {
+                        update({ totalCost: 0 });
+                        setPriceVal("");
+                        setEditingPrice(false);
+                        return;
+                      }
+
+                      const parsed = Number(cleaned);
+                      if (!Number.isFinite(parsed) || parsed < 0) {
+                        Alert.alert("Invalid price", "Please enter a valid non-negative amount.");
+                        return;
+                      }
+
+                      const rounded = Math.round(parsed * 100) / 100;
+                      update({ totalCost: rounded });
+                      setPriceVal(String(rounded));
+                      setEditingPrice(false);
+                    }}
+                  >
+                    <Text style={s.inlineSaveText}>Save</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity style={s.addBtn} onPress={() => setEditingPrice(true)}>
+                  <Text style={s.addBtnText}>
+                    {item.totalCost !== undefined && item.totalCost !== null
+                      ? `$${Number(item.totalCost).toFixed(2)}`
+                      : "ADD"}
+                  </Text>
                 </TouchableOpacity>
               )}
             </View>
