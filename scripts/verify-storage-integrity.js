@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config({ override: true });
 const fs = require('fs/promises');
 const mongoose = require('mongoose');
 

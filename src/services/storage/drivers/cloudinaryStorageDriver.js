@@ -258,7 +258,11 @@ const getManagedReadUrl = async (filename) => {
     return null;
   }
 
-  return `https://res.cloudinary.com/${encodeURIComponent(CLOUDINARY_CLOUD_NAME)}/image/upload/${encodePublicIdForDelivery(publicId)}`;
+  const encodedPublicId = encodePublicIdForDelivery(publicId);
+  const extension = path.extname(publicId).replace('.', '').toLowerCase();
+  const formatSuffix = extension ? `.${encodeURIComponent(extension)}` : '';
+
+  return `https://res.cloudinary.com/${encodeURIComponent(CLOUDINARY_CLOUD_NAME)}/image/upload/${encodedPublicId}${formatSuffix}`;
 };
 
 module.exports = {
