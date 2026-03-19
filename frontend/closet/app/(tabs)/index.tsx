@@ -116,44 +116,67 @@ type OutfitSummary = {
 
 type PreviewTile = {
   key: string;
-  uri: string;
+  uri?: string | null;
 };
 
-function buildPreviewTiles(outfit: OutfitSummary, items: { id: string; image?: string | null }[]): PreviewTile[] {
+const getOutfitItemCount = (outfit: OutfitSummary) => {
+  if (Array.isArray(outfit.garments) && outfit.garments.length > 0) {
+    return outfit.garments.length;
+  }
+
+  return Array.isArray(outfit.garmentIds) ? outfit.garmentIds.length : 0;
+};
+
+function buildPreviewTiles(
+  outfit: OutfitSummary,
+  items: { id: string; image?: string | null }[],
+  maxTiles = 4,
+): PreviewTile[] {
   const tiles: PreviewTile[] = [];
-  const seen = new Set<string>();
 
   const addTile = (uri: string | null | undefined, key: string) => {
-    if (!uri || seen.has(uri) || tiles.length >= 4) return;
-    seen.add(uri);
+    if (tiles.length >= maxTiles) return;
     tiles.push({ key, uri });
   };
 
-  if (outfit.previewImage) {
+  if (outfit.isLookbook && outfit.previewImage) {
     addTile(buildImageUrl(outfit.previewImage), 'cover');
-
-    // For lookbooks, a selected/uploaded cover should be the sole preview image.
-    if (outfit.isLookbook) {
-      return tiles;
-    }
+    return tiles;
   }
 
   if (Array.isArray(outfit.garments)) {
     outfit.garments.forEach((garment, index) => {
       addTile(garment?.imageUrl ? buildImageUrl(garment.imageUrl) : null, `garment-${index}`);
     });
+  } else {
+    const garmentIds = Array.isArray(outfit.garmentIds) ? outfit.garmentIds : [];
+    if (garmentIds.length > 0) {
+      garmentIds.forEach((garmentId, index) => {
+        const match = items.find((item) => String(item.id) === String(garmentId));
+        addTile(match?.image || null, `item-${garmentId}-${index}`);
+      });
+    }
   }
 
-  const garmentIds = Array.isArray(outfit.garmentIds) ? outfit.garmentIds : [];
-  if (garmentIds.length > 0) {
-    items.forEach((item) => {
-      if (garmentIds.includes(String(item.id))) {
-        addTile(item.image || null, `item-${item.id}`);
-      }
-    });
+  if (tiles.length === 0 && outfit.previewImage) {
+    addTile(buildImageUrl(outfit.previewImage), 'cover');
   }
 
-  return tiles.slice(0, 4);
+  return tiles.slice(0, maxTiles);
+}
+
+function PreviewTileContent({ tile }: { tile: PreviewTile }) {
+  if (!tile.uri) {
+    return <View style={{ width: '100%', height: '100%', backgroundColor: '#ececec' }} />;
+  }
+
+  return (
+    <AuthenticatedImage
+      source={{ uri: tile.uri }}
+      style={{ width: '100%', height: '100%' }}
+      resizeMode="cover"
+    />
+  );
 }
 
 function OutfitPreviewTile({ tiles }: { tiles: PreviewTile[] }) {
@@ -162,6 +185,10 @@ function OutfitPreviewTile({ tiles }: { tiles: PreviewTile[] }) {
   }
 
   if (tiles.length === 1) {
+    if (!tiles[0].uri) {
+      return <View style={s.gridEmpty} />;
+    }
+
     return (
       <AuthenticatedImage
         source={{ uri: tiles[0].uri }}
@@ -176,11 +203,7 @@ function OutfitPreviewTile({ tiles }: { tiles: PreviewTile[] }) {
       <View style={[s.gridImg, { flexDirection: 'row', overflow: 'hidden', backgroundColor: '#f3f3f3' }]}>
         {tiles.map((tile) => (
           <View key={tile.key} style={{ width: '50%', height: '100%', padding: 1 }}>
-            <AuthenticatedImage
-              source={{ uri: tile.uri }}
-              style={{ width: '100%', height: '100%' }}
-              resizeMode="cover"
-            />
+            <PreviewTileContent tile={tile} />
           </View>
         ))}
       </View>
@@ -191,26 +214,14 @@ function OutfitPreviewTile({ tiles }: { tiles: PreviewTile[] }) {
     return (
       <View style={[s.gridImg, { flexDirection: 'row', overflow: 'hidden', backgroundColor: '#f3f3f3' }]}>
         <View style={{ width: '50%', height: '100%', padding: 1 }}>
-          <AuthenticatedImage
-            source={{ uri: tiles[0].uri }}
-            style={{ width: '100%', height: '100%' }}
-            resizeMode="cover"
-          />
+          <PreviewTileContent tile={tiles[0]} />
         </View>
         <View style={{ width: '50%', height: '100%' }}>
           <View style={{ height: '50%', padding: 1 }}>
-            <AuthenticatedImage
-              source={{ uri: tiles[1].uri }}
-              style={{ width: '100%', height: '100%' }}
-              resizeMode="cover"
-            />
+            <PreviewTileContent tile={tiles[1]} />
           </View>
           <View style={{ height: '50%', padding: 1 }}>
-            <AuthenticatedImage
-              source={{ uri: tiles[2].uri }}
-              style={{ width: '100%', height: '100%' }}
-              resizeMode="cover"
-            />
+            <PreviewTileContent tile={tiles[2]} />
           </View>
         </View>
       </View>
@@ -228,11 +239,7 @@ function OutfitPreviewTile({ tiles }: { tiles: PreviewTile[] }) {
             padding: 1,
           }}
         >
-          <AuthenticatedImage
-            source={{ uri: tile.uri }}
-            style={{ width: '100%', height: '100%' }}
-            resizeMode="cover"
-          />
+          <PreviewTileContent tile={tile} />
         </View>
       ))}
     </View>
@@ -755,9 +762,12 @@ export default function WardrobeScreen() {
             ) : (
               <View style={s.gridContent}>
                 {savedOutfits.map((outfit) => {
-                  const garmentIds = Array.isArray(outfit.garmentIds) ? outfit.garmentIds : [];
-                  const previewTiles = buildPreviewTiles(outfit, items);
-                  const itemCount = garmentIds.length;
+                  const itemCount = getOutfitItemCount(outfit);
+                  const previewTiles = buildPreviewTiles(
+                    outfit,
+                    items,
+                    itemCount > 0 ? Math.min(4, itemCount) : 4,
+                  );
                   const dateLabel = outfit.date
                     ? new Date(outfit.date).toLocaleDateString()
                     : "No date";
@@ -809,9 +819,12 @@ export default function WardrobeScreen() {
             ) : (
               <View style={s.gridContent}>
                 {savedLookbooks.map((outfit) => {
-                  const garmentIds = Array.isArray(outfit.garmentIds) ? outfit.garmentIds : [];
-                  const previewTiles = buildPreviewTiles(outfit, items);
-                  const itemCount = garmentIds.length;
+                  const itemCount = getOutfitItemCount(outfit);
+                  const previewTiles = buildPreviewTiles(
+                    outfit,
+                    items,
+                    itemCount > 0 ? Math.min(4, itemCount) : 4,
+                  );
                   const displayName = (outfit.name || "").trim() || "Untitled Lookbook";
                   const dateLabel = outfit.date
                     ? new Date(outfit.date).toLocaleDateString()
