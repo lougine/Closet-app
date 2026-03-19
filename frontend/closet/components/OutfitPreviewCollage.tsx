@@ -5,6 +5,7 @@ import AuthenticatedImage from './AuthenticatedImage';
 
 type OutfitPreviewSource = {
   previewImage?: string | null;
+  isLookbook?: boolean;
   garments?: Array<{ imageUrl?: string | null }>;
 };
 
@@ -15,20 +16,21 @@ type OutfitPreviewCollageProps = {
 
 type Tile = {
   key: string;
-  uri: string;
+  uri?: string | null;
 };
 
 const buildTiles = (outfit?: OutfitPreviewSource | null) => {
   const tiles: Tile[] = [];
-  const seen = new Set<string>();
 
   const addTile = (uri?: string | null, key = '') => {
-    if (!uri || seen.has(uri) || tiles.length >= 4) return;
-    seen.add(uri);
+    if (tiles.length >= 4) return;
     tiles.push({ key: key || uri, uri });
   };
 
-  addTile(outfit?.previewImage ? buildImageUrl(outfit.previewImage) : null, 'preview');
+  if (outfit?.isLookbook && outfit?.previewImage) {
+    addTile(buildImageUrl(outfit.previewImage), 'preview');
+    return tiles;
+  }
 
   if (Array.isArray(outfit?.garments)) {
     outfit.garments.forEach((garment, index) => {
@@ -36,7 +38,19 @@ const buildTiles = (outfit?: OutfitPreviewSource | null) => {
     });
   }
 
+  if (tiles.length === 0 && outfit?.previewImage) {
+    addTile(buildImageUrl(outfit.previewImage), 'preview');
+  }
+
   return tiles;
+};
+
+const TileContent = ({ tile }: { tile: Tile }) => {
+  if (!tile.uri) {
+    return <View style={{ width: '100%', height: '100%', backgroundColor: '#ececec' }} />;
+  }
+
+  return <AuthenticatedImage source={{ uri: tile.uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />;
 };
 
 export default function OutfitPreviewCollage({ outfit, style }: OutfitPreviewCollageProps) {
@@ -47,6 +61,10 @@ export default function OutfitPreviewCollage({ outfit, style }: OutfitPreviewCol
   }
 
   if (tiles.length === 1) {
+    if (!tiles[0].uri) {
+      return <View style={[style, { backgroundColor: '#ececec' }]} />;
+    }
+
     return (
       <AuthenticatedImage
         source={{ uri: tiles[0].uri }}
@@ -61,7 +79,7 @@ export default function OutfitPreviewCollage({ outfit, style }: OutfitPreviewCol
       <View style={[style, { flexDirection: 'row', overflow: 'hidden', backgroundColor: '#f2f2f2' }]}>
         {tiles.map((tile) => (
           <View key={tile.key} style={{ width: '50%', height: '100%', padding: 1 }}>
-            <AuthenticatedImage source={{ uri: tile.uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+            <TileContent tile={tile} />
           </View>
         ))}
       </View>
@@ -72,14 +90,14 @@ export default function OutfitPreviewCollage({ outfit, style }: OutfitPreviewCol
     return (
       <View style={[style, { flexDirection: 'row', overflow: 'hidden', backgroundColor: '#f2f2f2' }]}>
         <View style={{ width: '50%', height: '100%', padding: 1 }}>
-          <AuthenticatedImage source={{ uri: tiles[0].uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+          <TileContent tile={tiles[0]} />
         </View>
         <View style={{ width: '50%', height: '100%' }}>
           <View style={{ height: '50%', padding: 1 }}>
-            <AuthenticatedImage source={{ uri: tiles[1].uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+            <TileContent tile={tiles[1]} />
           </View>
           <View style={{ height: '50%', padding: 1 }}>
-            <AuthenticatedImage source={{ uri: tiles[2].uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+            <TileContent tile={tiles[2]} />
           </View>
         </View>
       </View>
@@ -90,7 +108,7 @@ export default function OutfitPreviewCollage({ outfit, style }: OutfitPreviewCol
     <View style={[style, { flexDirection: 'row', flexWrap: 'wrap', overflow: 'hidden', backgroundColor: '#f2f2f2' }]}>
       {tiles.slice(0, 4).map((tile) => (
         <View key={tile.key} style={{ width: '50%', height: '50%', padding: 1 }}>
-          <AuthenticatedImage source={{ uri: tile.uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+          <TileContent tile={tile} />
         </View>
       ))}
     </View>

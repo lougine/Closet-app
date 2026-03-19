@@ -49,6 +49,13 @@ export default function DayScreen() {
     });
   }
 
+  function openOutfitDetail(outfit: OutfitEntry) {
+    router.push({
+      pathname: '/wardrobe/outfit-detail' as any,
+      params: { outfitJson: JSON.stringify(outfit) },
+    });
+  }
+
   async function handleDelete(outfit: OutfitEntry) {
     Alert.alert('Delete Outfit', 'Remove this outfit from your calendar?', [
       { text: 'Cancel', style: 'cancel' },
@@ -166,14 +173,19 @@ export default function DayScreen() {
           />
         </TouchableOpacity>
 
-        {selectedOutfit?.previewImage || selectedOutfit?.garments?.some((garment) => garment?.imageUrl) ? (
-          <OutfitPreviewCollage outfit={selectedOutfit} style={styles.outfitImage} />
-        ) : (
-          <View style={[styles.outfitImage, { alignItems: 'center', justifyContent: 'center' }]}>
-            <Ionicons name="shirt-outline" size={48} color={COLORS.lightGray} />
-            <Text style={{ marginTop: 8, color: COLORS.subText, fontSize: 12 }}>Outfit saved</Text>
-          </View>
-        )}
+        <TouchableOpacity
+          activeOpacity={0.9}
+          onPress={() => openOutfitDetail(selectedOutfit!)}
+        >
+          {selectedOutfit?.previewImage || selectedOutfit?.garments?.some((garment) => garment?.imageUrl) ? (
+            <OutfitPreviewCollage outfit={selectedOutfit} style={styles.outfitImage} />
+          ) : (
+            <View style={[styles.outfitImage, { alignItems: 'center', justifyContent: 'center' }]}>
+              <Ionicons name="shirt-outline" size={48} color={COLORS.lightGray} />
+              <Text style={{ marginTop: 8, color: COLORS.subText, fontSize: 12 }}>Outfit saved</Text>
+            </View>
+          )}
+        </TouchableOpacity>
 
         <Modal
           transparent

@@ -36,6 +36,13 @@ export default function MonthScreen() {
     setCurrentMonth(new Date(year, month + 1, 1));
   }
 
+  function openOutfitDetail(outfit: any) {
+    router.push({
+      pathname: '/wardrobe/outfit-detail' as any,
+      params: { outfitJson: JSON.stringify(outfit) },
+    });
+  }
+
   return (
     <ScrollView style={styles.flex} contentContainerStyle={styles.container}>
       
@@ -87,6 +94,10 @@ export default function MonthScreen() {
               style={[styles.gridCell, { width: cellSize, height: cellSize + 10 }]}
               onPress={() => {
                 setSelectedDate(day);
+                if (outfit) {
+                  openOutfitDetail(outfit);
+                  return;
+                }
                 router.back();
               }}
             >
