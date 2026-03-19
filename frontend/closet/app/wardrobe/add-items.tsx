@@ -113,6 +113,16 @@ export default function AddItemsScreen() {
   const removeTag = (tag: string) =>
     update("tags", form.tags.filter((t) => t !== tag));
 
+  const parsePurchasePrice = () => {
+    const trimmed = form.cost.trim();
+    if (!trimmed) return null;
+
+    const parsed = Number.parseFloat(trimmed);
+    if (!Number.isFinite(parsed) || parsed < 0) return null;
+
+    return parsed;
+  };
+
   const handleSave = async () => {
     if (!form.name.trim()) { Alert.alert("Missing name", "Please give this item a name."); return; }
     if (!form.category) { Alert.alert("Missing category", "Please select a category."); return; }
@@ -135,6 +145,7 @@ export default function AddItemsScreen() {
       }
 
       let res;
+      const purchasePrice = parsePurchasePrice();
 
       if (image) {
         setUploadStatus("Uploading image...");
@@ -153,6 +164,9 @@ export default function AddItemsScreen() {
         formData.append('category', form.category);
         if (form.colors.length > 0) {
           formData.append('color', form.colors[0]);
+        }
+        if (purchasePrice !== null) {
+          formData.append('purchasePrice', String(purchasePrice));
         }
 
         const payload = await uploadMultipartWithRetry<any>({
@@ -176,6 +190,7 @@ export default function AddItemsScreen() {
           name: form.name.trim(),
           category: form.category,
           color: form.colors.length > 0 ? form.colors[0] : undefined,
+          purchasePrice: purchasePrice ?? undefined,
         };
 
         res = await fetch(buildApiUrl('/api/garments'), {
@@ -207,7 +222,7 @@ export default function AddItemsScreen() {
         brand: form.brand,
         size: form.size,
         tags: form.tags,
-        totalCost: parseFloat(form.cost) || 0,
+        totalCost: Number(savedGarment.purchasePrice ?? purchasePrice ?? 0),
         timesWorn: 0,
         dateAdded: form.datePurchased || new Date().toLocaleDateString("en-US", { month: "short", year: "numeric" }),
       });
