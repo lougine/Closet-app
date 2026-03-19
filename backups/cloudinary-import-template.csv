@@ -1,0 +1,69 @@
+model,id,field,imagePath,note
+garment,69b7689c05b9c5ef6e2f6f13,imageUrl,..\frontend\closet\assets\images\hanger.png,Garment: Timbs
+garment,69b7710b44e9acb1d72940fa,imageUrl,..\frontend\closet\assets\images\hanger.png,Garment: Leather
+garment,69ba0b17741aec333c81f0ff,imageUrl,..\frontend\closet\assets\images\hanger.png,Garment: Bottoms Item 1
+garment,69ba0b17741aec333c81f100,imageUrl,..\frontend\closet\assets\images\hanger.png,Garment: Dresses Item 2
+garment,69ba0b17741aec333c81f101,imageUrl,..\frontend\closet\assets\images\hanger.png,Garment: Outerwear Item 3
+garment,69ba0b17741aec333c81f102,imageUrl,..\frontend\closet\assets\images\hanger.png,Garment: Accessories Item 4
+garment,69ba0b17741aec333c81f103,imageUrl,..\frontend\closet\assets\images\hanger.png,Garment: Tops Item 5
+garment,69ba0b17741aec333c81f104,imageUrl,..\frontend\closet\assets\images\hanger.png,Garment: Outerwear Item 6
+garment,69ba0b17741aec333c81f105,imageUrl,..\frontend\closet\assets\images\hanger.png,Garment: Dresses Item 7
+garment,69ba0b17741aec333c81f106,imageUrl,..\frontend\closet\assets\images\hanger.png,Garment: Outerwear Item 8
+garment,69ba0b17741aec333c81f107,imageUrl,..\frontend\closet\assets\images\hanger.png,Garment: Accessories Item 9
+garment,69ba0b17741aec333c81f108,imageUrl,..\frontend\closet\assets\images\hanger.png,Garment: Dresses Item 10
+garment,69ba0b17741aec333c81f109,imageUrl,..\frontend\closet\assets\images\hanger.png,Garment: Bottoms Item 11
+garment,69ba0b17741aec333c81f10a,imageUrl,..\frontend\closet\assets\images\hanger.png,Garment: Accessories Item 12
+garment,69ba0b17741aec333c81f10b,imageUrl,..\frontend\closet\assets\images\hanger.png,Garment: Outerwear Item 13
+garment,69ba0b17741aec333c81f10c,imageUrl,..\frontend\closet\assets\images\hanger.png,Garment: Tops Item 14
+garment,69ba0b17741aec333c81f10d,imageUrl,..\frontend\closet\assets\images\hanger.png,Garment: Bottoms Item 15
+garment,69ba0b17741aec333c81f10e,imageUrl,..\frontend\closet\assets\images\hanger.png,Garment: Shoes Item 16
+garment,69ba0b17741aec333c81f10f,imageUrl,..\frontend\closet\assets\images\hanger.png,Garment: Outerwear Item 17
+garment,69ba0b17741aec333c81f110,imageUrl,..\frontend\closet\assets\images\hanger.png,Garment: Dresses Item 18
+garment,69ba0b17741aec333c81f111,imageUrl,..\frontend\closet\assets\images\hanger.png,Garment: Tops Item 19
+garment,69ba0b17741aec333c81f112,imageUrl,..\frontend\closet\assets\images\hanger.png,Garment: Outerwear Item 20
+garment,69ba34f8250ccc04e74c4d03,imageUrl,..\frontend\closet\assets\images\hanger.png,Garment: Probe Top
+garment,69ba35070f6af0594e2e3277,imageUrl,..\frontend\closet\assets\images\hanger.png,Garment: Probe Top
+garment,69ba49cfddc05e8337d2c59e,imageUrl,..\frontend\closet\assets\images\hanger.png,Garment: Check Tee
+garment,69ba4d66f3fc3286138ab679,imageUrl,..\frontend\closet\assets\images\hanger.png,Garment: Cover Shirt
+garment,69ba50d5bcb22c1aa4786406,imageUrl,..\frontend\closet\assets\images\hanger.png,Garment: Upload Cover Garment
+garment,69ba510f37cd3c5b1c476da9,imageUrl,..\frontend\closet\assets\images\hanger.png,Garment: Upload Cover Garment
+garment,69ba52bc748f4a4386372f85,imageUrl,..\frontend\closet\assets\images\hanger.png,Garment: Compat Garment
+user,69b6723da0a6d6e8aca70ebe,profilePicture,..\frontend\closet\assets\images\authy.png,User: lizzy <lougiineexlx@gmail.com>
+user,69b6723da0a6d6e8aca70ebe,bannerImage,..\frontend\closet\assets\images\logo.png,User: lizzy <lougiineexlx@gmail.com>
+user,69ba0b17741aec333c81f0fd,profilePicture,..\frontend\closet\assets\images\authy.png,User: seed-user- <seed-user-1773800215423-914454512@example.com>
+user,69ba0b17741aec333c81f0fd,bannerImage,..\frontend\closet\assets\images\logo.png,User: seed-user- <seed-user-1773800215423-914454512@example.com>
+user,69ba34f8250ccc04e74c4d01,profilePicture,..\frontend\closet\assets\images\authy.png,User: lookbook-probe-1773810936222 <lookbook-probe-1773810936222@example.com>
+user,69ba34f8250ccc04e74c4d01,bannerImage,..\frontend\closet\assets\images\logo.png,User: lookbook-probe-1773810936222 <lookbook-probe-1773810936222@example.com>
+user,69ba35070f6af0594e2e3275,profilePicture,..\frontend\closet\assets\images\authy.png,User: lookbook-probe-1773810951405 <lookbook-probe-1773810951405@example.com>
+user,69ba35070f6af0594e2e3275,bannerImage,..\frontend\closet\assets\images\logo.png,User: lookbook-probe-1773810951405 <lookbook-probe-1773810951405@example.com>
+user,69ba49cfddc05e8337d2c597,profilePicture,..\frontend\closet\assets\images\authy.png,User: wear-check-1773816271681 <wear-check-1773816271681@example.com>
+user,69ba49cfddc05e8337d2c597,bannerImage,..\frontend\closet\assets\images\logo.png,User: wear-check-1773816271681 <wear-check-1773816271681@example.com>
+user,69ba4d66f3fc3286138ab677,profilePicture,..\frontend\closet\assets\images\authy.png,User: cover-check-1773817190195 <cover-check-1773817190195@example.com>
+user,69ba4d66f3fc3286138ab677,bannerImage,..\frontend\closet\assets\images\logo.png,User: cover-check-1773817190195 <cover-check-1773817190195@example.com>
+user,69ba50d5bcb22c1aa4786404,profilePicture,..\frontend\closet\assets\images\authy.png,User: cover-upload-1773818069423 <cover-upload-1773818069423@example.com>
+user,69ba50d5bcb22c1aa4786404,bannerImage,..\frontend\closet\assets\images\logo.png,User: cover-upload-1773818069423 <cover-upload-1773818069423@example.com>
+user,69ba510f37cd3c5b1c476da5,profilePicture,..\frontend\closet\assets\images\authy.png,User: cover-upload-1773818127260 <cover-upload-1773818127260@example.com>
+user,69ba510f37cd3c5b1c476da5,bannerImage,..\frontend\closet\assets\images\logo.png,User: cover-upload-1773818127260 <cover-upload-1773818127260@example.com>
+user,69ba52bc748f4a4386372f83,profilePicture,..\frontend\closet\assets\images\authy.png,User: cover-compat-1773818556633 <cover-compat-1773818556633@example.com>
+user,69ba52bc748f4a4386372f83,bannerImage,..\frontend\closet\assets\images\logo.png,User: cover-compat-1773818556633 <cover-compat-1773818556633@example.com>
+outfit,69b49b25c6a2c07d95b1240a,previewImage,..\frontend\closet\assets\images\styling.png,Outfit: Casual Friday
+outfit,69ba0b17741aec333c81f115,previewImage,..\frontend\closet\assets\images\styling.png,Outfit: Generated Outfit 2
+outfit,69ba0b17741aec333c81f116,previewImage,..\frontend\closet\assets\images\styling.png,Outfit: Generated Outfit 3
+outfit,69ba0b17741aec333c81f117,previewImage,..\frontend\closet\assets\images\styling.png,Outfit: Generated Outfit 4
+outfit,69ba0b17741aec333c81f118,previewImage,..\frontend\closet\assets\images\styling.png,Outfit: Generated Outfit 5
+outfit,69ba0b17741aec333c81f119,previewImage,..\frontend\closet\assets\images\styling.png,Outfit: Generated Outfit 6
+outfit,69ba0b17741aec333c81f11a,previewImage,..\frontend\closet\assets\images\styling.png,Outfit: Generated Outfit 7
+outfit,69ba0b17741aec333c81f11b,previewImage,..\frontend\closet\assets\images\styling.png,Outfit: Generated Outfit 8
+outfit,69ba0b17741aec333c81f11c,previewImage,..\frontend\closet\assets\images\styling.png,Outfit: Generated Outfit 9
+outfit,69ba0b17741aec333c81f11d,previewImage,..\frontend\closet\assets\images\styling.png,Outfit: Generated Outfit 10
+outfit,69ba34f8250ccc04e74c4d0a,previewImage,..\frontend\closet\assets\images\styling.png,Outfit: Probe Lookbook
+outfit,69ba35070f6af0594e2e327a,previewImage,..\frontend\closet\assets\images\styling.png,Outfit: Probe Lookbook
+outfit,69ba3719dccd71e9de66aa6e,previewImage,..\frontend\closet\assets\images\styling.png,Outfit: Summer Fits
+outfit,69ba3784dccd71e9de66aad7,previewImage,..\frontend\closet\assets\images\styling.png,Outfit: Summer Fits
+outfit,69ba4d66f3fc3286138ab67c,previewImage,..\frontend\closet\assets\images\styling.png,Outfit: Lookbook A
+outfit,69ba50d5bcb22c1aa4786409,previewImage,..\frontend\closet\assets\images\styling.png,Outfit: Lookbook Upload
+outfit,69ba510f37cd3c5b1c476db3,previewImage,..\frontend\closet\assets\images\styling.png,Outfit: Lookbook Upload
+outfit,69ba52bc748f4a4386372f88,previewImage,..\frontend\closet\assets\images\styling.png,Outfit: Compat Lookbook
+outfit,69ba5592481ab99520d8ed2d,previewImage,..\frontend\closet\assets\images\styling.png,Outfit: Create outfit Outfit
+outfit,69ba566e481ab99520d8ef93,previewImage,..\frontend\closet\assets\images\styling.png,Outfit: Create outfit Outfit
+outfit,69bb2f0b6ab19fbd00c92ea1,previewImage,..\frontend\closet\assets\images\styling.png,Outfit: Lara's wedding Look 1

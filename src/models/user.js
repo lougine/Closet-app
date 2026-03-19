@@ -4,6 +4,23 @@ const Garment = require('./garment');
 const Outfit = require('./outfit');
 const Usage = require('./usage');
 
+const imageMetadataSchema = new mongoose.Schema({
+  imageUrl: { type: String, default: null },
+  provider: { type: String, default: 'local' },
+  publicId: { type: String, default: null },
+  secureUrl: { type: String, default: null },
+  assetId: { type: String, default: null },
+  version: { type: Number, default: null },
+  resourceType: { type: String, default: null },
+  format: { type: String, default: null },
+  width: { type: Number, default: null },
+  height: { type: Number, default: null },
+  bytes: { type: Number, default: null },
+  mimeType: { type: String, default: null },
+  originalFilename: { type: String, default: null },
+  uploadedAt: { type: Date, default: null },
+}, { _id: false });
+
 const deleteUserOwnedData = async (userIds = []) => {
   if (!Array.isArray(userIds) || userIds.length === 0) {
     return;
@@ -22,7 +39,9 @@ const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true, index: true },
   password: { type: String, required: true },
   profilePicture: { type: String, default: null },
+  profilePictureMetadata: { type: imageMetadataSchema, default: null },
   bannerImage: { type: String, default: null },
+  bannerImageMetadata: { type: imageMetadataSchema, default: null },
   bannerPreset: { type: String, default: 'pink' },
   age: { type: Number, min: 1, max: 99, default: null },
   heightCm: { type: Number, min: 1, max: 272, default: null },
