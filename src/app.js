@@ -16,10 +16,12 @@ app.get('/', (req, res) => {
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
+const healthRoutes = require('./routes/healthRoutes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/uploads', uploadRoutes);
+app.use('/api/health', healthRoutes);
 
 const garmentRoutes = require("./routes/garmentRoutes");
 const usageRoutes = require('./routes/usageRoutes');

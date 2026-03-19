@@ -3,6 +3,7 @@ const fs = require('fs/promises');
 const User = require('../models/user');
 const Garment = require('../models/garment');
 const Outfit = require('../models/outfit');
+const CommunityPost = require('../models/communityPost');
 const Usage = require('../models/usage');
 const {
   extractFilenameFromImageUrl,
@@ -20,7 +21,7 @@ const buildMissingOwnerFilter = (existingUserIds) => {
 };
 
 const buildReferencedImageSet = async () => {
-  const [garments, users] = await Promise.all([
+  const [garments, users, outfits, communityPosts] = await Promise.all([
     Garment.find({ imageUrl: { $exists: true, $ne: null } }).select('imageUrl').lean(),
     User.find({
       $or: [
@@ -28,6 +29,8 @@ const buildReferencedImageSet = async () => {
         { bannerImage: { $exists: true, $ne: null } },
       ],
     }).select('profilePicture bannerImage').lean(),
+    Outfit.find({ previewImage: { $exists: true, $ne: null, $ne: '' } }).select('previewImage').lean(),
+    CommunityPost.find({ imageUrl: { $exists: true, $ne: null } }).select('imageUrl').lean(),
   ]);
 
   const referencedFilenames = new Set();
@@ -42,6 +45,16 @@ const buildReferencedImageSet = async () => {
     const bannerFilename = extractFilenameFromImageUrl(user.bannerImage);
     if (profileFilename) referencedFilenames.add(profileFilename);
     if (bannerFilename) referencedFilenames.add(bannerFilename);
+  }
+
+  for (const outfit of outfits) {
+    const filename = extractFilenameFromImageUrl(outfit.previewImage);
+    if (filename) referencedFilenames.add(filename);
+  }
+
+  for (const post of communityPosts) {
+    const filename = extractFilenameFromImageUrl(post.imageUrl);
+    if (filename) referencedFilenames.add(filename);
   }
 
   return referencedFilenames;

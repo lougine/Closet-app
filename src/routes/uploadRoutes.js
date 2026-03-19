@@ -6,7 +6,7 @@ const Outfit = require('../models/outfit');
 const User = require('../models/user');
 const authMiddleware = require('../middleware/authMiddleware');
 const { isSafeFilename } = require('../utils/imageFileUtils');
-const { getReadableLocalPath } = require('../services/storage');
+const { getReadableLocalPath, getManagedReadUrl } = require('../services/storage');
 
 const router = express.Router();
 
@@ -41,17 +41,44 @@ router.get('/:filename', async (req, res) => {
     }
 
     const fullPath = await getReadableLocalPath(filename);
-    if (!fullPath) {
+    if (fullPath) {
+      try {
+        await fs.access(fullPath);
+        return res.sendFile(fullPath);
+      } catch {
+        // Fall through to managed remote storage lookup.
+      }
+    }
+
+    const managedReadUrl = await getManagedReadUrl(filename);
+    if (!managedReadUrl) {
       return res.status(404).json({ message: 'Image not found.' });
     }
 
-    try {
-      await fs.access(fullPath);
-    } catch {
-      return res.status(404).json({ message: 'Image not found.' });
+    if (typeof fetch !== 'function') {
+      return res.status(500).json({ message: 'Server runtime does not support remote fetch.' });
     }
 
-    return res.sendFile(fullPath);
+    const upstream = await fetch(managedReadUrl);
+    if (upstream.status === 404) {
+      return res.status(404).json({ message: 'Image not found.' });
+    }
+    if (!upstream.ok) {
+      return res.status(502).json({ message: 'Failed to retrieve image from storage.' });
+    }
+
+    const contentType = upstream.headers.get('content-type');
+    if (contentType) {
+      res.setHeader('Content-Type', contentType);
+    }
+
+    const cacheControl = upstream.headers.get('cache-control');
+    if (cacheControl) {
+      res.setHeader('Cache-Control', cacheControl);
+    }
+
+    const payload = Buffer.from(await upstream.arrayBuffer());
+    return res.send(payload);
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }

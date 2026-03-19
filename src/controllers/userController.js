@@ -4,6 +4,7 @@ const User = require('../models/user');
 const bcrypt = require('bcryptjs');
 const { createImageUpload } = require('../middleware/imageUploadMiddleware');
 const { deleteImageByUrl } = require('../utils/imageFileUtils');
+const { buildImageMetadata } = require('../utils/imageMetadata');
 
 exports.uploadProfileImage = createImageUpload('profileImage');
 exports.uploadBannerImage = createImageUpload('bannerImage');
@@ -61,6 +62,7 @@ exports.updateProfileImage = async (req, res) => {
 
     const previousImage = user.profilePicture;
     user.profilePicture = `/uploads/${req.file.filename}`;
+    user.profilePictureMetadata = buildImageMetadata(req.file, user.profilePicture);
     await user.save();
 
     if (previousImage && previousImage !== user.profilePicture) {
@@ -87,6 +89,7 @@ exports.updateBannerImage = async (req, res) => {
 
     const previousBanner = user.bannerImage;
     user.bannerImage = `/uploads/${req.file.filename}`;
+    user.bannerImageMetadata = buildImageMetadata(req.file, user.bannerImage);
     await user.save();
 
     if (previousBanner && previousBanner !== user.bannerImage) {

@@ -105,6 +105,9 @@ describe('Image upload endpoints', () => {
 
     expect(response.status).toBe(201);
     expect(response.body.imageUrl).toMatch(/^\/uploads\//);
+    expect(response.body.imageMetadata).toBeTruthy();
+    expect(response.body.imageMetadata.provider).toBeTruthy();
+    expect(response.body.imageMetadata.bytes).toBeGreaterThan(0);
 
     const filename = trackImageFromResponse(response);
     expect(filename).toBeTruthy();
@@ -256,6 +259,9 @@ describe('Image upload endpoints', () => {
 
     expect(response.status).toBe(200);
     expect(response.body.profilePicture).toMatch(/^\/uploads\//);
+    expect(response.body.profilePictureMetadata).toBeTruthy();
+    expect(response.body.profilePictureMetadata.provider).toBeTruthy();
+    expect(response.body.profilePictureMetadata.bytes).toBeGreaterThan(0);
 
     const filename = extractFilenameFromImageUrl(response.body.profilePicture);
     createdFilenames.add(filename);
@@ -273,6 +279,9 @@ describe('Image upload endpoints', () => {
 
     expect(uploadResponse.status).toBe(200);
     expect(uploadResponse.body.bannerImage).toMatch(/^\/uploads\//);
+    expect(uploadResponse.body.bannerImageMetadata).toBeTruthy();
+    expect(uploadResponse.body.bannerImageMetadata.provider).toBeTruthy();
+    expect(uploadResponse.body.bannerImageMetadata.bytes).toBeGreaterThan(0);
 
     const bannerFilename = extractFilenameFromImageUrl(uploadResponse.body.bannerImage);
     createdFilenames.add(bannerFilename);
