@@ -1,5 +1,5 @@
 import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import * as SecureStore from "expo-secure-store";
 import { Alert, Animated, Dimensions, FlatList, Image, StatusBar, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from "react-native";
@@ -13,6 +13,11 @@ const { width: W } = Dimensions.get("window");
 const MODES    = ["Create outfit", "Randomize", "AI recommended"] as const;
 type Mode      = typeof MODES[number];
 const TABS     = ["All", "Footwear", "Tops", "Bottoms"];
+
+const normalizeCategory = (category?: string) => {
+  if (!category) return "";
+  return /^shoes$/i.test(category) ? "Footwear" : category;
+};
 
 type RecommendedGarment = {
   _id: string;
@@ -58,7 +63,10 @@ function WardrobePanel({
   const [searchQuery, setSearchQuery] = useState("");
 
   const filtered = items.filter(item => {
-    if (activeTab !== "All" && !item.category?.includes(activeTab)) return false;
+    if (
+      activeTab !== "All" &&
+      !item.category?.some((category) => normalizeCategory(category) === activeTab)
+    ) return false;
     if (searchQuery && !item.label.toLowerCase().includes(searchQuery.toLowerCase())) return false;
     return true;
   });
@@ -165,6 +173,7 @@ function WardrobePanel({
 
 export default function StylingScreen() {
   const params = useLocalSearchParams<{ mode?: string; date?: string }>();
+  const router = useRouter();
 
   // Map incoming route param → tab mode
   const resolveInitialMode = (): Mode => {
@@ -354,6 +363,18 @@ export default function StylingScreen() {
   const selectedItems = items.filter(i => selected.includes(String(i.id)));
   const selectedGridColumns = Math.min(2, selectedItems.length);
 
+  const handleSelectedItemPress = (item: (typeof selectedItems)[number]) => {
+    if (mode === "Create outfit") {
+      toggleItem(String(item.id));
+      return;
+    }
+
+    router.push({
+      pathname: "/wardrobe/item-detail" as any,
+      params: { itemJson: JSON.stringify(item) },
+    });
+  };
+
   return (
     <View style={s.root}>
       <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
@@ -412,7 +433,7 @@ export default function StylingScreen() {
                   borderRadius: 12, overflow: "hidden",
                   alignItems: "center", justifyContent: "center",
                 }}
-                onPress={() => toggleItem(String(item.id))}
+                onPress={() => handleSelectedItemPress(item)}
               >
                 {item.image
                   ? <AuthenticatedImage source={{ uri: item.image }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />

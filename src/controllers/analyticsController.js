@@ -166,8 +166,31 @@ exports.getCategories = async (req, res) => {
     const result = await Garment.aggregate([
       { $match: { owner: ownerObjectId } },
       {
+        $addFields: {
+          normalizedCategory: {
+            $switch: {
+              branches: [
+                {
+                  case: {
+                    $regexMatch: {
+                      input: { $ifNull: ['$category', ''] },
+                      regex: '^(shoes|footwear)$',
+                      options: 'i',
+                    },
+                  },
+                  then: 'Footwear',
+                },
+              ],
+              default: {
+                $ifNull: ['$category', 'Unknown'],
+              },
+            },
+          },
+        },
+      },
+      {
         $group: {
-          _id: { $ifNull: ['$category', 'Unknown'] },
+          _id: '$normalizedCategory',
           count: { $sum: 1 },
         },
       },

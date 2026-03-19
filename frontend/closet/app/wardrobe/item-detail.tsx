@@ -11,9 +11,10 @@ import {
   IMAGE_UPLOAD_QUALITY,
   validateImageFileSize,
 } from "../../constants/imageUpload";
-import { buildApiUrl, buildImageUrl } from "../../constants/api";
+import { buildApiUrl, buildAuthHeaders, buildImageUrl } from "../../constants/api";
 import { getUploadErrorMessage, uploadMultipartWithRetry } from "../../services/uploadRequest";
 import { useWardrobe, type ClothingItem } from "../../context/wardrobeContext";
+import OutfitPreviewCollage from "../../components/OutfitPreviewCollage";
 import { s } from "../../Styles/wardrobe/item-detail.styles";
 
 const DETAIL_TABS = ["Details", "Styles", "Stats"];
@@ -35,6 +36,55 @@ const COLOR_HEX_BY_LABEL = COLOR_OPTIONS.reduce<Record<string, string>>((acc, op
 }, {});
 
 const resolveColorHex = (value: string) => COLOR_HEX_BY_LABEL[value] || value;
+
+type ItemOutfitSummary = {
+  _id: string;
+  name?: string;
+  date?: string;
+  garmentIds?: string[];
+  garments?: { _id?: string; imageUrl?: string | null }[];
+  previewImage?: string;
+  isLookbook?: boolean;
+};
+
+const toIdString = (value: unknown): string => {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "object" && value !== null && "_id" in value) {
+    return String((value as { _id?: unknown })._id ?? "");
+  }
+  return String(value);
+};
+
+const normalizeItemOutfit = (raw: any): ItemOutfitSummary => {
+  const garments = Array.isArray(raw?.garments) ? raw.garments : [];
+  const garmentIds = Array.isArray(raw?.garmentIds)
+    ? raw.garmentIds.map((value: unknown) => toIdString(value)).filter(Boolean)
+    : garments.map((garment: any) => toIdString(garment)).filter(Boolean);
+
+  return {
+    _id: toIdString(raw?._id),
+    name: raw?.name,
+    date: raw?.date,
+    garmentIds,
+    garments,
+    previewImage: raw?.previewImage,
+    isLookbook: Boolean(raw?.isLookbook),
+  };
+};
+
+const outfitIncludesItem = (outfit: ItemOutfitSummary, itemId: string) => {
+  const normalizedItemId = String(itemId);
+  const byIds = Array.isArray(outfit.garmentIds)
+    ? outfit.garmentIds.some((id) => String(id) === normalizedItemId)
+    : false;
+
+  if (byIds) return true;
+
+  return Array.isArray(outfit.garments)
+    ? outfit.garments.some((garment) => toIdString(garment?._id) === normalizedItemId)
+    : false;
+};
 
 export default function ItemDetailScreen() {
   const router = useRouter();
@@ -61,6 +111,39 @@ export default function ItemDetailScreen() {
   const [savingColor, setSavingColor] = useState(false);
   const [deletingItem, setDeletingItem] = useState(false);
   const [markingWorn, setMarkingWorn] = useState(false);
+  const [relatedOutfits, setRelatedOutfits] = useState<ItemOutfitSummary[]>([]);
+  const [loadingRelatedOutfits, setLoadingRelatedOutfits] = useState(false);
+
+  const fetchRelatedOutfits = async () => {
+    try {
+      setLoadingRelatedOutfits(true);
+      const token = await SecureStore.getItemAsync("userToken");
+      if (!token) {
+        setRelatedOutfits([]);
+        return;
+      }
+
+      const response = await fetch(buildApiUrl("/api/outfits"), {
+        headers: buildAuthHeaders(token),
+      });
+
+      if (!response.ok) {
+        setRelatedOutfits([]);
+        return;
+      }
+
+      const payload = await response.json();
+      const normalized = Array.isArray(payload)
+        ? payload.map((entry: any) => normalizeItemOutfit(entry))
+        : [];
+
+      setRelatedOutfits(normalized.filter((outfit) => outfitIncludesItem(outfit, item.id)));
+    } catch {
+      setRelatedOutfits([]);
+    } finally {
+      setLoadingRelatedOutfits(false);
+    }
+  };
 
   const fetchTimesWorn = async () => {
     try {
@@ -90,6 +173,10 @@ export default function ItemDetailScreen() {
 
   useEffect(() => {
     fetchTimesWorn();
+  }, [item.id]);
+
+  useEffect(() => {
+    fetchRelatedOutfits();
   }, [item.id]);
 
   const update = (changes: Partial<ClothingItem>) =>
@@ -527,13 +614,49 @@ export default function ItemDetailScreen() {
         )}
 
         {activeTab === "Styles" && (
-          <View style={s.emptyState}>
-            <Text style={s.emptyTitle}>No outfits yet</Text>
-            <Text style={s.emptySubtitle}>Add this piece to an outfit to see it here</Text>
-            <TouchableOpacity style={s.pinkBtn}>
-              <Text style={s.pinkBtnText}>+ Create Outfit</Text>
-            </TouchableOpacity>
-          </View>
+          loadingRelatedOutfits ? (
+            <View style={s.emptyState}>
+              <Text style={s.emptyTitle}>Loading outfits...</Text>
+              <Text style={s.emptySubtitle}>Fetching styles that include this item</Text>
+            </View>
+          ) : relatedOutfits.length === 0 ? (
+            <View style={s.emptyState}>
+              <Text style={s.emptyTitle}>No outfits yet</Text>
+              <Text style={s.emptySubtitle}>Add this piece to an outfit to see it here</Text>
+              <TouchableOpacity style={s.pinkBtn} onPress={() => router.push("/wardrobe/outfit" as any)}>
+                <Text style={s.pinkBtnText}>+ Create Outfit</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={s.stylesList}>
+              {relatedOutfits.map((outfit) => {
+                const count = Array.isArray(outfit.garmentIds) ? outfit.garmentIds.length : 0;
+                const dateLabel = outfit.date ? new Date(outfit.date).toLocaleDateString() : "No date";
+
+                return (
+                  <TouchableOpacity
+                    key={outfit._id}
+                    style={s.styleCard}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/wardrobe/outfit-detail" as any,
+                        params: { outfitJson: JSON.stringify(outfit) },
+                      })
+                    }
+                  >
+                    <OutfitPreviewCollage outfit={outfit} style={s.stylePreview} />
+                    <View style={s.styleMeta}>
+                      <Text style={s.styleName} numberOfLines={1}>
+                        {outfit.name || "Untitled Outfit"}
+                      </Text>
+                      <Text style={s.styleSubtext}>{count} items</Text>
+                      <Text style={s.styleSubtext}>{dateLabel}</Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )
         )}
 
         {activeTab === "Stats" && (
