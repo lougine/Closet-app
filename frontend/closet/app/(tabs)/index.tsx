@@ -70,6 +70,11 @@ function GridItem({ item, onPress }: { item: any; onPress: () => void }) {
 
 const FILTER_TABS = [ "All", "Outerwear", "Tops", "Bottoms", "Footwear", "Accessories" ];
 
+const normalizeCategory = (category?: string) => {
+  if (!category) return "";
+  return /^shoes$/i.test(category) ? "Footwear" : category;
+};
+
 const CATEGORY_TREE: Record<string, string[]> = {
   Tops: [ "T-Shirt", "Blouse", "Crop Top", "Tank Top", "Shirt", "Hoodie", "Sweater", "Cardigan"],
   Bottoms: [ "Jeans", "Skirt", "Shorts", "Trousers", "Leggings", "Cargo Pants", "Sweatpants" ],
@@ -467,14 +472,16 @@ export default function WardrobeScreen() {
   };
 
   const filtered = items.filter((item) => {
+    const normalizedItemCategories = (item.category ?? []).map((category) => normalizeCategory(category));
+
     if (
       searchQuery &&
       !item.label.toLowerCase().includes(searchQuery.toLowerCase())
     )
       return false;
-    if (activeFilter !== "All" && !item.category?.includes(activeFilter))
+    if (activeFilter !== "All" && !normalizedItemCategories.includes(activeFilter))
       return false;
-    if (filters.category && !item.category?.includes(filters.category))
+    if (filters.category && !normalizedItemCategories.includes(normalizeCategory(filters.category)))
       return false;
     if (
       filters.subcategories.length > 0 &&

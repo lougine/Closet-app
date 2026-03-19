@@ -43,6 +43,23 @@ const CHART_COLORS = [
   '#C8E6C9', '#FFD180', '#FFAB91', '#CE93D8',
 ];
 
+const NAMED_COLOUR_TO_HEX: Record<string, string> = {
+  black: '#000000',
+  white: '#FFFFFF',
+  blue: '#3B82F6',
+  green: '#22C55E',
+  red: '#EF4444',
+  beige: '#D6C6A9',
+  navy: '#1E3A8A',
+  gray: '#9CA3AF',
+  grey: '#9CA3AF',
+  brown: '#8B5E3C',
+  pink: '#EC4899',
+  purple: '#8B5CF6',
+  yellow: '#EAB308',
+  orange: '#F97316',
+};
+
 const { width: SW } = Dimensions.get('window');
 const TREND_RANGE_OPTIONS = [3, 6, 12] as const;
 type TrendRangeMonths = (typeof TREND_RANGE_OPTIONS)[number];
@@ -139,6 +156,24 @@ function formatTrendMonth(monthKey: string) {
     year: '2-digit',
     timeZone: 'UTC',
   });
+}
+
+function isDrawableColour(value: string) {
+  return (
+    /^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(value)
+    || /^rgba?\(/i.test(value)
+    || /^hsla?\(/i.test(value)
+    || /^transparent$/i.test(value)
+  );
+}
+
+function toDrawableColour(rawValue: string | null | undefined, fallback: string) {
+  const trimmed = rawValue?.trim();
+  if (!trimmed) return fallback;
+  if (isDrawableColour(trimmed)) return trimmed;
+
+  const mapped = NAMED_COLOUR_TO_HEX[trimmed.toLowerCase()];
+  return mapped || fallback;
 }
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
@@ -320,13 +355,21 @@ export default function AnalyticsScreen() {
       return best;
     }, null);
 
+  const normalizedColours = colours.map((entry, i) => ({
+    ...entry,
+    chartColour: toDrawableColour(
+      entry.colour || entry.label,
+      CHART_COLORS[i % CHART_COLORS.length]
+    ),
+  }));
+
   // Top 2 colours for the "favourite colours" label
-  const topColours = [...colours].sort((a, b) => b.count - a.count).slice(0, 2);
+  const topColours = [...normalizedColours].sort((a, b) => b.count - a.count).slice(0, 2);
 
   // Pie chart data for colours
-  const colourPieData = colours.map((c, i) => ({
+  const colourPieData = normalizedColours.map((c, i) => ({
     count: c.count,
-    colour: c.colour || CHART_COLORS[i % CHART_COLORS.length],
+    colour: c.chartColour || CHART_COLORS[i % CHART_COLORS.length],
   }));
   const pieSlices = buildPieSlices(colourPieData, 80, 100, 100);
 
@@ -440,7 +483,7 @@ export default function AnalyticsScreen() {
           {/* Category rows */}
           {/* Categories come from backend but we define the expected ones here */}
           {/* TODO: backend should return these category names exactly:
-              Tops, Bottoms, Dresses, Shoes, Bags, Accessories
+              Tops, Bottoms, Dresses, Footwear, Bags, Accessories
               Add more if needed — they'll appear automatically */}
           {categories.length > 0 ? categories.map((cat, i) => {
             const pct = totalItems > 0 ? Math.round((cat.count / totalItems) * 100) : 0;
@@ -463,7 +506,7 @@ export default function AnalyticsScreen() {
             );
           }) : (
             // Fallback if no data yet — shows the expected categories as empty
-            ['Tops', 'Bottoms', 'Dresses', 'Shoes', 'Bags', 'Accessories'].map((name, i) => (
+            ['Tops', 'Bottoms', 'Dresses', 'Footwear', 'Bags', 'Accessories'].map((name, i) => (
               <View key={name} style={styles.categoryRow}>
                 <View style={styles.categoryLeft}>
                   <View style={[styles.categoryDot, { backgroundColor: CHART_COLORS[i] }]} />
@@ -499,10 +542,10 @@ export default function AnalyticsScreen() {
 
               {/* Colour legend on the right */}
               <View style={styles.colourLegend}>
-                {colours.slice(0, 6).map((c, i) => (
+                {normalizedColours.slice(0, 6).map((c, i) => (
                   <View key={i} style={styles.legendRow}>
                     <View style={[styles.legendDot, {
-                      backgroundColor: c.colour || CHART_COLORS[i % CHART_COLORS.length]
+                      backgroundColor: c.chartColour || CHART_COLORS[i % CHART_COLORS.length]
                     }]} />
                     <Text style={styles.legendLabel}>{c.label}</Text>
                   </View>
@@ -514,11 +557,11 @@ export default function AnalyticsScreen() {
             {topColours.length >= 2 && (
               <Text style={styles.favouriteColoursText}>
                 Your favourites are{' '}
-                <Text style={[styles.colourBold, { color: topColours[0].colour || COLORS.hotPink }]}>
+                <Text style={[styles.colourBold, { color: topColours[0].chartColour || COLORS.hotPink }]}>
                   {topColours[0].label}
                 </Text>
                 {' '}and{' '}
-                <Text style={[styles.colourBold, { color: topColours[1].colour || COLORS.lightPink }]}>
+                <Text style={[styles.colourBold, { color: topColours[1].chartColour || COLORS.lightPink }]}>
                   {topColours[1].label}
                 </Text>
               </Text>
