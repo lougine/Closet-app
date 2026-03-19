@@ -36,3 +36,23 @@
 - Run orphan cleanup dry-run then live:
 - `npm run cleanup:orphans -- --dry-run`
 - `npm run cleanup:orphans`
+
+## 7) Bulk image restore to Cloudinary (manual mapping)
+- Use when DB records exist but image fields are empty and you have source files.
+- Generate a template from current records:
+- `npm run storage:export-image-template`
+- Fill `imagePath` values in the generated CSV.
+- Prepare a CSV mapping file with header: `model,id,field,imagePath`.
+- Sample file: `backups/cloudinary-import-sample.csv`.
+- Dry-run first:
+- `npm run storage:import-images -- --csv=backups/cloudinary-import-sample.csv --dry-run`
+- Execute import:
+- `npm run storage:import-images -- --csv=backups/cloudinary-import-sample.csv`
+- Optional to avoid replacing already set image fields:
+- `npm run storage:import-images -- --csv=backups/cloudinary-import-sample.csv --skip-existing`
+
+Supported mappings:
+- `garment` -> `imageUrl`
+- `user` -> `profilePicture`, `bannerImage`
+- `outfit` -> `previewImage`
+- `communitypost` -> `imageUrl`
