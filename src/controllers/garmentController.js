@@ -3,6 +3,7 @@ const Garment = require("../models/garment");
 const Usage = require('../models/usage');
 const { createImageUpload } = require("../middleware/imageUploadMiddleware");
 const { deleteImageByUrl } = require("../utils/imageFileUtils");
+const { buildImageMetadata } = require('../utils/imageMetadata');
 
 exports.uploadImage = createImageUpload("image");
 
@@ -16,6 +17,7 @@ exports.createGarment = async (req, res) => {
     // If an image was uploaded, add the path to the garment data
     if (req.file) {
       garmentData.imageUrl = `/uploads/${req.file.filename}`;
+      garmentData.imageMetadata = buildImageMetadata(req.file, garmentData.imageUrl);
     }
 
     const garment = new Garment(garmentData);
@@ -120,8 +122,14 @@ exports.updateGarment = async (req, res) => {
     const previousImageUrl = garment.imageUrl;
 
     Object.assign(garment, req.body);
+
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'imageUrl') && !req.body.imageUrl) {
+      garment.imageMetadata = null;
+    }
+
     if (req.file) {
       garment.imageUrl = `/uploads/${req.file.filename}`;
+      garment.imageMetadata = buildImageMetadata(req.file, garment.imageUrl);
     }
 
     await garment.save();

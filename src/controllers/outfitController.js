@@ -4,6 +4,7 @@ const User = require('../models/user');
 const Usage = require('../models/usage');
 const { createImageUpload } = require('../middleware/imageUploadMiddleware');
 const { deleteImageByUrl } = require('../utils/imageFileUtils');
+const { buildImageMetadata } = require('../utils/imageMetadata');
 
 const DEFAULT_RANDOMIZE_COUNT = 4;
 const MAX_STYLING_COUNT = 8;
@@ -135,19 +136,30 @@ const mapGarment = (garment) => ({
 
 exports.uploadCoverImage = createImageUpload('coverImage');
 
-const cleanupReplacedPreviewImage = async (owner, previousPreviewImage, nextPreviewImage) => {
+const cleanupReplacedPreviewImage = async (owner, previousPreviewImage, nextPreviewImage, options = {}) => {
   if (!previousPreviewImage || previousPreviewImage === nextPreviewImage) return;
 
-  const [isGarmentImage, isUserProfileImage] = await Promise.all([
+  const { excludeOutfitId } = options;
+  const outfitReferenceFilter = {
+    owner,
+    previewImage: previousPreviewImage,
+  };
+
+  if (excludeOutfitId) {
+    outfitReferenceFilter._id = { $ne: excludeOutfitId };
+  }
+
+  const [isGarmentImage, isUserProfileImage, isStillUsedByOutfit] = await Promise.all([
     Garment.exists({ owner, imageUrl: previousPreviewImage }),
     User.exists({
       _id: owner,
       $or: [{ profilePicture: previousPreviewImage }, { bannerImage: previousPreviewImage }],
     }),
+    Outfit.exists(outfitReferenceFilter),
   ]);
 
-  // Only delete files that are not referenced by garments/profile images.
-  if (!isGarmentImage && !isUserProfileImage) {
+  // Only delete files that are not referenced by garments/profile images/other outfits.
+  if (!isGarmentImage && !isUserProfileImage && !isStillUsedByOutfit) {
     await deleteImageByUrl(previousPreviewImage);
   }
 };
@@ -276,11 +288,14 @@ exports.updateOutfit = async (req, res) => {
     Object.assign(outfit, req.body);
     if (req.file) {
       outfit.previewImage = `/uploads/${req.file.filename}`;
+      outfit.previewImageMetadata = buildImageMetadata(req.file, outfit.previewImage);
+    } else if (Object.prototype.hasOwnProperty.call(req.body || {}, 'previewImage') && !req.body.previewImage) {
+      outfit.previewImageMetadata = null;
     }
     await outfit.save();
 
     if (req.file) {
-      await cleanupReplacedPreviewImage(owner, oldPreviewImage, outfit.previewImage);
+      await cleanupReplacedPreviewImage(owner, oldPreviewImage, outfit.previewImage, { excludeOutfitId: outfit._id });
     }
 
     if (hasGarmentsUpdate) {
@@ -330,14 +345,18 @@ exports.updateOutfitCover = async (req, res) => {
 
     if (req.file) {
       outfit.previewImage = `/uploads/${req.file.filename}`;
+      outfit.previewImageMetadata = buildImageMetadata(req.file, outfit.previewImage);
     } else if (Object.prototype.hasOwnProperty.call(req.body || {}, 'previewImage')) {
       outfit.previewImage = req.body.previewImage || '';
+      if (!outfit.previewImage) {
+        outfit.previewImageMetadata = null;
+      }
     }
 
     await outfit.save();
 
     if (req.file) {
-      await cleanupReplacedPreviewImage(owner, previousPreviewImage, outfit.previewImage);
+      await cleanupReplacedPreviewImage(owner, previousPreviewImage, outfit.previewImage, { excludeOutfitId: outfit._id });
     }
 
     const populated = await Outfit.findById(outfit._id)
@@ -366,6 +385,12 @@ exports.deleteOutfit = async (req, res) => {
       user: req.user.userId,
       outfit: req.params.id,
     });
+
+    if (deletedOutfit.previewImage) {
+      await cleanupReplacedPreviewImage(req.user.userId, deletedOutfit.previewImage, '', {
+        excludeOutfitId: deletedOutfit._id,
+      });
+    }
 
     res.json({ message: "Outfit deleted" });
 

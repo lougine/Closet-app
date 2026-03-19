@@ -10,6 +10,7 @@ const {
   IMAGE_UPLOAD_MAX_DIMENSION_PX,
   IMAGE_UPLOAD_MAX_PIXELS,
 } = require('../config/upload');
+const { registerUploadedFile } = require('../services/storage');
 
 const uploadsDir = path.join(__dirname, '../../uploads');
 
@@ -115,6 +116,8 @@ const createImageUpload = (fieldName) => {
 
       try {
         await validateUploadedImage(req.file.path);
+        const storageUpload = await registerUploadedFile(req.file);
+        req.file.storage = storageUpload || null;
         next();
       } catch (validationError) {
         await deleteFileSilently(req.file.path);
@@ -153,6 +156,10 @@ const imageUploadErrorHandler = (err, req, res, next) => {
 
   if (err.code === 'IMAGE_DIMENSIONS_EXCEEDED' || err.code === 'IMAGE_PIXELS_EXCEEDED') {
     return res.status(400).json({ message: err.message || 'Image dimensions exceed limits.' });
+  }
+
+  if (err.code === 'STORAGE_UPLOAD_FAILED') {
+    return res.status(502).json({ message: err.message || 'Image upload to storage failed.' });
   }
 
   return next(err);
