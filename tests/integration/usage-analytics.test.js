@@ -5,6 +5,7 @@ const { MongoMemoryServer } = require('mongodb-memory-server');
 
 const User = require('../../src/models/user');
 const Garment = require('../../src/models/garment');
+const Outfit = require('../../src/models/outfit');
 const Usage = require('../../src/models/usage');
 
 let mongoServer;
@@ -48,6 +49,7 @@ afterEach(async () => {
   await Promise.all([
     User.deleteMany({}),
     Garment.deleteMany({}),
+    Outfit.deleteMany({}),
     Usage.deleteMany({}),
   ]);
 });
@@ -114,6 +116,71 @@ describe('Usage endpoints', () => {
 });
 
 describe('Analytics endpoints', () => {
+  test('GET /api/analytics/overview counts only non-lookbook outfits and worn outfits in that scope', async () => {
+    const user = await createUser();
+    const garmentA = await Garment.create({
+      owner: user._id,
+      name: 'Cream Tee',
+      category: 'Tops',
+      color: 'White',
+      purchasePrice: 30,
+    });
+    const garmentB = await Garment.create({
+      owner: user._id,
+      name: 'Navy Pants',
+      category: 'Bottoms',
+      color: 'Blue',
+      purchasePrice: 70,
+    });
+
+    const wornOutfit = await Outfit.create({
+      owner: user._id,
+      name: 'Office Outfit',
+      garments: [garmentA._id, garmentB._id],
+      date: new Date('2026-03-10T00:00:00.000Z'),
+      isLookbook: false,
+    });
+
+    await Outfit.create({
+      owner: user._id,
+      name: 'Unworn Outfit',
+      garments: [garmentA._id],
+      date: new Date('2026-03-11T00:00:00.000Z'),
+      isLookbook: false,
+    });
+
+    const lookbookOutfit = await Outfit.create({
+      owner: user._id,
+      name: 'Moodboard',
+      garments: [garmentB._id],
+      date: new Date('2026-03-12T00:00:00.000Z'),
+      isLookbook: true,
+    });
+
+    await Usage.create({
+      user: user._id,
+      garment: garmentA._id,
+      outfit: wornOutfit._id,
+      wornDate: new Date('2026-03-10T00:00:00.000Z'),
+    });
+
+    // A lookbook usage should not affect the outfitsWorn/totalOutfits ratio.
+    await Usage.create({
+      user: user._id,
+      garment: garmentB._id,
+      outfit: lookbookOutfit._id,
+      wornDate: new Date('2026-03-12T00:00:00.000Z'),
+    });
+
+    const response = await request(app)
+      .get('/api/analytics/overview')
+      .set(authHeader(user._id.toString()));
+
+    expect(response.status).toBe(200);
+    expect(response.body.totalOutfits).toBe(2);
+    expect(response.body.outfitsWorn).toBe(1);
+  });
+
   test('GET /api/analytics/cost-per-wear returns computed data', async () => {
     const user = await createUser();
     const garment = await Garment.create({

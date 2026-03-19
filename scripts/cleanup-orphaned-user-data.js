@@ -1,4 +1,4 @@
-require('dotenv').config({ override: true });
+require('dotenv').config();
 const mongoose = require('mongoose');
 
 const connectDB = require('../src/config/db');
@@ -13,10 +13,22 @@ const parseRetentionDaysArg = () => {
   return value;
 };
 
+const isTruthy = (value) => String(value || '').toLowerCase() === 'true';
+
+const isAtlasUri = (uri) => {
+  const normalized = String(uri || '').toLowerCase();
+  return normalized.startsWith('mongodb+srv://') || normalized.includes('.mongodb.net');
+};
+
 const run = async () => {
   try {
     const dryRun = process.argv.includes('--dry-run');
     const retentionDays = parseRetentionDaysArg();
+    const allowAtlas = process.argv.includes('--allow-atlas') || isTruthy(process.env.ALLOW_ATLAS_ORPHAN_CLEANUP);
+
+    if (isAtlasUri(process.env.MONGO_URI) && !allowAtlas) {
+      throw new Error('Refusing orphan cleanup against Atlas without explicit opt-in. Use --allow-atlas or set ALLOW_ATLAS_ORPHAN_CLEANUP=true.');
+    }
 
     await connectDB();
     const summary = await cleanupOrphanedUserData({ dryRun, retentionDays });

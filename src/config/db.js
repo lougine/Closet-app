@@ -2,6 +2,10 @@ const mongoose = require('mongoose');
 const { cleanupOrphanedUserData } = require('../utils/orphanCleanup');
 
 const isTruthy = (value) => String(value || '').toLowerCase() === 'true';
+const isAtlasUri = (uri) => {
+  const normalized = String(uri || '').toLowerCase();
+  return normalized.startsWith('mongodb+srv://') || normalized.includes('.mongodb.net');
+};
 
 const getMongoConnectOptions = () => {
   const options = {
@@ -22,8 +26,7 @@ const sanitizeMongoUriForLogs = (uri) => {
 };
 
 const getMongoDeploymentType = (uri) => {
-  const normalized = String(uri || '').toLowerCase();
-  if (normalized.startsWith('mongodb+srv://') || normalized.includes('.mongodb.net')) {
+  if (isAtlasUri(uri)) {
     return 'atlas';
   }
 
@@ -37,16 +40,26 @@ const connectDB = async () => {
       throw new Error('MONGO_URI is not set. Configure your Atlas connection string in environment variables.');
     }
 
+    const deployment = getMongoDeploymentType(mongoUri);
+    const isTestRuntime = process.env.NODE_ENV === 'test' || Boolean(process.env.JEST_WORKER_ID);
+    if (isTestRuntime && deployment === 'atlas' && !isTruthy(process.env.ALLOW_TEST_ATLAS)) {
+      throw new Error('Refusing Atlas connection during tests. Set ALLOW_TEST_ATLAS=true to override intentionally.');
+    }
+
     await mongoose.connect(mongoUri, getMongoConnectOptions());
     console.log('MongoDB connected');
-    console.log(`MongoDB startup: db=${mongoose.connection.name} deployment=${getMongoDeploymentType(mongoUri)}`);
+    console.log(`MongoDB startup: db=${mongoose.connection.name} deployment=${deployment}`);
 
     if (isTruthy(process.env.AUTO_CLEANUP_ORPHANS)) {
-      try {
-        const summary = await cleanupOrphanedUserData();
-        console.log(`Orphan cleanup complete: ${JSON.stringify(summary)}`);
-      } catch (cleanupError) {
-        console.error('Orphan cleanup failed:', cleanupError);
+      if (deployment === 'atlas' && !isTruthy(process.env.ALLOW_ATLAS_ORPHAN_CLEANUP)) {
+        console.warn('Orphan cleanup skipped for Atlas (set ALLOW_ATLAS_ORPHAN_CLEANUP=true to allow).');
+      } else {
+        try {
+          const summary = await cleanupOrphanedUserData();
+          console.log(`Orphan cleanup complete: ${JSON.stringify(summary)}`);
+        } catch (cleanupError) {
+          console.error('Orphan cleanup failed:', cleanupError);
+        }
       }
     } else {
       console.log('Orphan auto-cleanup is disabled (set AUTO_CLEANUP_ORPHANS=true to enable).');
