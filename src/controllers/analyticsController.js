@@ -108,10 +108,57 @@ exports.getOverview = async (req, res) => {
   try {
     const owner = req.user.userId;
     const ownerObjectId = new mongoose.Types.ObjectId(owner);
+    const nonLookbookOutfitFilter = {
+      owner: ownerObjectId,
+      isLookbook: { $ne: true },
+    };
 
-    const [totalItems, totalOutfits, usageStats] = await Promise.all([
-      Garment.countDocuments({ owner }),
-      Outfit.countDocuments({ owner }),
+    const [totalItems, outfitStats, usageStats] = await Promise.all([
+      Garment.countDocuments({ owner: ownerObjectId }),
+      Outfit.aggregate([
+        { $match: nonLookbookOutfitFilter },
+        {
+          $lookup: {
+            from: 'usages',
+            let: { outfitId: '$_id' },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $and: [
+                      { $eq: ['$outfit', '$$outfitId'] },
+                      { $eq: ['$user', ownerObjectId] },
+                    ],
+                  },
+                },
+              },
+              { $limit: 1 },
+            ],
+            as: 'usageHit',
+          },
+        },
+        {
+          $project: {
+            isWorn: { $gt: [{ $size: '$usageHit' }, 0] },
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            totalOutfits: { $sum: 1 },
+            outfitsWornCount: {
+              $sum: { $cond: ['$isWorn', 1, 0] },
+            },
+          },
+        },
+        {
+          $project: {
+            _id: 0,
+            totalOutfits: 1,
+            outfitsWornCount: 1,
+          },
+        },
+      ]),
       Usage.aggregate([
         { $match: { user: ownerObjectId } },
         {
@@ -119,7 +166,6 @@ exports.getOverview = async (req, res) => {
             _id: null,
             totalWearEvents: { $sum: 1 },
             uniqueGarments: { $addToSet: '$garment' },
-            uniqueOutfits: { $addToSet: '$outfit' },
           },
         },
         {
@@ -127,18 +173,19 @@ exports.getOverview = async (req, res) => {
             _id: 0,
             totalWearEvents: 1,
             wornGarmentCount: { $size: '$uniqueGarments' },
-            outfitsWornCount: {
-              $size: { $setDifference: ['$uniqueOutfits', [null]] },
-            },
           },
         },
       ]),
     ]);
 
+    const outfitTotals = outfitStats[0] || {
+      totalOutfits: 0,
+      outfitsWornCount: 0,
+    };
+
     const stats = usageStats[0] || {
       totalWearEvents: 0,
       wornGarmentCount: 0,
-      outfitsWornCount: 0,
     };
 
     const wardrobeUsagePercent = totalItems === 0
@@ -148,8 +195,8 @@ exports.getOverview = async (req, res) => {
     res.json({
       totalItems,
       wardrobeUsagePercent,
-      outfitsWorn: stats.outfitsWornCount,
-      totalOutfits,
+      outfitsWorn: outfitTotals.outfitsWornCount,
+      totalOutfits: outfitTotals.totalOutfits,
       totalWearEvents: stats.totalWearEvents,
       averageWearPerItem: totalItems === 0
         ? 0
