@@ -163,6 +163,7 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
       Dresses: "#fce4ec",
       Outerwear: "#f5f5f5",
       Footwear: "#fff8e1",
+      Shoes: "#fff8e1",
       Accessories: "#e8f5e9",
       Bags: "#faf6f0",
       Swimwear: "#e3f2fd",
