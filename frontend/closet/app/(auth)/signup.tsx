@@ -63,7 +63,11 @@ export default function SignUpScreen() {
   };
 
   const handleSignup = async () => {
-    if (!firstName || !lastName || !email || !password || !confirmPassword) {
+    const normalizedFirstName = firstName.trim();
+    const normalizedLastName = lastName.trim();
+    const normalizedEmail = email.trim().toLowerCase();
+
+    if (!normalizedFirstName || !normalizedLastName || !normalizedEmail || !password || !confirmPassword) {
       Alert.alert('Missing fields', 'Please fill in all fields.');
       return;
     }
@@ -78,8 +82,8 @@ export default function SignUpScreen() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: `${firstName} ${lastName}`.trim(),
-          email,
+          name: `${normalizedFirstName} ${normalizedLastName}`.trim(),
+          email: normalizedEmail,
           password,
         }),
       });

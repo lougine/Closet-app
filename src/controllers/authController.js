@@ -15,6 +15,10 @@ const normalizeName = (value) => String(value || '')
   .replace(/\s+/g, ' ')
   .slice(0, 64);
 
+const normalizeEmail = (value) => String(value || '')
+  .trim()
+  .toLowerCase();
+
 const buildUniqueUserName = async (nameSeed) => {
   const baseName = normalizeName(nameSeed) || 'user';
   let candidate = baseName;
@@ -31,8 +35,13 @@ const buildUniqueUserName = async (nameSeed) => {
 exports.register = async (req, res) => {
   try {
     const { name, email, password } = req.body;
+    const normalizedEmail = normalizeEmail(email);
 
-    const existingUser = await User.findOne({ email });
+    if (!normalizedEmail || !password || !name) {
+      return res.status(400).json({ message: 'name, email, and password are required' });
+    }
+
+    const existingUser = await User.findOne({ email: normalizedEmail });
     if (existingUser) {
       return res.status(400).json({ message: "User already exists" });
     }
@@ -41,7 +50,7 @@ exports.register = async (req, res) => {
 
     const user = await User.create({
       name,
-      email,
+      email: normalizedEmail,
       password: hashedPassword
     });
 
@@ -59,8 +68,13 @@ exports.register = async (req, res) => {
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
+    const normalizedEmail = normalizeEmail(email);
 
-    const user = await User.findOne({ email });
+    if (!normalizedEmail || !password) {
+      return res.status(400).json({ message: 'email and password are required' });
+    }
+
+    const user = await User.findOne({ email: normalizedEmail });
 
     if (!user) {
       return res.status(400).json({ message: "Invalid credentials" });
