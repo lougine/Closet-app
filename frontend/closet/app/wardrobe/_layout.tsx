@@ -6,7 +6,9 @@ export default function WardrobeLayout() {
       <Stack.Screen name="add-items" />
       <Stack.Screen name="item-detail" />
       <Stack.Screen name="outfit" />
+      <Stack.Screen name="outfit-detail" />
       <Stack.Screen name="lookbook" />
+      <Stack.Screen name="lookbook-detail" />
     </Stack>
   );
 }

@@ -10,7 +10,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   TextInput,
-  Image,
   Alert,
   ScrollView,
   ActivityIndicator,
@@ -20,8 +19,18 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker'; // lets user pick photo or take one
-import * as SecureStore from 'expo-secure-store';
-import { buildApiUrl, buildAuthHeaders } from '../../app/api';
+import AuthenticatedImage from '@/components/AuthenticatedImage';
+import {
+  IMAGE_UPLOAD_ASPECT,
+  IMAGE_UPLOAD_QUALITY,
+  validateImageFileSize,
+} from '@/constants/imageUpload';
+import {
+  fetchCurrentUserProfile,
+  updateDisplayName,
+  uploadProfileImage,
+} from '@/services/userProfileService';
+import { getUploadErrorMessage } from '@/services/uploadRequest';
 
 // ─── COLORS ───────────────────────────────────────────────────────────────────
 const COLORS = {
@@ -42,6 +51,7 @@ export default function EditProfileScreen() {
   const [profilePicture, setProfilePicture] = useState<string | null>(null); // current pfp URL or local URI
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
 
   // Load current user data on mount
   useEffect(() => {
@@ -50,13 +60,9 @@ export default function EditProfileScreen() {
 
   async function fetchUser() {
     try {
-      const token = await SecureStore.getItemAsync('userToken');
-      const res = await fetch(buildApiUrl('/api/users/me'), {
-        headers: buildAuthHeaders(token),
-      });
-      const data = await res.json();
-      setUsername(data.name ?? '');
-      setProfilePicture(data.profilePicture ?? null);
+      const profile = await fetchCurrentUserProfile();
+      setUsername(profile.name ?? profile.username ?? '');
+      setProfilePicture(profile.profilePicture ?? null);
     } catch (e) {
       console.error('Failed to load profile:', e);
     } finally {
@@ -97,10 +103,15 @@ export default function EditProfileScreen() {
     }
     const result = await ImagePicker.launchCameraAsync({
       allowsEditing: true,   // lets user crop to a square
-      aspect: [1, 1],        // square crop
-      quality: 0.8,
+      aspect: IMAGE_UPLOAD_ASPECT.profile,
+      quality: IMAGE_UPLOAD_QUALITY.profile,
     });
     if (!result.canceled) {
+      const sizeError = validateImageFileSize(result.assets[0].fileSize, 'profile');
+      if (sizeError) {
+        Alert.alert(sizeError.title, sizeError.body);
+        return;
+      }
       setProfilePicture(result.assets[0].uri); // local URI for preview
     }
   }
@@ -114,10 +125,15 @@ export default function EditProfileScreen() {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
+      aspect: IMAGE_UPLOAD_ASPECT.profile,
+      quality: IMAGE_UPLOAD_QUALITY.profile,
     });
     if (!result.canceled) {
+      const sizeError = validateImageFileSize(result.assets[0].fileSize, 'profile');
+      if (sizeError) {
+        Alert.alert(sizeError.title, sizeError.body);
+        return;
+      }
       setProfilePicture(result.assets[0].uri);
     }
   }
@@ -131,27 +147,22 @@ export default function EditProfileScreen() {
 
     setSaving(true);
     try {
-      const token = await SecureStore.getItemAsync('userToken');
+      await updateDisplayName(username.trim());
 
-      // Save only the username for now (backend does not support image uploads yet)
-      const res = await fetch(buildApiUrl('/api/users/me'), {
-        method: 'PUT',
-        headers: {
-          ...buildAuthHeaders(token),
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ name: username.trim() }),
-      });
-
-      if (!res.ok) throw new Error('Save failed');
+      if (profilePicture && (profilePicture.startsWith('file:') || profilePicture.startsWith('content:'))) {
+        setUploadingProfileImage(true);
+        const updatedUser = await uploadProfileImage(profilePicture);
+        setProfilePicture(updatedUser.profilePicture ?? null);
+      }
 
       Alert.alert('Saved!', 'Your profile has been updated.', [
         { text: 'OK', onPress: () => router.back() },
       ]);
     } catch (e) {
       console.error('Save error:', e);
-      Alert.alert('Error', 'Could not save changes. Please try again.');
+      Alert.alert('Error', getUploadErrorMessage(e, 'Could not save changes. Please try again.'));
     } finally {
+      setUploadingProfileImage(false);
       setSaving(false);
     }
   }
@@ -183,7 +194,7 @@ export default function EditProfileScreen() {
       {/* ── Profile picture ── */}
       <View style={styles.pfpSection}>
         {profilePicture ? (
-          <Image source={{ uri: profilePicture }} style={styles.avatar} />
+          <AuthenticatedImage source={{ uri: profilePicture }} style={styles.avatar} />
         ) : (
           <View style={styles.avatarPlaceholder}>
             <Ionicons name="person" size={40} color={COLORS.white} />
@@ -226,6 +237,10 @@ export default function EditProfileScreen() {
           <Text style={styles.saveBtnText}>Save changes</Text>
         )}
       </TouchableOpacity>
+
+      {uploadingProfileImage ? (
+        <Text style={styles.uploadStatus}>Uploading profile image...</Text>
+      ) : null}
     </ScrollView>
   );
 }
@@ -312,4 +327,5 @@ const styles = StyleSheet.create({
   },
   saveBtnDisabled: { opacity: 0.6 },
   saveBtnText: { fontSize: 16, fontWeight: '700', color: COLORS.white },
+  uploadStatus: { textAlign: 'center', color: COLORS.subText, fontSize: 13 },
 });

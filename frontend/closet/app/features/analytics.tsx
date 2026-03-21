@@ -14,11 +14,13 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, Image, Dimensions, ActivityIndicator,
+  TouchableOpacity, Dimensions, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import * as SecureStore from 'expo-secure-store';
-import { buildApiUrl, buildAuthHeaders } from '../api';
+import AuthenticatedImage from '@/components/AuthenticatedImage';
+import { buildApiUrl, buildAuthHeaders, buildImageUrl } from '@/constants/api';
 import Svg, {
   Circle, G, Path, Text as SvgText,
 } from 'react-native-svg';
@@ -41,7 +43,27 @@ const CHART_COLORS = [
   '#C8E6C9', '#FFD180', '#FFAB91', '#CE93D8',
 ];
 
+const NAMED_COLOUR_TO_HEX: Record<string, string> = {
+  black: '#000000',
+  white: '#FFFFFF',
+  blue: '#3B82F6',
+  green: '#22C55E',
+  red: '#EF4444',
+  beige: '#D6C6A9',
+  navy: '#1E3A8A',
+  gray: '#9CA3AF',
+  grey: '#9CA3AF',
+  brown: '#8B5E3C',
+  pink: '#EC4899',
+  purple: '#8B5CF6',
+  yellow: '#EAB308',
+  orange: '#F97316',
+};
+
 const { width: SW } = Dimensions.get('window');
+const TREND_RANGE_OPTIONS = [3, 6, 12] as const;
+type TrendRangeMonths = (typeof TREND_RANGE_OPTIONS)[number];
+const ANALYTICS_TREND_RANGE_KEY = 'analyticsTrendRangeMonths';
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
@@ -51,6 +73,8 @@ type OverviewStats = {
   wardrobeUsagePercent: number;  // 0–100, % of items worn at least once
   outfitsWorn: number;           // how many outfits logged in calendar
   totalOutfits: number;          // total outfits saved
+  totalWearEvents?: number;
+  averageWearPerItem?: number;
 };
 
 // One wardrobe category e.g. { name: 'Tops', count: 42 }
@@ -74,6 +98,83 @@ type WornItem = {
   wearCount: number;      // separate wearCount field on the garment document
   category: string;
 };
+
+type CostPerWearItem = WornItem & {
+  purchasePrice?: number | null;
+  costPerWear?: number | null;
+};
+
+type CostPerWearSummary = {
+  trackedItems: number;
+  averageCostPerWear: number;
+  minCostPerWear: number;
+  maxCostPerWear: number;
+};
+
+type CostPerWearResponse = {
+  items: CostPerWearItem[];
+  summary: CostPerWearSummary;
+};
+
+type MonthlyTrend = {
+  month: string;
+  wearCount: number;
+};
+
+type DayTrend = {
+  day: string;
+  dayNumber: number;
+  wearCount: number;
+};
+
+type CategoryTrend = {
+  category: string;
+  wearCount: number;
+};
+
+type UsageTrendsResponse = {
+  rangeMonths: number;
+  rangeStart?: string;
+  monthly: MonthlyTrend[];
+  dayOfWeek: DayTrend[];
+  byCategory: CategoryTrend[];
+  summary?: {
+    totalWearEventsInRange: number;
+    mostActiveDay: {
+      day: string;
+      dayNumber: number;
+      wearCount: number;
+    } | null;
+  };
+};
+
+function formatTrendMonth(monthKey: string) {
+  const [year, month] = monthKey.split('-').map(Number);
+  if (!year || !month) return monthKey;
+  return new Date(Date.UTC(year, month - 1, 1)).toLocaleDateString(undefined, {
+    month: 'short',
+    year: '2-digit',
+    timeZone: 'UTC',
+  });
+}
+
+function isDrawableColour(value: string) {
+  return (
+    /^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(value)
+    || /^rgba?\(/i.test(value)
+    || /^hsla?\(/i.test(value)
+    || /^transparent$/i.test(value)
+  );
+}
+
+function toDrawableColour(rawValue: string | null | undefined, fallback: string) {
+  const trimmed = rawValue?.trim();
+  if (!trimmed) return fallback;
+  if (isDrawableColour(trimmed)) return trimmed;
+
+  const mapped = NAMED_COLOUR_TO_HEX[trimmed.toLowerCase()];
+  return mapped || fallback;
+}
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 
@@ -105,19 +206,92 @@ export default function AnalyticsScreen() {
   const [mostWorn, setMostWorn] = useState<WornItem[]>([]);
   const [leastWorn, setLeastWorn] = useState<WornItem[]>([]);
   const [neverWorn, setNeverWorn] = useState<WornItem[]>([]);
+  const [costPerWear, setCostPerWear] = useState<CostPerWearResponse | null>(null);
+  const [usageTrends, setUsageTrends] = useState<UsageTrendsResponse | null>(null);
+  const [selectedTrendMonths, setSelectedTrendMonths] = useState<TrendRangeMonths>(6);
+  const [trendLoading, setTrendLoading] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const [wardrobeExpanded, setWardrobeExpanded] = useState(true);
   const [usageExpanded, setUsageExpanded] = useState(true);
 
-  useEffect(() => { fetchAll(); }, []);
+  useEffect(() => {
+    async function initializeAnalytics() {
+      let initialTrendMonths: TrendRangeMonths = 6;
 
-  async function fetchAll() {
+      try {
+        const savedRange = await SecureStore.getItemAsync(ANALYTICS_TREND_RANGE_KEY);
+        const parsed = Number(savedRange);
+        if (TREND_RANGE_OPTIONS.includes(parsed as TrendRangeMonths)) {
+          initialTrendMonths = parsed as TrendRangeMonths;
+          setSelectedTrendMonths(initialTrendMonths);
+        }
+      } catch (error) {
+        console.warn('Failed to load saved trend range:', error);
+      }
+
+      await fetchAll(initialTrendMonths);
+      setInitialLoadComplete(true);
+    }
+
+    initializeAnalytics();
+  }, []);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      if (!initialLoadComplete) return;
+      fetchAll(selectedTrendMonths);
+    }, [initialLoadComplete, selectedTrendMonths])
+  );
+
+  const parseJsonOrThrow = async (res: Response, label: string) => {
+    if (!res.ok) {
+      throw new Error(`${label} request failed (${res.status})`);
+    }
+    return res.json();
+  };
+
+  async function fetchUsageTrends(
+    months: TrendRangeMonths,
+    options: { persistSelection?: boolean; showLoading?: boolean } = {}
+  ) {
+    const { persistSelection = true, showLoading = true } = options;
+
+    try {
+      if (showLoading) {
+        setTrendLoading(true);
+      }
+
+      const token = await SecureStore.getItemAsync('userToken');
+      const headers = buildAuthHeaders(token);
+      const trendsRes = await fetch(buildApiUrl(`/api/analytics/usage-trends?months=${months}`), { headers });
+      setUsageTrends(await parseJsonOrThrow(trendsRes, 'Usage trends'));
+      setSelectedTrendMonths(months);
+
+      if (persistSelection) {
+        await SecureStore.setItemAsync(ANALYTICS_TREND_RANGE_KEY, String(months));
+      }
+    } catch (e) {
+      console.error('Failed to load usage trends:', e);
+    } finally {
+      if (showLoading) {
+        setTrendLoading(false);
+      }
+    }
+  }
+
+  async function fetchAll(initialTrendMonths: TrendRangeMonths = selectedTrendMonths) {
     try {
       const token = await SecureStore.getItemAsync('userToken');
       const headers = buildAuthHeaders(token);
 
+      const normalizeItems = (items: WornItem[]) => items.map((item) => ({
+        ...item,
+        imageUrl: item.imageUrl ? buildImageUrl(item.imageUrl) : item.imageUrl,
+      }));
+
       // Fetch all analytics in parallel for speed
-      const [overviewRes, catRes, colourRes, mostRes, leastRes, neverRes] = await Promise.all([
+      const [overviewRes, catRes, colourRes, mostRes, leastRes, neverRes, costRes] = await Promise.all([
         // GET /analytics/overview → { totalItems, wardrobeUsagePercent, outfitsWorn, totalOutfits }
         fetch(buildApiUrl('/api/analytics/overview'), { headers }),
         // GET /analytics/categories → [{ name, count }] for Tops/Bottoms/etc.
@@ -130,14 +304,18 @@ export default function AnalyticsScreen() {
         fetch(buildApiUrl('/api/analytics/least-worn?limit=6'), { headers }),
         // GET /analytics/never-worn?limit=6 → items where wearCount === 0
         fetch(buildApiUrl('/api/analytics/never-worn?limit=6'), { headers }),
+        // GET /analytics/cost-per-wear?limit=20
+        fetch(buildApiUrl('/api/analytics/cost-per-wear?limit=20'), { headers }),
       ]);
 
-      setOverview(await overviewRes.json());
-      setCategories(await catRes.json());
-      setColours(await colourRes.json());
-      setMostWorn(await mostRes.json());
-      setLeastWorn(await leastRes.json());
-      setNeverWorn(await neverRes.json());
+      setOverview(await parseJsonOrThrow(overviewRes, 'Overview'));
+      setCategories(await parseJsonOrThrow(catRes, 'Categories'));
+      setColours(await parseJsonOrThrow(colourRes, 'Colours'));
+      setMostWorn(normalizeItems(await parseJsonOrThrow(mostRes, 'Most worn')));
+      setLeastWorn(normalizeItems(await parseJsonOrThrow(leastRes, 'Least worn')));
+      setNeverWorn(normalizeItems(await parseJsonOrThrow(neverRes, 'Never worn')));
+      setCostPerWear(await parseJsonOrThrow(costRes, 'Cost per wear'));
+      await fetchUsageTrends(initialTrendMonths, { persistSelection: false, showLoading: false });
     } catch (e) {
       console.error('Failed to load analytics:', e);
     } finally {
@@ -159,14 +337,39 @@ export default function AnalyticsScreen() {
   const totalOutfits = overview?.totalOutfits ?? 0;
   const outfitPercent = totalOutfits > 0 ? Math.round((outfitsWorn / totalOutfits) * 100) : 0;
   const totalItems = overview?.totalItems ?? 0;
+  const totalWearEvents = overview?.totalWearEvents ?? 0;
+  const averageWearPerItem = overview?.averageWearPerItem ?? 0;
+
+  const monthlyTrends = usageTrends?.monthly ?? [];
+  const dayOfWeekTrends = usageTrends?.dayOfWeek ?? [];
+  const maxMonthlyWear = monthlyTrends.reduce((max, entry) => Math.max(max, entry.wearCount), 0);
+  const trendSummary = usageTrends?.summary;
+  const mostActiveDay = trendSummary?.mostActiveDay;
+
+  const costSummary = costPerWear?.summary;
+  const costItems = costPerWear?.items ?? [];
+  const cheapestItem = costItems
+    .filter((item) => item.costPerWear !== null && item.costPerWear !== undefined)
+    .reduce<CostPerWearItem | null>((best, item) => {
+      if (!best || (item.costPerWear || 0) < (best.costPerWear || 0)) return item;
+      return best;
+    }, null);
+
+  const normalizedColours = colours.map((entry, i) => ({
+    ...entry,
+    chartColour: toDrawableColour(
+      entry.colour || entry.label,
+      CHART_COLORS[i % CHART_COLORS.length]
+    ),
+  }));
 
   // Top 2 colours for the "favourite colours" label
-  const topColours = [...colours].sort((a, b) => b.count - a.count).slice(0, 2);
+  const topColours = [...normalizedColours].sort((a, b) => b.count - a.count).slice(0, 2);
 
   // Pie chart data for colours
-  const colourPieData = colours.map((c, i) => ({
+  const colourPieData = normalizedColours.map((c, i) => ({
     count: c.count,
-    colour: c.colour || CHART_COLORS[i % CHART_COLORS.length],
+    colour: c.chartColour || CHART_COLORS[i % CHART_COLORS.length],
   }));
   const pieSlices = buildPieSlices(colourPieData, 80, 100, 100);
 
@@ -215,6 +418,7 @@ export default function AnalyticsScreen() {
             <View style={[styles.progressFill, { width: `${usagePercent}%` }]} />
           </View>
           <Text style={styles.cardSub}>of items worn</Text>
+          <Text style={styles.secondarySub}>Avg wears/item: {averageWearPerItem}</Text>
         </View>
 
         {/* ── Outfits Worn donut card ── */}
@@ -250,6 +454,7 @@ export default function AnalyticsScreen() {
               {outfitsWorn}/{totalOutfits}
             </SvgText>
           </Svg>
+          <Text style={styles.secondarySub}>Wear events: {totalWearEvents}</Text>
         </View>
       </View>
 
@@ -278,7 +483,7 @@ export default function AnalyticsScreen() {
           {/* Category rows */}
           {/* Categories come from backend but we define the expected ones here */}
           {/* TODO: backend should return these category names exactly:
-              Tops, Bottoms, Dresses, Shoes, Bags, Accessories
+              Tops, Bottoms, Dresses, Footwear, Bags, Accessories
               Add more if needed — they'll appear automatically */}
           {categories.length > 0 ? categories.map((cat, i) => {
             const pct = totalItems > 0 ? Math.round((cat.count / totalItems) * 100) : 0;
@@ -301,7 +506,7 @@ export default function AnalyticsScreen() {
             );
           }) : (
             // Fallback if no data yet — shows the expected categories as empty
-            ['Tops', 'Bottoms', 'Dresses', 'Shoes', 'Bags', 'Accessories'].map((name, i) => (
+            ['Tops', 'Bottoms', 'Dresses', 'Footwear', 'Bags', 'Accessories'].map((name, i) => (
               <View key={name} style={styles.categoryRow}>
                 <View style={styles.categoryLeft}>
                   <View style={[styles.categoryDot, { backgroundColor: CHART_COLORS[i] }]} />
@@ -337,10 +542,10 @@ export default function AnalyticsScreen() {
 
               {/* Colour legend on the right */}
               <View style={styles.colourLegend}>
-                {colours.slice(0, 6).map((c, i) => (
+                {normalizedColours.slice(0, 6).map((c, i) => (
                   <View key={i} style={styles.legendRow}>
                     <View style={[styles.legendDot, {
-                      backgroundColor: c.colour || CHART_COLORS[i % CHART_COLORS.length]
+                      backgroundColor: c.chartColour || CHART_COLORS[i % CHART_COLORS.length]
                     }]} />
                     <Text style={styles.legendLabel}>{c.label}</Text>
                   </View>
@@ -352,11 +557,11 @@ export default function AnalyticsScreen() {
             {topColours.length >= 2 && (
               <Text style={styles.favouriteColoursText}>
                 Your favourites are{' '}
-                <Text style={[styles.colourBold, { color: topColours[0].colour || COLORS.hotPink }]}>
+                <Text style={[styles.colourBold, { color: topColours[0].chartColour || COLORS.hotPink }]}>
                   {topColours[0].label}
                 </Text>
                 {' '}and{' '}
-                <Text style={[styles.colourBold, { color: topColours[1].colour || COLORS.lightPink }]}>
+                <Text style={[styles.colourBold, { color: topColours[1].chartColour || COLORS.lightPink }]}>
                   {topColours[1].label}
                 </Text>
               </Text>
@@ -412,16 +617,87 @@ export default function AnalyticsScreen() {
           />
 
           {/* ── Cost per wear insight ── */}
-          {/* TODO: if your backend stores item price, you can calculate
-              cost-per-wear = price / wearCount and show it per item */}
           <View style={styles.insightCard}>
             <Ionicons name="bulb-outline" size={22} color={COLORS.hotPink} />
             <View style={styles.insightText}>
-              <Text style={styles.insightTitle}>Tip 💡</Text>
+              <Text style={styles.insightTitle}>Cost Per Wear 💸</Text>
               <Text style={styles.insightBody}>
-                Items you've never worn are costing you the most. Try styling them this week!
+                Tracked items: {costSummary?.trackedItems ?? 0} · Avg CPW: ${costSummary?.averageCostPerWear ?? 0}
               </Text>
+              {cheapestItem && (
+                <Text style={styles.insightBody}>
+                  Best value right now: {cheapestItem.name} (${cheapestItem.costPerWear}/wear)
+                </Text>
+              )}
             </View>
+          </View>
+
+          {/* ── Usage trends ── */}
+          <View style={styles.card}>
+            <View style={styles.trendHeaderRow}>
+              <Text style={styles.cardTitle}>Usage Trends 📈</Text>
+              <View style={styles.trendSelectorWrap}>
+                {TREND_RANGE_OPTIONS.map((months) => {
+                  const selected = months === selectedTrendMonths;
+                  return (
+                    <TouchableOpacity
+                      key={months}
+                      style={[styles.trendSelectorPill, selected && styles.trendSelectorPillActive]}
+                      onPress={() => { fetchUsageTrends(months); }}
+                      activeOpacity={0.8}
+                      disabled={trendLoading}
+                    >
+                      <Text style={[styles.trendSelectorText, selected && styles.trendSelectorTextActive]}>{months}m</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+            {trendLoading && (
+              <View style={styles.trendLoadingRow}>
+                <ActivityIndicator size="small" color={COLORS.hotPink} />
+                <Text style={styles.secondarySub}>Updating trends...</Text>
+              </View>
+            )}
+            {monthlyTrends.length > 0 ? (
+              <>
+                {monthlyTrends.map((entry) => {
+                  const width = maxMonthlyWear > 0 ? `${Math.round((entry.wearCount / maxMonthlyWear) * 100)}%` : '0%';
+                  return (
+                    <View key={entry.month} style={styles.trendRow}>
+                      <Text style={styles.trendLabel}>{formatTrendMonth(entry.month)}</Text>
+                      <View style={styles.trendTrack}>
+                        <View style={[styles.trendFill, { width }]} />
+                      </View>
+                      <Text style={styles.trendValue}>{entry.wearCount}</Text>
+                    </View>
+                  );
+                })}
+
+                <Text style={styles.insightBody}>
+                  Last {usageTrends?.rangeMonths ?? 6} months: {trendSummary?.totalWearEventsInRange ?? 0} wear events
+                </Text>
+                {mostActiveDay && (
+                  <Text style={styles.insightBody}>
+                    Most active day: {mostActiveDay.day} ({mostActiveDay.wearCount} wears)
+                  </Text>
+                )}
+
+                <Text style={styles.trendTitle}>Most active days</Text>
+                <View style={styles.dayTrendWrap}>
+                  {dayOfWeekTrends.map((entry) => (
+                    <View key={entry.dayNumber} style={styles.dayChip}>
+                      <Text style={styles.dayChipTitle}>{entry.day.slice(0, 3)}</Text>
+                      <Text style={styles.dayChipValue}>{entry.wearCount}</Text>
+                    </View>
+                  ))}
+                </View>
+              </>
+            ) : (
+              <Text style={styles.insightBody}>
+                No usage trend data yet. Log outfits or usage events to unlock this view.
+              </Text>
+            )}
           </View>
         </>
       )}
@@ -458,7 +734,7 @@ function UsageSection({
           {items.map((item) => (
             <View key={item._id} style={styles.itemCell}>
               {item.imageUrl ? (
-                <Image source={{ uri: item.imageUrl }} style={styles.itemThumb} resizeMode="cover" />
+                <AuthenticatedImage source={{ uri: item.imageUrl }} style={styles.itemThumb} resizeMode="cover" />
               ) : (
                 <View style={[styles.itemThumb, styles.itemThumbEmpty]}>
                   <Ionicons name="shirt-outline" size={22} color={COLORS.lightGray} />
@@ -515,6 +791,7 @@ const styles = StyleSheet.create({
   cardLabel: { fontSize: 12, fontWeight: '600', color: COLORS.subText, textTransform: 'uppercase', letterSpacing: 0.8 },
   cardTitle: { fontSize: 16, fontWeight: '700', color: COLORS.text },
   cardSub: { fontSize: 12, color: COLORS.subText },
+  secondarySub: { fontSize: 11, color: COLORS.subText, marginTop: 2 },
 
   // ── Side by side row ───────────────────────────────────────────────────────
   row: {
@@ -654,6 +931,70 @@ const styles = StyleSheet.create({
   insightText: { flex: 1 },
   insightTitle: { fontSize: 14, fontWeight: '700', color: COLORS.text },
   insightBody: { fontSize: 13, color: COLORS.subText, marginTop: 2, lineHeight: 20 },
+
+  // ── Trend styles ──────────────────────────────────────────────────────────
+  trendHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  trendSelectorWrap: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  trendSelectorPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: COLORS.offWhite,
+    borderWidth: 1,
+    borderColor: COLORS.lightGray,
+  },
+  trendSelectorPillActive: {
+    backgroundColor: COLORS.hotPink,
+    borderColor: COLORS.hotPink,
+  },
+  trendSelectorText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.subText,
+  },
+  trendSelectorTextActive: {
+    color: COLORS.white,
+  },
+  trendLoadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  trendTitle: { fontSize: 13, fontWeight: '700', color: COLORS.text, marginTop: 8 },
+  trendRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  trendLabel: { width: 56, fontSize: 12, color: COLORS.subText },
+  trendTrack: {
+    flex: 1,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: COLORS.offWhite,
+    overflow: 'hidden',
+  },
+  trendFill: {
+    height: '100%',
+    borderRadius: 4,
+    backgroundColor: COLORS.hotPink,
+  },
+  trendValue: { width: 28, textAlign: 'right', fontSize: 12, color: COLORS.text, fontWeight: '700' },
+  dayTrendWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
+  dayChip: {
+    backgroundColor: COLORS.offWhite,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    minWidth: 58,
+    alignItems: 'center',
+  },
+  dayChipTitle: { fontSize: 11, color: COLORS.subText, fontWeight: '600' },
+  dayChipValue: { fontSize: 13, color: COLORS.text, fontWeight: '700' },
 
   // ── Empty state ────────────────────────────────────────────────────────────
   emptyState: { alignItems: 'center', paddingVertical: 20, gap: 8 },

@@ -1,0 +1,13 @@
+# Supported model values: garment,user,outfit,communitypost
+# Supported field values by model:
+# garment -> imageUrl
+# user -> profilePicture | bannerImage
+# outfit -> previewImage
+# communitypost -> imageUrl
+# imagePath can be absolute or relative to this CSV file location.
+model,id,field,imagePath
+garment,507f1f77bcf86cd799439011,imageUrl,.\images\garment-1.jpg
+user,507f1f77bcf86cd799439012,profilePicture,.\images\user-profile.jpg
+user,507f1f77bcf86cd799439012,bannerImage,.\images\user-banner.jpg
+outfit,507f1f77bcf86cd799439013,previewImage,.\images\outfit-cover.jpg
+communitypost,507f1f77bcf86cd799439014,imageUrl,.\images\community-post.jpg

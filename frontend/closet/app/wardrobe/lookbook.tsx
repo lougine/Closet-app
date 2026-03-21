@@ -1,26 +1,97 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
-import { Dimensions, FlatList, Image, SafeAreaView, StatusBar, Text, TextInput, TouchableOpacity, View } from "react-native";
+import * as SecureStore from "expo-secure-store";
+import { Alert, Dimensions, FlatList, SafeAreaView, StatusBar, Text, TextInput, TouchableOpacity, View } from "react-native";
+import AuthenticatedImage from "../../components/AuthenticatedImage";
+import { buildApiUrl, buildAuthHeaders } from "../../constants/api";
 import { useWardrobe } from "../../context/wardrobeContext";
 import { s, s2 } from "../../Styles/wardrobe/lookbook.styles";
 
 const { width: W } = Dimensions.get("window");
 const PINK = "#FF4F81";
 const ITEM_SIZE = (W - 48) / 3;
+const LOOKBOOK_IDS_KEY = "lookbookIds";
+
+const parseStoredLookbookIds = (rawValue: string | null) => {
+  if (!rawValue) return [] as string[];
+  try {
+    const parsed = JSON.parse(rawValue);
+    return Array.isArray(parsed) ? parsed.map((value) => String(value)) : [];
+  } catch {
+    return [] as string[];
+  }
+};
 
 export default function LookbookScreen() {
   const router = useRouter();
-  const { items } = useWardrobe();
+  const { items, refreshItems } = useWardrobe();
 
   const [name, setName] = useState("");
-  const [selected, setSelected] = useState<number[]>([]);
+  const [selected, setSelected] = useState<string[]>([]);
   const [step, setStep] = useState<"name" | "pick">("name");
+  const [saving, setSaving] = useState(false);
 
-  const toggle = (id: number) =>
+  const toggle = (id: string) =>
     setSelected((prev) =>
       prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
     );
+
+  const handleSave = async () => {
+    if (selected.length === 0 || saving) return;
+
+    const token = await SecureStore.getItemAsync("userToken");
+    if (!token) {
+      Alert.alert("Session expired", "Please log in again.");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const response = await fetch(buildApiUrl("/api/outfits"), {
+        method: "POST",
+        headers: {
+          ...buildAuthHeaders(token),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: name.trim(),
+          garments: selected,
+          date: new Date().toISOString(),
+          isLookbook: true,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorPayload = await response.json().catch(() => ({}));
+        throw new Error(errorPayload?.message || "Could not save lookbook");
+      }
+
+      const createdPayload = await response.json().catch(() => ({}));
+      const createdId = createdPayload?._id ? String(createdPayload._id) : "";
+      if (createdId) {
+        const existingIds = parseStoredLookbookIds(
+          await SecureStore.getItemAsync(LOOKBOOK_IDS_KEY),
+        );
+        if (!existingIds.includes(createdId)) {
+          await SecureStore.setItemAsync(
+            LOOKBOOK_IDS_KEY,
+            JSON.stringify([...existingIds, createdId]),
+          );
+        }
+      }
+
+      await refreshItems();
+
+      Alert.alert("Saved", "Lookbook created successfully.", [
+        { text: "OK", onPress: () => router.back() },
+      ]);
+    } catch (error: any) {
+      Alert.alert("Save failed", error?.message || "Could not save lookbook.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <SafeAreaView style={s.root}>
@@ -38,13 +109,11 @@ export default function LookbookScreen() {
 
         {step === "pick" ? (
           <TouchableOpacity
-            style={[s.saveBtn, selected.length === 0 && { opacity: 0.4 }]}
-            disabled={selected.length === 0}
-            onPress={() => {
-              router.back();
-            }}
+            style={[s.saveBtn, (selected.length === 0 || saving) && { opacity: 0.4 }]}
+            disabled={selected.length === 0 || saving}
+            onPress={handleSave}
           >
-            <Text style={s.saveBtnText}>Save</Text>
+            <Text style={s.saveBtnText}>{saving ? "Saving..." : "Save"}</Text>
           </TouchableOpacity>
         ) : (
           <TouchableOpacity
@@ -131,7 +200,7 @@ export default function LookbookScreen() {
                     activeOpacity={0.75}
                   >
                     {item.image ? (
-                      <Image
+                      <AuthenticatedImage
                         source={{ uri: item.image }}
                         style={s.gridImg}
                         resizeMode="cover"

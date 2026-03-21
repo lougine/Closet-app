@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, Image, Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Modal, RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import OutfitPreviewCollage from '../../../components/OutfitPreviewCollage';
 import { styles } from '../../../Styles/calendar/day.styles';
-import { COLORS, DAYS_SHORT, getWeekDays, isSameDay, MONTHS, OutfitEntry, toDateKey, useCalendar } from '../../../context/calendar-context';
+import { COLORS, DAYS_SHORT, getOutfitForDate, getWeekDays, isSameDay, MONTHS, OutfitEntry, toDateKey, useCalendar } from '../../../context/calendar-context';
 
 export default function DayScreen() {
   const router = useRouter();
@@ -13,25 +14,47 @@ export default function DayScreen() {
     setSelectedDate,
     setCurrentMonth,
     outfitMap,
+    saveOutfitForDate,
+    refetch,
     loading,
     deleteOutfit,
   } = useCalendar();
 
   const [menuVisible, setMenuVisible] = useState(false);
 
-  const selectedOutfit = outfitMap[toDateKey(selectedDate)];
+  const selectedOutfit = getOutfitForDate(outfitMap, selectedDate);
   const weekDays = getWeekDays(selectedDate);
 
   function prevWeek() {
     const d = new Date(selectedDate);
     d.setDate(d.getDate() - 7);
     setSelectedDate(d);
+    setCurrentMonth(new Date(d.getFullYear(), d.getMonth(), 1));
   }
 
   function nextWeek() {
     const d = new Date(selectedDate);
     d.setDate(d.getDate() + 7);
     setSelectedDate(d);
+    setCurrentMonth(new Date(d.getFullYear(), d.getMonth(), 1));
+  }
+
+  function goToNearestOutfit(direction: 'next' | 'prev') {
+    const step = direction === 'next' ? 1 : -1;
+    const probe = new Date(selectedDate);
+
+    for (let i = 0; i < 365; i++) {
+      probe.setDate(probe.getDate() + step);
+      const outfit = getOutfitForDate(outfitMap, probe);
+      if (outfit) {
+        const nextDate = new Date(probe);
+        setSelectedDate(nextDate);
+        setCurrentMonth(new Date(nextDate.getFullYear(), nextDate.getMonth(), 1));
+        return;
+      }
+    }
+
+    Alert.alert('No outfits found', `There are no ${direction === 'next' ? 'future' : 'previous'} outfit entries yet.`);
   }
 
   function goToMonth() {
@@ -41,17 +64,17 @@ export default function DayScreen() {
     router.push('/(tabs)/calendar/month');
   }
 
-  function goToIndex(mode: 'wardrobe') {
-    router.push({
-      pathname: '/(tabs)',
-      params: { mode, date: toDateKey(selectedDate), tab: 'outfits' },
-    });
-  }
-
   function goToStyling(mode: 'create' | 'discover' | 'randomize') {
     router.push({
       pathname: '/(tabs)/styling',
       params: { mode, date: toDateKey(selectedDate) },
+    });
+  }
+
+  function openOutfitDetail(outfit: OutfitEntry) {
+    router.push({
+      pathname: '/wardrobe/outfit-detail' as any,
+      params: { outfitJson: JSON.stringify(outfit) },
     });
   }
 
@@ -71,6 +94,35 @@ export default function DayScreen() {
         },
       },
     ]);
+  }
+
+  async function handleDuplicateToTomorrow(outfit: OutfitEntry) {
+    if (!outfit?.garmentIds?.length) {
+      Alert.alert('Unavailable', 'This outfit has no items to duplicate.');
+      return;
+    }
+
+    const targetDate = new Date(selectedDate);
+    targetDate.setDate(targetDate.getDate() + 1);
+
+    try {
+      setMenuVisible(false);
+      await saveOutfitForDate({
+        garmentIds: outfit.garmentIds,
+        date: targetDate,
+        name: 'Duplicated outfit',
+      });
+      setSelectedDate(targetDate);
+      setCurrentMonth(new Date(targetDate.getFullYear(), targetDate.getMonth(), 1));
+      Alert.alert('Saved', 'Outfit duplicated to tomorrow.');
+    } catch {
+      Alert.alert('Error', 'Could not duplicate outfit. Try again.');
+    }
+  }
+
+  function handleEditInStyling() {
+    setMenuVisible(false);
+    goToStyling('create');
   }
 
   if (loading) {
@@ -104,7 +156,7 @@ export default function DayScreen() {
           {weekDays.map((day, i) => {
             const isSelected = isSameDay(day, selectedDate);
             const isToday = isSameDay(day, new Date());
-            const hasOutfit = !!outfitMap[toDateKey(day)];
+            const hasOutfit = !!getOutfitForDate(outfitMap, day);
 
             return (
               <TouchableOpacity
@@ -152,7 +204,22 @@ export default function DayScreen() {
       <ScrollView
         style={styles.flex}
         contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl refreshing={loading} onRefresh={refetch} tintColor={COLORS.hotPink} />
+        }
       >
+        <View style={styles.quickActionRow}>
+          <TouchableOpacity style={styles.secondaryQuickBtn} onPress={() => goToNearestOutfit('prev')}>
+            <Ionicons name="chevron-back-circle-outline" size={14} color={COLORS.subText} />
+            <Text style={styles.secondaryQuickText}>Previous look</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.secondaryQuickBtn} onPress={() => goToNearestOutfit('next')}>
+            <Text style={styles.secondaryQuickText}>Next look</Text>
+            <Ionicons name="chevron-forward-circle-outline" size={14} color={COLORS.subText} />
+          </TouchableOpacity>
+        </View>
+
         {selectedOutfit ? renderFilledDay() : renderEmptyDay()}
       </ScrollView>
     </View>
@@ -172,11 +239,41 @@ export default function DayScreen() {
           />
         </TouchableOpacity>
 
-        <Image
-          source={{ uri: selectedOutfit!.previewImage }}
-          style={styles.outfitImage}
-          resizeMode="contain"
-        />
+        <TouchableOpacity
+          activeOpacity={0.9}
+          onPress={() => openOutfitDetail(selectedOutfit!)}
+        >
+          {selectedOutfit?.previewImage || selectedOutfit?.garments?.some((garment) => garment?.imageUrl) ? (
+            <OutfitPreviewCollage outfit={selectedOutfit} style={styles.outfitImage} />
+          ) : (
+            <View style={[styles.outfitImage, { alignItems: 'center', justifyContent: 'center' }]}>
+              <Ionicons name="shirt-outline" size={48} color={COLORS.lightGray} />
+              <Text style={{ marginTop: 8, color: COLORS.subText, fontSize: 12 }}>Outfit saved</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+
+        <View style={styles.outfitMetaRow}>
+          <View style={styles.outfitMetaPill}>
+            <Ionicons name="shirt-outline" size={14} color={COLORS.subText} />
+            <Text style={styles.outfitMetaText}>{selectedOutfit?.garmentIds?.length || 0} items</Text>
+          </View>
+          <View style={styles.outfitMetaPill}>
+            <Ionicons name="calendar-outline" size={14} color={COLORS.subText} />
+            <Text style={styles.outfitMetaText}>{selectedDate.toLocaleDateString()}</Text>
+          </View>
+        </View>
+
+        <View style={styles.outfitActionRow}>
+          <TouchableOpacity style={styles.outfitActionBtn} onPress={() => goToStyling('create')}>
+            <Ionicons name="color-wand-outline" size={16} color={COLORS.hotPink} />
+            <Text style={styles.outfitActionText}>Re-style day</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.outfitActionBtn} onPress={() => goToStyling('randomize')}>
+            <Ionicons name="shuffle-outline" size={16} color={COLORS.hotPink} />
+            <Text style={styles.outfitActionText}>Remix outfit</Text>
+          </TouchableOpacity>
+        </View>
 
         <Modal
           transparent
@@ -190,6 +287,30 @@ export default function DayScreen() {
             onPress={() => setMenuVisible(false)}
           >
             <View style={styles.menuPopup}>
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={handleEditInStyling}
+              >
+                <Ionicons
+                  name="create-outline"
+                  size={18}
+                  color={COLORS.subText}
+                />
+                <Text style={styles.menuItemTextNeutral}>Edit in styling</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => handleDuplicateToTomorrow(selectedOutfit!)}
+              >
+                <Ionicons
+                  name="copy-outline"
+                  size={18}
+                  color={COLORS.subText}
+                />
+                <Text style={styles.menuItemTextNeutral}>Duplicate to tomorrow</Text>
+              </TouchableOpacity>
+
               <TouchableOpacity
                 style={styles.menuItem}
                 onPress={() => handleDelete(selectedOutfit!)}
@@ -255,7 +376,7 @@ export default function DayScreen() {
               key={mode}
               style={styles.optionBtn}
               onPress={() => {
-                if (mode === 'wardrobe') goToIndex('wardrobe');
+                if (mode === 'wardrobe') goToStyling('create');
                 else if (mode === 'discover') goToStyling('randomize');
                 else goToStyling(mode);
               }}
