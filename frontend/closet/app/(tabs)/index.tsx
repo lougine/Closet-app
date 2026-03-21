@@ -1,10 +1,24 @@
 import { Feather, Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
-import { useRouter } from "expo-router";
-import React, { useState } from "react";
-import { Dimensions, Image, Modal, ScrollView, StatusBar, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { useFocusEffect, useRouter } from "expo-router";
+import * as SecureStore from "expo-secure-store";
+import React, { useCallback, useEffect, useState } from "react";
+import { Alert, Dimensions, Modal, ScrollView, StatusBar, Text, TextInput, TouchableOpacity, View, ActivityIndicator } from "react-native";
 import Svg, { Path } from "react-native-svg";
 import { useWardrobe } from "../../context/wardrobeContext";
+import AuthenticatedImage from "../../components/AuthenticatedImage";
+import {
+  IMAGE_UPLOAD_ASPECT,
+  IMAGE_UPLOAD_QUALITY,
+  validateImageFileSize,
+} from "../../constants/imageUpload";
+import {
+  fetchCurrentUserProfile,
+  uploadBannerImage,
+  uploadProfileImage,
+} from "../../services/userProfileService";
+import { getUploadErrorMessage } from "../../services/uploadRequest";
+import { buildApiUrl, buildAuthHeaders, buildImageUrl } from "../../constants/api";
 import { fc, s } from "../../Styles/index.styles";
 
 const { width: W } = Dimensions.get("window");
@@ -15,7 +29,7 @@ function GridItem({ item, onPress }: { item: any; onPress: () => void }) {
   return (
     <TouchableOpacity style={s.gridItem} onPress={onPress}>
       {item.image ? (
-        <Image
+        <AuthenticatedImage
           source={{ uri: item.image }}
           style={s.gridImg}
           resizeMode="cover"
@@ -56,6 +70,11 @@ function GridItem({ item, onPress }: { item: any; onPress: () => void }) {
 
 const FILTER_TABS = [ "All", "Outerwear", "Tops", "Bottoms", "Footwear", "Accessories" ];
 
+const normalizeCategory = (category?: string) => {
+  if (!category) return "";
+  return /^shoes$/i.test(category) ? "Footwear" : category;
+};
+
 const CATEGORY_TREE: Record<string, string[]> = {
   Tops: [ "T-Shirt", "Blouse", "Crop Top", "Tank Top", "Shirt", "Hoodie", "Sweater", "Cardigan"],
   Bottoms: [ "Jeans", "Skirt", "Shorts", "Trousers", "Leggings", "Cargo Pants", "Sweatpants" ],
@@ -81,6 +100,196 @@ interface FilterState {
   seasons: string[];
   sizes: string[];
 }
+
+type OutfitSummary = {
+  _id: string;
+  name?: string;
+  date?: string;
+  isLookbook?: boolean;
+  previewImage?: string;
+  garmentIds?: string[];
+  garments?: {
+    _id?: string;
+    imageUrl?: string | null;
+  }[];
+};
+
+type PreviewTile = {
+  key: string;
+  uri?: string | null;
+};
+
+const getOutfitItemCount = (outfit: OutfitSummary) => {
+  if (Array.isArray(outfit.garments) && outfit.garments.length > 0) {
+    return outfit.garments.length;
+  }
+
+  return Array.isArray(outfit.garmentIds) ? outfit.garmentIds.length : 0;
+};
+
+function buildPreviewTiles(
+  outfit: OutfitSummary,
+  items: { id: string; image?: string | null }[],
+  maxTiles = 4,
+): PreviewTile[] {
+  const tiles: PreviewTile[] = [];
+
+  const addTile = (uri: string | null | undefined, key: string) => {
+    if (tiles.length >= maxTiles) return;
+    tiles.push({ key, uri });
+  };
+
+  if (outfit.isLookbook && outfit.previewImage) {
+    addTile(buildImageUrl(outfit.previewImage), 'cover');
+    return tiles;
+  }
+
+  if (Array.isArray(outfit.garments)) {
+    outfit.garments.forEach((garment, index) => {
+      addTile(garment?.imageUrl ? buildImageUrl(garment.imageUrl) : null, `garment-${index}`);
+    });
+  } else {
+    const garmentIds = Array.isArray(outfit.garmentIds) ? outfit.garmentIds : [];
+    if (garmentIds.length > 0) {
+      garmentIds.forEach((garmentId, index) => {
+        const match = items.find((item) => String(item.id) === String(garmentId));
+        addTile(match?.image || null, `item-${garmentId}-${index}`);
+      });
+    }
+  }
+
+  if (tiles.length === 0 && outfit.previewImage) {
+    addTile(buildImageUrl(outfit.previewImage), 'cover');
+  }
+
+  return tiles.slice(0, maxTiles);
+}
+
+function PreviewTileContent({ tile }: { tile: PreviewTile }) {
+  if (!tile.uri) {
+    return <View style={{ width: '100%', height: '100%', backgroundColor: '#ececec' }} />;
+  }
+
+  return (
+    <AuthenticatedImage
+      source={{ uri: tile.uri }}
+      style={{ width: '100%', height: '100%' }}
+      resizeMode="cover"
+    />
+  );
+}
+
+function OutfitPreviewTile({ tiles }: { tiles: PreviewTile[] }) {
+  if (tiles.length === 0) {
+    return <View style={s.gridEmpty} />;
+  }
+
+  if (tiles.length === 1) {
+    if (!tiles[0].uri) {
+      return <View style={s.gridEmpty} />;
+    }
+
+    return (
+      <AuthenticatedImage
+        source={{ uri: tiles[0].uri }}
+        style={s.gridImg}
+        resizeMode="cover"
+      />
+    );
+  }
+
+  if (tiles.length === 2) {
+    return (
+      <View style={[s.gridImg, { flexDirection: 'row', overflow: 'hidden', backgroundColor: '#f3f3f3' }]}>
+        {tiles.map((tile) => (
+          <View key={tile.key} style={{ width: '50%', height: '100%', padding: 1 }}>
+            <PreviewTileContent tile={tile} />
+          </View>
+        ))}
+      </View>
+    );
+  }
+
+  if (tiles.length === 3) {
+    return (
+      <View style={[s.gridImg, { flexDirection: 'row', overflow: 'hidden', backgroundColor: '#f3f3f3' }]}>
+        <View style={{ width: '50%', height: '100%', padding: 1 }}>
+          <PreviewTileContent tile={tiles[0]} />
+        </View>
+        <View style={{ width: '50%', height: '100%' }}>
+          <View style={{ height: '50%', padding: 1 }}>
+            <PreviewTileContent tile={tiles[1]} />
+          </View>
+          <View style={{ height: '50%', padding: 1 }}>
+            <PreviewTileContent tile={tiles[2]} />
+          </View>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={[s.gridImg, { flexDirection: 'row', flexWrap: 'wrap', overflow: 'hidden', backgroundColor: '#f3f3f3' }]}>
+      {tiles.slice(0, 4).map((tile) => (
+        <View
+          key={tile.key}
+          style={{
+            width: '50%',
+            height: '50%',
+            padding: 1,
+          }}
+        >
+          <PreviewTileContent tile={tile} />
+        </View>
+      ))}
+    </View>
+  );
+}
+
+const LOOKBOOK_IDS_KEY = "lookbookIds";
+
+const toIdString = (value: any) => {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  if (value._id) return String(value._id);
+  return String(value);
+};
+
+const normalizeOutfit = (raw: any, localLookbookIds: Set<string>): OutfitSummary => {
+  const garments = Array.isArray(raw?.garments) ? raw.garments : [];
+  const lookbookFlag = raw?.isLookbook;
+  const rawId = toIdString(raw?._id);
+  const garmentIds = Array.isArray(raw?.garmentIds)
+    ? raw.garmentIds.map(toIdString).filter(Boolean)
+    : garments.map((garment: any) => toIdString(garment)).filter(Boolean);
+
+  const derivedPreviewImage = garments.find((garment: any) => garment?.imageUrl)?.imageUrl;
+
+  return {
+    _id: rawId,
+    name: raw?.name,
+    date: raw?.date,
+    isLookbook:
+      lookbookFlag === true ||
+      lookbookFlag === "true" ||
+      lookbookFlag === 1 ||
+      localLookbookIds.has(rawId),
+    previewImage: raw?.previewImage || derivedPreviewImage || undefined,
+    garmentIds,
+    garments,
+  };
+};
+
+const parseStoredLookbookIds = (rawValue: string | null) => {
+  if (!rawValue) return [] as string[];
+  try {
+    const parsed = JSON.parse(rawValue);
+    return Array.isArray(parsed) ? parsed.map((value) => String(value)) : [];
+  } catch {
+    return [] as string[];
+  }
+};
+
 const EMPTY_FILTERS: FilterState = {
   category: "",
   subcategories: [],
@@ -112,10 +321,11 @@ const Chip = ({ label, active, onPress, }: { label: string; active: boolean;onPr
 
 export default function WardrobeScreen() {
   const router = useRouter();
-  const { items, counts } = useWardrobe();
+  const { items, counts, loading, refreshItems } = useWardrobe();
 
   const [profilePic, setProfilePic] = useState<string | null>(null);
   const [bgImage, setBgImage] = useState<string | null>(null);
+  const [username, setUsername] = useState("wizliz");
   const [activeTopTab, setActiveTopTab] = useState(0);
   const [activeFilter, setActiveFilter] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
@@ -124,6 +334,73 @@ export default function WardrobeScreen() {
   );
   const [showFilter, setShowFilter] = useState(false);
   const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS);
+  const [uploadingHeaderImage, setUploadingHeaderImage] = useState(false);
+  const [outfits, setOutfits] = useState<OutfitSummary[]>([]);
+  const [loadingOutfits, setLoadingOutfits] = useState(false);
+
+  const fetchUserHeaderImages = useCallback(async () => {
+    try {
+      const profile = await fetchCurrentUserProfile();
+      setUsername(profile.username || profile.name || "wizliz");
+      setProfilePic(profile.profilePicture ?? null);
+      setBgImage(profile.bannerImage ?? null);
+    } catch (error) {
+      console.warn("Failed to load header images:", error);
+    }
+  }, []);
+
+  const fetchOutfits = useCallback(async () => {
+    try {
+      setLoadingOutfits(true);
+      const token = await SecureStore.getItemAsync("userToken");
+      if (!token) {
+        setOutfits([]);
+        return;
+      }
+
+      const [response, storedIdsRaw] = await Promise.all([
+        fetch(buildApiUrl("/api/outfits"), {
+          headers: buildAuthHeaders(token),
+        }),
+        SecureStore.getItemAsync(LOOKBOOK_IDS_KEY),
+      ]);
+
+      const localLookbookIds = new Set(parseStoredLookbookIds(storedIdsRaw));
+
+      if (!response.ok) {
+        setOutfits([]);
+        return;
+      }
+
+      const payload = await response.json();
+      setOutfits(
+        Array.isArray(payload)
+          ? payload.map((entry) => normalizeOutfit(entry, localLookbookIds))
+          : [],
+      );
+    } catch {
+      setOutfits([]);
+    } finally {
+      setLoadingOutfits(false);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshItems();
+      fetchUserHeaderImages();
+      fetchOutfits();
+    }, [fetchOutfits, fetchUserHeaderImages, refreshItems]),
+  );
+
+  useEffect(() => {
+    if (activeTopTab === 1 || activeTopTab === 2) {
+      fetchOutfits();
+    }
+  }, [activeTopTab, counts.outfits, counts.lookbooks, fetchOutfits]);
+
+  const savedOutfits = outfits.filter((outfit) => !outfit.isLookbook);
+  const savedLookbooks = outfits.filter((outfit) => outfit.isLookbook);
 
   const switchTab = (idx: number) => {
     setActiveTopTab(idx);
@@ -157,26 +434,61 @@ export default function WardrobeScreen() {
     filters.sizes.length;
 
   const pickImage = async (source: "library" | "camera") => {
-    const result =
-      source === "library"
-        ? await ImagePicker.launchImageLibraryAsync({ quality: 0.8 })
-        : await ImagePicker.launchCameraAsync({ quality: 0.8 });
-    if (!result.canceled && result.assets[0]) {
-      if (imageMenuFor === "profile") setProfilePic(result.assets[0].uri);
-      else setBgImage(result.assets[0].uri);
+    try {
+      const isProfile = imageMenuFor === "profile";
+      const pickerOptions: ImagePicker.ImagePickerOptions = {
+        allowsEditing: true,
+        aspect: isProfile ? IMAGE_UPLOAD_ASPECT.profile : IMAGE_UPLOAD_ASPECT.banner,
+        quality: isProfile ? IMAGE_UPLOAD_QUALITY.profile : IMAGE_UPLOAD_QUALITY.banner,
+      };
+
+      const result =
+        source === "library"
+          ? await ImagePicker.launchImageLibraryAsync(pickerOptions)
+          : await ImagePicker.launchCameraAsync(pickerOptions);
+
+      if (!result.canceled && result.assets[0]) {
+        const selectedUri = result.assets[0].uri;
+        const sizeError = validateImageFileSize(
+          result.assets[0].fileSize,
+          isProfile ? "profile" : "banner",
+        );
+
+        if (sizeError) {
+          Alert.alert(sizeError.title, sizeError.body);
+          return;
+        }
+
+        if (isProfile) setProfilePic(selectedUri);
+        else setBgImage(selectedUri);
+
+        setUploadingHeaderImage(true);
+        const updatedUser = isProfile
+          ? await uploadProfileImage(selectedUri)
+          : await uploadBannerImage(selectedUri);
+
+        setProfilePic(updatedUser.profilePicture ?? null);
+        setBgImage(updatedUser.bannerImage ?? null);
+      }
+    } catch (error: any) {
+      Alert.alert("Upload failed", getUploadErrorMessage(error, "Unable to update image."));
+    } finally {
+      setUploadingHeaderImage(false);
+      setImageMenuFor(null);
     }
-    setImageMenuFor(null);
   };
 
   const filtered = items.filter((item) => {
+    const normalizedItemCategories = (item.category ?? []).map((category) => normalizeCategory(category));
+
     if (
       searchQuery &&
       !item.label.toLowerCase().includes(searchQuery.toLowerCase())
     )
       return false;
-    if (activeFilter !== "All" && !item.category?.includes(activeFilter))
+    if (activeFilter !== "All" && !normalizedItemCategories.includes(activeFilter))
       return false;
-    if (filters.category && !item.category?.includes(filters.category))
+    if (filters.category && !normalizedItemCategories.includes(normalizeCategory(filters.category)))
       return false;
     if (
       filters.subcategories.length > 0 &&
@@ -218,7 +530,7 @@ export default function WardrobeScreen() {
           activeOpacity={0.9}
         >
           {bgImage ? (
-            <Image source={{ uri: bgImage }} style={s.bgImage} />
+            <AuthenticatedImage source={{ uri: bgImage }} style={s.bgImage} />
           ) : (
             <View style={s.headerDefault} />
           )}
@@ -237,7 +549,7 @@ export default function WardrobeScreen() {
           onPress={() => setImageMenuFor("profile")}
         >
           {profilePic ? (
-            <Image source={{ uri: profilePic }} style={s.profilePic} />
+            <AuthenticatedImage source={{ uri: profilePic }} style={s.profilePic} />
           ) : (
             <View style={[s.profilePic, s.profilePlaceholder]}>
               <Ionicons name="person" size={36} color="#fff" />
@@ -249,13 +561,16 @@ export default function WardrobeScreen() {
       {/* ── Body — sits on top of header ── */}
       <View style={s.body}>
         <View style={s.usernameRow}>
-          <Text style={s.username}>@wizliz</Text>
+          <Text style={s.username}>@{username}</Text>
           <TouchableOpacity
             onPress={() => router.push("/features/analytics" as any)}
           >
             <Text style={s.analyticsLink}>Style Analytics ›</Text>
           </TouchableOpacity>
         </View>
+        {uploadingHeaderImage ? (
+          <Text style={{ color: "#777", marginBottom: 8 }}>Uploading image...</Text>
+        ) : null}
 
         <View style={s.statsCard}>
           <TouchableOpacity style={s.statItem} onPress={() => switchTab(0)}>
@@ -341,6 +656,11 @@ export default function WardrobeScreen() {
                   )}
                 </TouchableOpacity>
               </View>
+              {!loading && items.length > 0 && (
+                <Text style={s.resultsCountTxt}>
+                  {filtered.length} {filtered.length === 1 ? "result" : "results"}
+                </Text>
+              )}
               {activeFilterCount > 0 && (
                 <ScrollView
                   horizontal
@@ -382,7 +702,12 @@ export default function WardrobeScreen() {
                   </TouchableOpacity>
                 </ScrollView>
               )}
-              {items.length === 0 ? (
+              {loading ? (
+                <View style={s.emptyState}>
+                  <ActivityIndicator size="large" color="#E91E63" />
+                  <Text style={s.emptyTitle}>Loading your wardrobe...</Text>
+                </View>
+              ) : items.length === 0 ? (
                 <View style={s.emptyState}>
                   <Text style={s.emptyTitle}>Your wardrobe is empty</Text>
                   <Text style={s.emptySubtitle}>
@@ -416,33 +741,136 @@ export default function WardrobeScreen() {
           )}
 
           {activeTopTab === 1 && (
-            <View style={s.emptyState}>
-              <Text style={s.emptyTitle}>No outfits yet</Text>
-              <Text style={s.emptySubtitle}>
-                Use the + button to create your first outfit
-              </Text>
-              <TouchableOpacity
-                style={s.clearBtn}
-                onPress={() => router.push("/wardrobe/outfit" as any)}
-              >
-                <Text style={s.clearBtnTxt}>Create Outfit</Text>
-              </TouchableOpacity>
-            </View>
+            loadingOutfits ? (
+              <View style={s.emptyState}>
+                <ActivityIndicator size="large" color="#E91E63" />
+                <Text style={s.emptyTitle}>Loading outfits...</Text>
+              </View>
+            ) : savedOutfits.length === 0 ? (
+              <View style={s.emptyState}>
+                <Text style={s.emptyTitle}>No outfits yet</Text>
+                <Text style={s.emptySubtitle}>
+                  Use the + button to create your first outfit
+                </Text>
+                <TouchableOpacity
+                  style={s.clearBtn}
+                  onPress={() => router.push("/wardrobe/outfit" as any)}
+                >
+                  <Text style={s.clearBtnTxt}>Create Outfit</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={s.gridContent}>
+                {savedOutfits.map((outfit) => {
+                  const itemCount = getOutfitItemCount(outfit);
+                  const previewTiles = buildPreviewTiles(
+                    outfit,
+                    items,
+                    itemCount > 0 ? Math.min(4, itemCount) : 4,
+                  );
+                  const dateLabel = outfit.date
+                    ? new Date(outfit.date).toLocaleDateString()
+                    : "No date";
+
+                  return (
+                    <TouchableOpacity
+                      key={outfit._id}
+                      style={s.gridItem}
+                      onPress={() =>
+                        router.push({
+                          pathname: "/wardrobe/outfit-detail" as any,
+                          params: { outfitJson: JSON.stringify(outfit) },
+                        })
+                      }
+                    >
+                      <OutfitPreviewTile tiles={previewTiles} />
+                      <Text style={s.gridLabel} numberOfLines={1}>
+                        {outfit.name || `Outfit • ${itemCount} items`}
+                      </Text>
+                      <Text style={{ position: "absolute", bottom: 18, left: 8, fontSize: 9, color: "#bbb" }}>
+                        {dateLabel}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )
           )}
 
           {activeTopTab === 2 && (
-            <View style={s.emptyState}>
-              <Text style={s.emptyTitle}>No lookbooks yet</Text>
-              <Text style={s.emptySubtitle}>
-                Use the + button to create your first lookbook
-              </Text>
-              <TouchableOpacity
-                style={s.clearBtn}
-                onPress={() => router.push("/wardrobe/lookbook" as any)}
-              >
-                <Text style={s.clearBtnTxt}>Create Lookbook</Text>
-              </TouchableOpacity>
-            </View>
+            loadingOutfits ? (
+              <View style={s.emptyState}>
+                <ActivityIndicator size="large" color="#E91E63" />
+                <Text style={s.emptyTitle}>Loading lookbooks...</Text>
+              </View>
+            ) : savedLookbooks.length === 0 ? (
+              <View style={s.emptyState}>
+                <Text style={s.emptyTitle}>No lookbooks yet</Text>
+                <Text style={s.emptySubtitle}>
+                  Use the + button to create your first lookbook
+                </Text>
+                <TouchableOpacity
+                  style={s.clearBtn}
+                  onPress={() => router.push("/wardrobe/lookbook" as any)}
+                >
+                  <Text style={s.clearBtnTxt}>Create Lookbook</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={s.gridContent}>
+                {savedLookbooks.map((outfit) => {
+                  const itemCount = getOutfitItemCount(outfit);
+                  const previewTiles = buildPreviewTiles(
+                    outfit,
+                    items,
+                    itemCount > 0 ? Math.min(4, itemCount) : 4,
+                  );
+                  const displayName = (outfit.name || "").trim() || "Untitled Lookbook";
+                  const dateLabel = outfit.date
+                    ? new Date(outfit.date).toLocaleDateString()
+                    : "No date";
+
+                  return (
+                    <TouchableOpacity
+                      key={outfit._id}
+                      style={s.gridItem}
+                      onPress={() =>
+                        router.push({
+                          pathname: "/wardrobe/lookbook-detail" as any,
+                          params: { lookbookJson: JSON.stringify(outfit) },
+                        })
+                      }
+                    >
+                      <OutfitPreviewTile tiles={previewTiles} />
+                      <Text
+                        style={{
+                          position: "absolute",
+                          top: 8,
+                          left: 8,
+                          right: 8,
+                          fontSize: 10,
+                          fontWeight: "700",
+                          color: "#1a1a1a",
+                          backgroundColor: "rgba(255,255,255,0.92)",
+                          borderRadius: 8,
+                          paddingHorizontal: 6,
+                          paddingVertical: 3,
+                        }}
+                        numberOfLines={1}
+                      >
+                        {displayName}
+                      </Text>
+                      <Text style={{ position: "absolute", bottom: 18, left: 8, fontSize: 9, color: "#888" }}>
+                        {itemCount} item{itemCount === 1 ? "" : "s"}
+                      </Text>
+                      <Text style={{ position: "absolute", bottom: 4, left: 8, fontSize: 9, color: "#bbb" }}>
+                        {dateLabel}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )
           )}
         </ScrollView>
       </View>
@@ -569,9 +997,9 @@ export default function WardrobeScreen() {
               onPress={() => setShowFilter(false)}
             >
               <Text style={s.applyBtnTxt}>
-                {activeFilterCount === 0
-                  ? "Show All Items"
-                  : `Show Results · ${activeFilterCount} active`}
+                {filtered.length === items.length
+                  ? `Show All Items · ${items.length}`
+                  : `Show Results · ${filtered.length}`}
               </Text>
             </TouchableOpacity>
           </View>

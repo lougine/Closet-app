@@ -42,6 +42,55 @@ export const styles = StyleSheet.create({
     fontWeight: '500',
   },
 
+  todayBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-end',
+    marginBottom: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: '#FFF1F6',
+    borderWidth: 1,
+    borderColor: '#FFD7E5',
+  },
+
+  todayBtnText: {
+    fontSize: 12,
+    color: COLORS.hotPink,
+    fontWeight: '600',
+  },
+
+  filterRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 10,
+  },
+
+  filterChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: COLORS.offWhite,
+  },
+
+  filterChipActive: {
+    backgroundColor: '#FFE2EC',
+    borderWidth: 1,
+    borderColor: '#FFC5D8',
+  },
+
+  filterChipText: {
+    fontSize: 12,
+    color: COLORS.subText,
+    fontWeight: '600',
+  },
+
+  filterChipTextActive: {
+    color: COLORS.hotPink,
+  },
+
   weekHeaderRow: {
     flexDirection: 'row',
     marginBottom: 4,
@@ -64,6 +113,10 @@ export const styles = StyleSheet.create({
     justifyContent: 'flex-start',
     paddingTop: 2,
     gap: 2,
+  },
+
+  gridCellMuted: {
+    opacity: 0.2,
   },
 
   gridDayNum: {
@@ -106,6 +159,35 @@ export const styles = StyleSheet.create({
   analyticsSection: {
     marginTop: 28,
     gap: 12,
+  },
+
+  kpiRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+
+  kpiCard: {
+    flex: 1,
+    backgroundColor: '#FFF1F6',
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#FFD7E5',
+  },
+
+  kpiValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.hotPink,
+  },
+
+  kpiLabel: {
+    marginTop: 4,
+    fontSize: 11,
+    color: COLORS.subText,
+    fontWeight: '600',
   },
 
   analyticsSectionTitle: {

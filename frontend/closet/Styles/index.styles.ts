@@ -183,6 +183,13 @@ export const s = StyleSheet.create({
     paddingVertical: 6,
     gap: 8,
   },
+  resultsCountTxt: {
+    fontSize: 12,
+    color: "#777",
+    fontWeight: "500",
+    paddingHorizontal: 14,
+    paddingBottom: 4,
+  },
   searchRow: {
     flex: 1,
   },

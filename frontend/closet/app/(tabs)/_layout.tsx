@@ -4,6 +4,7 @@ import React, { useRef, useState } from "react";
 import { Animated, Image, Modal, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { styles } from "../../Styles/tabs_layout.styles";
+import { CalendarProvider } from "../../context/calendar-context";
 
 function ActionButton({ label, onPress, icon, iconColor }: any) {
   return (
@@ -113,65 +114,67 @@ export default function TabLayout() {
   const tabBarBottom = Math.max(insets.bottom, 8) + 8;
 
   return (
-    <>
-      <Tabs
-        screenOptions={{
-          headerShown: false,
-          tabBarShowLabel: false,
-          tabBarStyle: {
-            position: "absolute",
-            bottom: tabBarBottom,
-            left: 20,
-            right: 20,
-            backgroundColor: "#1E1E1E",
-            borderRadius: 25,
-            height: 58,
-            borderColor: "transparent",
-          },
-        }}
-      >
-        <Tabs.Screen
-          name="Community"
-          options={{
-            tabBarIcon: ({ focused }) => (
-              <Image source={require("../../assets/images/Community.png")}
-                style={{ width: 40, height: 40, tintColor: focused ? "#F0507B" : "#fff", top: 12 }}
-                resizeMode="contain" />
-            ),
+    <CalendarProvider>
+      <>
+        <Tabs
+          screenOptions={{
+            headerShown: false,
+            tabBarShowLabel: false,
+            tabBarStyle: {
+              position: "absolute",
+              bottom: tabBarBottom,
+              left: 20,
+              right: 20,
+              backgroundColor: "#1E1E1E",
+              borderRadius: 25,
+              height: 58,
+              borderColor: "transparent",
+            },
           }}
-        />
-        <Tabs.Screen
-          name="calendar"
-          options={{
-            tabBarIcon: ({ focused }) => (
-              <Image source={require("../../assets/images/calender.png")}
-                style={{ width: 55, height: 55, tintColor: focused ? "#F0507B" : "#fff", top: 10, right: 20 }}
-                resizeMode="contain" />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="styling"
-          options={{
-            tabBarIcon: ({ focused }) => (
-              <Image source={require("../../assets/images/styling.png")}
-                style={{ width: 50, height: 50, tintColor: focused ? "#F0507B" : "#fff", top: 12, left: 20 }}
-                resizeMode="contain" />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="index"
-          options={{
-            tabBarIcon: ({ focused }) => (
-              <Image source={require("../../assets/images/waredrobe.png")}
-                style={{ width: 40, height: 40, tintColor: focused ? "#F0507B" : "#fff", top: 12 }}
-                resizeMode="contain" />
-            ),
-          }}
-        />
-      </Tabs>
-      <ExpandableFAB />
-    </>
+        >
+          <Tabs.Screen
+            name="Community"
+            options={{
+              tabBarIcon: ({ focused }) => (
+                <Image source={require("../../assets/images/Community.png")}
+                  style={{ width: 40, height: 40, tintColor: focused ? "#F0507B" : "#fff", top: 12 }}
+                  resizeMode="contain" />
+              ),
+            }}
+          />
+          <Tabs.Screen
+            name="calendar"
+            options={{
+              tabBarIcon: ({ focused }) => (
+                <Image source={require("../../assets/images/calender.png")}
+                  style={{ width: 55, height: 55, tintColor: focused ? "#F0507B" : "#fff", top: 10, right: 20 }}
+                  resizeMode="contain" />
+              ),
+            }}
+          />
+          <Tabs.Screen
+            name="styling"
+            options={{
+              tabBarIcon: ({ focused }) => (
+                <Image source={require("../../assets/images/styling.png")}
+                  style={{ width: 50, height: 50, tintColor: focused ? "#F0507B" : "#fff", top: 12, left: 20 }}
+                  resizeMode="contain" />
+              ),
+            }}
+          />
+          <Tabs.Screen
+            name="index"
+            options={{
+              tabBarIcon: ({ focused }) => (
+                <Image source={require("../../assets/images/waredrobe.png")}
+                  style={{ width: 40, height: 40, tintColor: focused ? "#F0507B" : "#fff", top: 12 }}
+                  resizeMode="contain" />
+              ),
+            }}
+          />
+        </Tabs>
+        <ExpandableFAB />
+      </>
+    </CalendarProvider>
   );
 }

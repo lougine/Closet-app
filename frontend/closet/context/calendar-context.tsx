@@ -1,6 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { buildApiUrl, buildAuthHeaders } from '../app/api';
+import { buildApiUrl, buildAuthHeaders } from '@/constants/api';
 
 export const COLORS = {
   white: '#FFFFFF',
@@ -24,12 +24,24 @@ export type OutfitEntry = {
   date: string;         
   garmentIds: string[];
   previewImage: string;
+  isLookbook?: boolean;
+  garments?: Array<{ imageUrl?: string | null }>;
 };
 
 export type OutfitMap = Record<string, OutfitEntry>; 
 
 export function toDateKey(date: Date): string {
-  return date.toISOString().split('T')[0];
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+export function toUtcDateKey(date: Date): string {
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 export function isSameDay(a: Date, b: Date): boolean {
@@ -38,8 +50,36 @@ export function isSameDay(a: Date, b: Date): boolean {
 
 export function buildOutfitMap(outfits: OutfitEntry[]): OutfitMap {
   const map: OutfitMap = {};
-  outfits.forEach((o) => { map[toDateKey(new Date(o.date))] = o; });
+  outfits.forEach((o) => {
+    if (o?.isLookbook) return;
+
+    const parsedDate = new Date(o.date);
+    const rawKey = typeof o.date === 'string' ? o.date.slice(0, 10) : '';
+    const localKey = toDateKey(parsedDate);
+    const utcKey = toUtcDateKey(parsedDate);
+    const hasPreview = Boolean(o.previewImage);
+
+    const upsert = (key: string) => {
+      if (!key) return;
+      const existing = map[key];
+      if (!existing) {
+        map[key] = o;
+        return;
+      }
+
+      // Prefer entries with preview image; otherwise keep the first (newest from API sort).
+      if (!existing.previewImage && hasPreview) {
+        map[key] = o;
+      }
+    };
+
+    [rawKey, localKey, utcKey].forEach(upsert);
+  });
   return map;
+}
+
+export function getOutfitForDate(outfitMap: OutfitMap, date: Date): OutfitEntry | undefined {
+  return outfitMap[toDateKey(date)] || outfitMap[toUtcDateKey(date)];
 }
 
 export function getWeekDays(date: Date): Date[] {
@@ -64,7 +104,7 @@ export function getMonthGrid(year: number, month: number): (Date | null)[] {
 
 export function getMostWornThisMonth(
   outfits: OutfitEntry[], year: number, month: number
-): { previewImage: string; count: number } | null {
+): { outfit: OutfitEntry; count: number } | null {
   const thisMonth = outfits.filter((o) => {
     const d = new Date(o.date);
     return d.getFullYear() === year && d.getMonth() === month;
@@ -77,7 +117,7 @@ export function getMostWornThisMonth(
     countMap[key].count++;
   });
   const best = Object.values(countMap).sort((a, b) => b.count - a.count)[0];
-  return { previewImage: best.outfit.previewImage, count: best.count };
+  return { outfit: best.outfit, count: best.count };
 }
 
 export function getStreak(outfitMap: OutfitMap): number {
@@ -99,8 +139,9 @@ type CalendarContextType = {
 
   setSelectedDate: (date: Date) => void;
   setCurrentMonth: (date: Date) => void;
+  saveOutfitForDate: (payload: { garmentIds: string[]; date: Date; name?: string }) => Promise<void>;
   deleteOutfit: (id: string) => Promise<void>;
-  refetch: () => void;
+  refetch: () => Promise<void>;
 };
 
 const CalendarContext = createContext<CalendarContextType | null>(null);
@@ -115,6 +156,24 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => { fetchOutfits(); }, []);
 
+  const normalizeOutfitEntry = (entry: any): OutfitEntry => {
+    const garments = Array.isArray(entry?.garments) ? entry.garments : [];
+    const derivedPreviewImage = garments.find((garment: any) => garment?.imageUrl)?.imageUrl || '';
+    const normalizedGarmentIds = Array.isArray(entry?.garmentIds)
+      ? entry.garmentIds.map((id: any) => String(id))
+      : [];
+
+    return {
+      _id: String(entry?._id || ''),
+      userId: String(entry?.userId || ''),
+      date: String(entry?.date || ''),
+      garmentIds: normalizedGarmentIds,
+      previewImage: String(entry?.previewImage || derivedPreviewImage || ''),
+      isLookbook: Boolean(entry?.isLookbook),
+      garments,
+    };
+  };
+
   async function fetchOutfits() {
     try {
       setLoading(true);
@@ -123,7 +182,8 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
         headers: buildAuthHeaders(token),
       });
       const data = await res.json();
-      setOutfits(data);
+      const normalized = Array.isArray(data) ? data.map(normalizeOutfitEntry) : [];
+      setOutfits(normalized);
     } catch (e) {
       console.warn('Calendar: could not load outfits (offline?)');
     } finally {
@@ -145,10 +205,34 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  async function saveOutfitForDate(payload: { garmentIds: string[]; date: Date; name?: string }) {
+    const { garmentIds, date, name } = payload;
+    const token = await SecureStore.getItemAsync('userToken');
+    const res = await fetch(buildApiUrl('/api/outfits'), {
+      method: 'POST',
+      headers: {
+        ...buildAuthHeaders(token),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        name: name || 'Outfit',
+        garments: garmentIds,
+        date: date.toISOString(),
+      }),
+    });
+
+    if (!res.ok) {
+      throw new Error('Could not save outfit');
+    }
+
+    await fetchOutfits();
+  }
+
   return (
     <CalendarContext.Provider value={{
       selectedDate, currentMonth, outfits, outfitMap, loading,
       setSelectedDate, setCurrentMonth,
+      saveOutfitForDate,
       deleteOutfit, refetch: fetchOutfits,
     }}>
       {children}

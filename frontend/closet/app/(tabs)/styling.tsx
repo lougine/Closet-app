@@ -1,7 +1,10 @@
 import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
-import { Animated, Dimensions, FlatList, Image, StatusBar, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from "react-native";
+import * as SecureStore from "expo-secure-store";
+import { Alert, Animated, Dimensions, FlatList, Image, StatusBar, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from "react-native";
+import AuthenticatedImage from "../../components/AuthenticatedImage";
+import { buildApiUrl, buildAuthHeaders } from "../../constants/api";
 import { useWardrobe } from "../../context/wardrobeContext";
 import { PANEL_W, PINK, s } from "../../Styles/styling.styles";
 
@@ -9,6 +12,41 @@ const { width: W } = Dimensions.get("window");
 const MODES    = ["Create outfit", "Randomize", "AI recommended"] as const;
 type Mode      = typeof MODES[number];
 const TABS     = ["All", "Footwear", "Tops", "Bottoms"];
+
+const normalizeCategory = (category?: string) => {
+  if (!category) return "";
+  return /^shoes$/i.test(category) ? "Footwear" : category;
+};
+
+type RecommendedGarment = {
+  _id: string;
+  name?: string;
+  category?: string;
+  color?: string;
+  season?: string;
+  imageUrl?: string;
+};
+
+type Recommendation = {
+  name: string;
+  score: number;
+  reason: string;
+  garments: RecommendedGarment[];
+};
+
+const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, timeoutMessage: string): Promise<T> => {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+};
 
 function WardrobePanel({
   visible, onClose, onSelect, selected,
@@ -24,7 +62,10 @@ function WardrobePanel({
   const [searchQuery, setSearchQuery] = useState("");
 
   const filtered = items.filter(item => {
-    if (activeTab !== "All" && !item.category?.includes(activeTab)) return false;
+    if (
+      activeTab !== "All" &&
+      !item.category?.some((category) => normalizeCategory(category) === activeTab)
+    ) return false;
     if (searchQuery && !item.label.toLowerCase().includes(searchQuery.toLowerCase())) return false;
     return true;
   });
@@ -108,7 +149,7 @@ function WardrobePanel({
                 activeOpacity={0.8}
               >
                 {item.image
-                  ? <Image source={{ uri: item.image }} style={s.panelImg} resizeMode="cover" />
+                  ? <AuthenticatedImage source={{ uri: item.image }} style={s.panelImg} resizeMode="cover" />
                   : <Text style={s.panelItemEmoji}>👗</Text>
                 }
                 {isSelected && (
@@ -131,6 +172,7 @@ function WardrobePanel({
 
 export default function StylingScreen() {
   const params = useLocalSearchParams<{ mode?: string; date?: string }>();
+  const router = useRouter();
 
   // Map incoming route param → tab mode
   const resolveInitialMode = (): Mode => {
@@ -142,28 +184,185 @@ export default function StylingScreen() {
   const [mode, setMode]           = useState<Mode>(resolveInitialMode);
   const [panelOpen, setPanelOpen] = useState(false);
   const [selected, setSelected]   = useState<string[]>([]);
-  const [eventText, setEventText] = useState("Lara's wedding");
+  const eventText = "Lara's wedding";
   const [inputText, setInputText] = useState("");
+  const [temperatureC] = useState(23);
+  const [loadingRandomize, setLoadingRandomize] = useState(false);
+  const [loadingAi, setLoadingAi] = useState(false);
+  const [savingOutfit, setSavingOutfit] = useState(false);
+  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
+  const [activeRecommendation, setActiveRecommendation] = useState(0);
   const { items } = useWardrobe();
 
   const toggleItem = (id: string) =>
     setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
 
-  const handleRandomize = () => {
-    if (items.length === 0) return;
-    const count   = Math.min(items.length, Math.floor(Math.random() * 3) + 3);
-    const shuffled = [...items].sort(() => Math.random() - 0.5);
-    setSelected(shuffled.slice(0, count).map(i => String(i.id)));
+  const getToken = async () => {
+    const token = await SecureStore.getItemAsync("userToken");
+    if (!token) {
+      Alert.alert("Session expired", "Please log in again.");
+      return null;
+    }
+    return token;
   };
 
-  // Auto-randomize if navigated with randomize/discover mode
-  useEffect(() => {
-    if (params.mode === "randomize" || params.mode === "discover") {
-      handleRandomize();
+  const applyRecommendationAt = (index: number, next: Recommendation[]) => {
+    if (!next[index]) {
+      setSelected([]);
+      return;
     }
-  }, []);
+    setSelected(next[index].garments.map((garment) => garment._id));
+  };
+
+  const loadRandomizedOutfit = async () => {
+    const token = await getToken();
+    if (!token) return;
+
+    setLoadingRandomize(true);
+    try {
+      const response = await withTimeout(
+        fetch(buildApiUrl("/api/outfits/randomize?count=4"), {
+          headers: buildAuthHeaders(token),
+        }),
+        12000,
+        "Randomize request timed out. Please try again.",
+      );
+
+      if (!response.ok) {
+        const errorPayload = await response.json().catch(() => ({}));
+        throw new Error(errorPayload?.message || "Could not randomize outfit");
+      }
+
+      const data = await response.json();
+      const ids = Array.isArray(data?.items) ? data.items.map((garment: RecommendedGarment) => garment._id) : [];
+      setSelected(ids);
+    } catch (error: any) {
+      Alert.alert("Randomize failed", error?.message || "Could not generate a random outfit.");
+    } finally {
+      setLoadingRandomize(false);
+    }
+  };
+
+  const loadAiRecommendations = async () => {
+    const token = await getToken();
+    if (!token) return;
+
+    setLoadingAi(true);
+    try {
+      const eventInput = inputText.trim() || eventText;
+      const response = await withTimeout(
+        fetch(buildApiUrl("/api/outfits/recommendations"), {
+          method: "POST",
+          headers: {
+            ...buildAuthHeaders(token),
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            event: eventInput,
+            temperatureC,
+            count: 3,
+          }),
+        }),
+        12000,
+        "AI recommendation request timed out. Please try again.",
+      );
+
+      if (!response.ok) {
+        const errorPayload = await response.json().catch(() => ({}));
+        throw new Error(errorPayload?.message || "Could not get AI recommendations");
+      }
+
+      const data = await response.json();
+      const nextRecommendations: Recommendation[] = Array.isArray(data?.recommendations)
+        ? data.recommendations
+        : [];
+
+      setRecommendations(nextRecommendations);
+      setActiveRecommendation(0);
+      applyRecommendationAt(0, nextRecommendations);
+    } catch (error: any) {
+      Alert.alert("AI recommendation failed", error?.message || "Could not generate recommendations.");
+    } finally {
+      setLoadingAi(false);
+    }
+  };
+
+  const cycleRecommendation = () => {
+    if (recommendations.length === 0) return;
+    const nextIndex = (activeRecommendation + 1) % recommendations.length;
+    setActiveRecommendation(nextIndex);
+    applyRecommendationAt(nextIndex, recommendations);
+  };
+
+  const persistCurrentOutfit = async () => {
+    if (savingOutfit) return;
+
+    if (selected.length === 0) {
+      Alert.alert("No outfit selected", "Generate or select an outfit first.");
+      return;
+    }
+
+    const token = await getToken();
+    if (!token) return;
+
+    setSavingOutfit(true);
+    try {
+      const selectedRecommendation = recommendations[activeRecommendation];
+
+      const response = await withTimeout(
+        fetch(buildApiUrl("/api/outfits"), {
+          method: "POST",
+          headers: {
+            ...buildAuthHeaders(token),
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: selectedRecommendation?.name || `${mode} Outfit`,
+            garments: selected,
+          }),
+        }),
+        15000,
+        "Save request timed out. Please check your connection and try again.",
+      );
+
+      if (!response.ok) {
+        const errorPayload = await response.json().catch(() => ({}));
+        throw new Error(errorPayload?.message || "Could not save outfit");
+      }
+
+      Alert.alert("Saved", "Outfit has been saved.");
+    } catch (error: any) {
+      Alert.alert("Save failed", error?.message || "Could not save this outfit.");
+    } finally {
+      setSavingOutfit(false);
+    }
+  };
+
+  useEffect(() => {
+    if (mode === "Randomize") {
+      loadRandomizedOutfit();
+      return;
+    }
+
+    if (mode === "AI recommended") {
+      loadAiRecommendations();
+    }
+  }, [mode]);
 
   const selectedItems = items.filter(i => selected.includes(String(i.id)));
+  const selectedGridColumns = Math.min(2, selectedItems.length);
+
+  const handleSelectedItemPress = (item: (typeof selectedItems)[number]) => {
+    if (mode === "Create outfit") {
+      toggleItem(String(item.id));
+      return;
+    }
+
+    router.push({
+      pathname: "/wardrobe/item-detail" as any,
+      params: { itemJson: JSON.stringify(item) },
+    });
+  };
 
   return (
     <View style={s.root}>
@@ -189,7 +388,6 @@ export default function StylingScreen() {
             style={[s.modeTab, mode === m && s.modeTabActive]}
             onPress={() => {
               setMode(m);
-              if (m === "Randomize") handleRandomize();
             }}
           >
             <Text style={[s.modeTabTxt, mode === m && s.modeTabTxtActive]} numberOfLines={1}>
@@ -211,8 +409,8 @@ export default function StylingScreen() {
         ) : (
           <FlatList
             data={selectedItems}
-            numColumns={selectedItems.length > 2 ? 2 : selectedItems.length}
-            key={selectedItems.length > 2 ? "2col" : "1col"}
+            numColumns={selectedGridColumns}
+            key={`selected-grid-${selectedGridColumns}`}
             keyExtractor={i => String(i.id)}
             contentContainerStyle={{ padding: 8, gap: 6 }}
             columnWrapperStyle={selectedItems.length > 1 ? { gap: 6 } : undefined}
@@ -224,10 +422,10 @@ export default function StylingScreen() {
                   borderRadius: 12, overflow: "hidden",
                   alignItems: "center", justifyContent: "center",
                 }}
-                onPress={() => toggleItem(String(item.id))}
+                onPress={() => handleSelectedItemPress(item)}
               >
                 {item.image
-                  ? <Image source={{ uri: item.image }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+                  ? <AuthenticatedImage source={{ uri: item.image }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
                   : <Text style={{ fontSize: 40 }}>👗</Text>
                 }
               </TouchableOpacity>
@@ -238,13 +436,10 @@ export default function StylingScreen() {
         {/* Right action buttons (visible in AI mode) */}
         {mode === "AI recommended" && (
           <View style={s.canvasActions}>
-            <TouchableOpacity style={s.actionBtn}>
-              <Ionicons name="checkmark" size={18} color="#fff" />
-            </TouchableOpacity>
-            <TouchableOpacity style={s.actionBtn}>
+            <TouchableOpacity style={s.actionBtn} onPress={cycleRecommendation} disabled={recommendations.length === 0 || loadingAi}>
               <MaterialCommunityIcons name="fit-to-screen-outline" size={18} color="#fff" />
             </TouchableOpacity>
-            <TouchableOpacity style={s.actionBtn}>
+            <TouchableOpacity style={s.actionBtn} onPress={loadAiRecommendations} disabled={loadingAi}>
               <MaterialCommunityIcons name="layers-outline" size={18} color="#fff" />
             </TouchableOpacity>
           </View>
@@ -258,13 +453,42 @@ export default function StylingScreen() {
         )}
       </View>
 
+      {mode === "Randomize" && (
+        <TouchableOpacity
+          style={[
+            s.randomizeBtn,
+            (loadingRandomize || loadingAi || savingOutfit) && s.randomizeBtnDisabled,
+          ]}
+          onPress={loadRandomizedOutfit}
+          disabled={loadingRandomize || loadingAi || savingOutfit}
+        >
+          <MaterialCommunityIcons name="shuffle-variant" size={16} color="#fff" />
+          <Text style={s.randomizeBtnTxt}>
+            {loadingRandomize ? "Randomizing..." : "Randomize outfit"}
+          </Text>
+        </TouchableOpacity>
+      )}
+
+      <TouchableOpacity
+        style={[
+          s.saveOutfitBtn,
+          (selected.length === 0 || savingOutfit || loadingAi || loadingRandomize) && s.saveOutfitBtnDisabled,
+        ]}
+        onPress={persistCurrentOutfit}
+        disabled={selected.length === 0 || savingOutfit || loadingAi || loadingRandomize}
+      >
+        <Text style={s.saveOutfitBtnTxt}>
+          {savingOutfit ? "Saving outfit..." : "Save outfit"}
+        </Text>
+      </TouchableOpacity>
+
       {/* Context card — AI mode only */}
       {mode === "AI recommended" && (
         <View style={s.contextCard}>
           <View style={s.tempRow}>
-            <Text style={s.tempTxt}>23°C</Text>
+            <Text style={s.tempTxt}>{temperatureC}°C</Text>
           </View>
-          <Text style={s.eventTxt}>Event: {eventText}</Text>
+          <Text style={s.eventTxt}>Event: {inputText.trim() || eventText}</Text>
           <View style={s.inputRow}>
             <TextInput
               style={s.input}
@@ -275,6 +499,16 @@ export default function StylingScreen() {
             />
             <Ionicons name="mic-outline" size={20} color="#bbb" />
           </View>
+          {recommendations[activeRecommendation]?.reason ? (
+            <Text style={{ marginTop: 10, color: "#666", fontSize: 12 }}>
+              {recommendations[activeRecommendation].reason}
+            </Text>
+          ) : null}
+          {(loadingAi || loadingRandomize || savingOutfit) ? (
+            <Text style={{ marginTop: 8, color: "#999", fontSize: 12 }}>
+              {savingOutfit ? "Saving outfit..." : loadingAi ? "Generating recommendations..." : "Randomizing..."}
+            </Text>
+          ) : null}
         </View>
       )}
 

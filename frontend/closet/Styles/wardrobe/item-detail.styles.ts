@@ -266,6 +266,41 @@ export const s = StyleSheet.create({
     textAlign: "center",
     marginBottom: 8,
   },
+  stylesList: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    gap: 10,
+  },
+  styleCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderWidth: 1,
+    borderColor: "#f0f0f0",
+    borderRadius: 14,
+    padding: 10,
+    backgroundColor: "#fff",
+  },
+  stylePreview: {
+    width: 72,
+    height: 72,
+    borderRadius: 10,
+    overflow: "hidden",
+    backgroundColor: "#f3f3f3",
+  },
+  styleMeta: {
+    flex: 1,
+    gap: 3,
+  },
+  styleName: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#1a1a1a",
+  },
+  styleSubtext: {
+    fontSize: 12,
+    color: "#8f8f8f",
+  },
   pinkBtn: {
     backgroundColor: PINK,
     borderRadius: 30,
