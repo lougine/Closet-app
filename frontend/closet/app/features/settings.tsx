@@ -23,6 +23,7 @@ import {
   IMAGE_UPLOAD_QUALITY,
   validateImageFileSize,
 } from '@/constants/imageUpload';
+import { COLORS } from '@/constants/theme';
 import {
   fetchCurrentUserProfile,
   saveBannerPreset,
@@ -43,17 +44,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-
-// ─── COLORS ───────────────────────────────────────────────────────────────────
-const COLORS = {
-  white: '#FFFFFF',
-  offWhite: '#F6F6F6',
-  lightGray: '#D9D9D9',
-  lightPink: '#FB92BD',
-  hotPink: '#F0507B',
-  text: '#1A1A1A',
-  subText: '#888888',
-};
 
 // ─── BANNER PRESETS ───────────────────────────────────────────────────────────
 // Color presets the user can choose for their profile banner.

@@ -27,6 +27,19 @@ export const Colors = {
   },
 };
 
+/**
+ * App color palette used throughout the application.
+ */
+export const COLORS = {
+  white: '#FFFFFF',
+  offWhite: '#F6F6F6',
+  lightGray: '#D9D9D9',
+  lightPink: '#FB92BD',
+  hotPink: '#F0507B',
+  text: '#1A1A1A',
+  subText: '#888888',
+};
+
 export const Fonts = Platform.select({
   ios: {
     /** iOS `UIFontDescriptorSystemDesignDefault` */

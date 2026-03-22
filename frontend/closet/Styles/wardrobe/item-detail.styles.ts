@@ -19,6 +19,9 @@ export const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  topSpacer: {
+    flex: 1,
+  },
   imageWrap: {
     marginHorizontal: 18,
     borderRadius: 20,
@@ -49,6 +52,11 @@ export const s = StyleSheet.create({
     color: "#fff",
     fontSize: 15,
     fontWeight: "500",
+  },
+  processingPill: {
+    bottom: 96,
+    paddingHorizontal: 24,
+    backgroundColor: "#222",
   },
   imageActions: {
     position: "absolute",
@@ -158,6 +166,10 @@ export const s = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 12,
   },
+  colorSavingText: {
+    color: "#777",
+    fontSize: 12,
+  },
   addBtn: {
     borderWidth: 1,
     borderColor: PINK,
@@ -165,11 +177,18 @@ export const s = StyleSheet.create({
     paddingVertical: 5,
     paddingHorizontal: 16,
   },
+  addBtnActive: {
+    backgroundColor: PINK,
+    borderColor: PINK,
+  },
   addBtnText: {
     color: PINK,
     fontSize: 12,
     fontWeight: "600",
     letterSpacing: 0.5,
+  },
+  addBtnTextActive: {
+    color: "#fff",
   },
   inlineRow: {
     flexDirection: "row",
@@ -185,6 +204,9 @@ export const s = StyleSheet.create({
     fontSize: 13,
     color: "#1a1a1a",
     width: 120,
+  },
+  tagInlineInput: {
+    width: 100,
   },
   inlineSave: {
     backgroundColor: PINK,
@@ -307,6 +329,21 @@ export const s = StyleSheet.create({
     paddingVertical: 13,
     paddingHorizontal: 32,
     alignItems: "center",
+  },
+  pinkBtnDetails: {
+    marginHorizontal: 20,
+  },
+  pinkBtnSpaced: {
+    marginTop: 16,
+  },
+  disabledOpacity: {
+    opacity: 0.7,
+  },
+  statsSection: {
+    padding: 20,
+  },
+  bottomSpacer: {
+    height: 40,
   },
   pinkBtnText: {
     color: "#fff",

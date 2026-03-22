@@ -18,16 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { buildApiUrl, buildAuthHeaders } from '@/constants/api';
-
-const COLORS = {
-  white: '#FFFFFF',
-  offWhite: '#F6F6F6',
-  lightGray: '#D9D9D9',
-  lightPink: '#FB92BD',
-  hotPink: '#F0507B',
-  text: '#1A1A1A',
-  subText: '#888888',
-};
+import { COLORS } from '@/constants/theme';
 
 type NotifSettings = {
   dailyOutfitReminder: boolean;  // "Don't forget to log today's outfit!"
@@ -108,7 +99,7 @@ export default function NotificationsScreen() {
           <Ionicons name="chevron-back" size={22} color={COLORS.hotPink} />
         </TouchableOpacity>
         <Text style={styles.pageTitle}>Notifications</Text>
-        <View style={{ width: 36 }} />
+        <View style={styles.headerSpacer} />
       </View>
 
       <Text style={styles.pageSubtitle}>
@@ -213,6 +204,7 @@ const styles = StyleSheet.create({
 
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
   backBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: COLORS.white, justifyContent: 'center', alignItems: 'center' },
+  headerSpacer: { width: 36 },
   pageTitle: { fontSize: 18, fontWeight: '700', color: COLORS.text },
   pageSubtitle: { fontSize: 13, color: COLORS.subText, marginBottom: 8 },
 

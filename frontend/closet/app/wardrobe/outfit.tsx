@@ -74,7 +74,7 @@ export default function OutfitScreen() {
         <Text style={s.headerTitle}>Create Outfit</Text>
 
         <TouchableOpacity
-          style={[s.saveBtn, (selected.length < 2 || saving) && { opacity: 0.4 }]}
+          style={[s.saveBtn, (selected.length < 2 || saving) && s.saveBtnDisabled]}
           disabled={selected.length < 2 || saving}
           onPress={handleSave}
         >
@@ -93,11 +93,7 @@ export default function OutfitScreen() {
             data={selectedItems}
             keyExtractor={(i) => String(i.id)}
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{
-              gap: 8,
-              paddingHorizontal: 16,
-              paddingVertical: 8,
-            }}
+            contentContainerStyle={s.previewListContent}
             renderItem={({ item }) => (
               <TouchableOpacity
                 style={s.previewItem}
@@ -113,11 +109,8 @@ export default function OutfitScreen() {
                   <View
                     style={[
                       s.previewImg,
-                      {
-                        backgroundColor: item.bg,
-                        alignItems: "center",
-                        justifyContent: "center",
-                      },
+                      s.previewImgPlaceholder,
+                      { backgroundColor: item.bg },
                     ]}
                   />
                 )}

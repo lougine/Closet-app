@@ -246,9 +246,9 @@ export default function DayScreen() {
           {selectedOutfit?.previewImage || selectedOutfit?.garments?.some((garment) => garment?.imageUrl) ? (
             <OutfitPreviewCollage outfit={selectedOutfit} style={styles.outfitImage} />
           ) : (
-            <View style={[styles.outfitImage, { alignItems: 'center', justifyContent: 'center' }]}>
+            <View style={[styles.outfitImage, styles.outfitImagePlaceholder]}>
               <Ionicons name="shirt-outline" size={48} color={COLORS.lightGray} />
-              <Text style={{ marginTop: 8, color: COLORS.subText, fontSize: 12 }}>Outfit saved</Text>
+              <Text style={styles.outfitSavedText}>Outfit saved</Text>
             </View>
           )}
         </TouchableOpacity>

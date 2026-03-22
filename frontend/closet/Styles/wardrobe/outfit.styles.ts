@@ -38,6 +38,9 @@ export const s = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 8,
   },
+  saveBtnDisabled: {
+    opacity: 0.4,
+  },
   saveBtnText: {
     color: "#fff",
     fontWeight: "600",
@@ -55,6 +58,11 @@ export const s = StyleSheet.create({
     paddingTop: 10,
     fontWeight: "500",
   },
+  previewListContent: {
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
   previewItem: {
     position: "relative",
   },
@@ -63,6 +71,10 @@ export const s = StyleSheet.create({
     height: 64,
     borderRadius: 12,
     overflow: "hidden",
+  },
+  previewImgPlaceholder: {
+    alignItems: "center",
+    justifyContent: "center",
   },
   previewRemove: {
     position: "absolute",

@@ -35,6 +35,7 @@ export interface ClothingItem {
   timesWorn?: number;
   totalCost?: number;
   dateAdded?: string;
+  createdAt?: string;
 }
 
 interface WardrobeContextType {
@@ -120,6 +121,7 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
           tags: garment.tags || [],
           timesWorn: Number(garment.wearCount) || 0,
           totalCost: Number(garment.purchasePrice) || 0,
+          createdAt: garment.createdAt,
           dateAdded: garment.createdAt ? new Date(garment.createdAt).toLocaleDateString("en-US", { month: "short", year: "numeric" }) : undefined,
         }));
 

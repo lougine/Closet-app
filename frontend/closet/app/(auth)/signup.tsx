@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as WebBrowser from 'expo-web-browser';
 import React, { useEffect, useState } from 'react';
-import { Alert, Dimensions, Image, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { buildApiUrl } from "@/constants/api";
 import { useWardrobe } from '../../context/wardrobeContext';
 import {
@@ -14,8 +14,6 @@ import {
 import { styles } from '../../Styles/auth/signup.styles';
 
 WebBrowser.maybeCompleteAuthSession();
-
-const { width } = Dimensions.get('window');
 
 export default function SignUpScreen() {
   const router = useRouter();
@@ -110,8 +108,6 @@ export default function SignUpScreen() {
     }
   };
 
-  const topImageHeight = 160;
-
   if (!fontsLoaded) return null;
 
   return (
@@ -120,13 +116,13 @@ export default function SignUpScreen() {
       
       <Image
         source={require('@/assets/images/auth.png')}
-        style={[styles.topImage, { width, height: topImageHeight }]}
+        style={styles.topImage}
         resizeMode="stretch"
       />
 
       <ScrollView 
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingTop: topImageHeight }}
+        contentContainerStyle={styles.scrollContent}
       >
         <View style={styles.contentContainer}>
           <Text style={styles.title}>Welcome!</Text>
@@ -168,7 +164,7 @@ export default function SignUpScreen() {
           />
 
           <TouchableOpacity
-            style={[styles.signUpButton, loading && { opacity: 0.6 }]}
+            style={[styles.signUpButton, loading && styles.signUpButtonDisabled]}
             onPress={handleSignup}
             disabled={loading}
           >

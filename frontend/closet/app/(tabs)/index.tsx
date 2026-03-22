@@ -2,37 +2,41 @@ import { Feather, Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useFocusEffect, useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Dimensions, Modal, ScrollView, StatusBar, Text, TextInput, TouchableOpacity, View, ActivityIndicator } from "react-native";
 import Svg, { Path } from "react-native-svg";
 import { useWardrobe } from "../../context/wardrobeContext";
 import AuthenticatedImage from "../../components/AuthenticatedImage";
-import {
-  IMAGE_UPLOAD_ASPECT,
-  IMAGE_UPLOAD_QUALITY,
-  validateImageFileSize,
-} from "../../constants/imageUpload";
-import {
-  fetchCurrentUserProfile,
-  uploadBannerImage,
-  uploadProfileImage,
-} from "../../services/userProfileService";
+import { IMAGE_UPLOAD_ASPECT, IMAGE_UPLOAD_QUALITY, validateImageFileSize } from "../../constants/imageUpload";
+import { fetchCurrentUserProfile, uploadBannerImage, uploadProfileImage} from "../../services/userProfileService";
 import { getUploadErrorMessage } from "../../services/uploadRequest";
 import { buildApiUrl, buildAuthHeaders, buildImageUrl } from "../../constants/api";
 import { fc, s } from "../../Styles/index.styles";
 
 const { width: W } = Dimensions.get("window");
 
-function GridItem({ item, onPress }: { item: any; onPress: () => void }) {
-  const [starred, setStarred] = useState(false);
-  const [hidden, setHidden] = useState(false);
+function GridItem({
+  item,
+  onPress,
+  starred,
+  hidden,
+  onToggleStar,
+  onToggleHidden,
+}: {
+  item: any;
+  onPress: () => void;
+  starred: boolean;
+  hidden: boolean;
+  onToggleStar: () => void;
+  onToggleHidden: () => void;
+}) {
   return (
     <TouchableOpacity style={s.gridItem} onPress={onPress}>
       {item.image ? (
         <AuthenticatedImage
           source={{ uri: item.image }}
           style={s.gridImg}
-          resizeMode="cover"
+          resizeMode="contain"
         />
       ) : (
         <View style={s.gridEmpty} />
@@ -42,11 +46,11 @@ function GridItem({ item, onPress }: { item: any; onPress: () => void }) {
         style={s.gridEyeBtn}
         onPress={(e) => {
           e.stopPropagation();
-          setHidden((v) => !v);
+          onToggleHidden();
         }}
       >
         <Ionicons
-          name={hidden ? "eye-off" : "eye-off-outline"}
+          name={hidden ? "eye-off" : "eye"}
           size={13}
           color={hidden ? "#333" : "#aaa"}
         />
@@ -55,7 +59,7 @@ function GridItem({ item, onPress }: { item: any; onPress: () => void }) {
         style={s.gridStarBtn}
         onPress={(e) => {
           e.stopPropagation();
-          setStarred((v) => !v);
+          onToggleStar();
         }}
       >
         <Ionicons
@@ -73,6 +77,22 @@ const FILTER_TABS = [ "All", "Outerwear", "Tops", "Bottoms", "Footwear", "Access
 const normalizeCategory = (category?: string) => {
   if (!category) return "";
   return /^shoes$/i.test(category) ? "Footwear" : category;
+};
+
+const getObjectIdTimestamp = (value: unknown) => {
+  if (typeof value !== "string" || value.length < 8) return 0;
+  const seconds = Number.parseInt(value.slice(0, 8), 16);
+  return Number.isFinite(seconds) ? seconds * 1000 : 0;
+};
+
+const getItemAddedTimestamp = (item: any) => {
+  const createdAtMs = item?.createdAt ? new Date(item.createdAt).getTime() : 0;
+  if (Number.isFinite(createdAtMs) && createdAtMs > 0) return createdAtMs;
+
+  const dateAddedMs = item?.dateAdded ? new Date(item.dateAdded).getTime() : 0;
+  if (Number.isFinite(dateAddedMs) && dateAddedMs > 0) return dateAddedMs;
+
+  return getObjectIdTimestamp(item?.id);
 };
 
 const CATEGORY_TREE: Record<string, string[]> = {
@@ -167,13 +187,13 @@ function buildPreviewTiles(
 
 function PreviewTileContent({ tile }: { tile: PreviewTile }) {
   if (!tile.uri) {
-    return <View style={{ width: '100%', height: '100%', backgroundColor: '#ececec' }} />;
+    return <View style={s.previewTileEmpty} />;
   }
 
   return (
     <AuthenticatedImage
       source={{ uri: tile.uri }}
-      style={{ width: '100%', height: '100%' }}
+      style={s.previewTileImage}
       resizeMode="cover"
     />
   );
@@ -200,9 +220,9 @@ function OutfitPreviewTile({ tiles }: { tiles: PreviewTile[] }) {
 
   if (tiles.length === 2) {
     return (
-      <View style={[s.gridImg, { flexDirection: 'row', overflow: 'hidden', backgroundColor: '#f3f3f3' }]}>
+      <View style={[s.gridImg, s.previewSplitContainer]}>
         {tiles.map((tile) => (
-          <View key={tile.key} style={{ width: '50%', height: '100%', padding: 1 }}>
+          <View key={tile.key} style={s.previewSplitHalf}>
             <PreviewTileContent tile={tile} />
           </View>
         ))}
@@ -212,15 +232,15 @@ function OutfitPreviewTile({ tiles }: { tiles: PreviewTile[] }) {
 
   if (tiles.length === 3) {
     return (
-      <View style={[s.gridImg, { flexDirection: 'row', overflow: 'hidden', backgroundColor: '#f3f3f3' }]}>
-        <View style={{ width: '50%', height: '100%', padding: 1 }}>
+      <View style={[s.gridImg, s.previewSplitContainer]}>
+        <View style={s.previewSplitHalf}>
           <PreviewTileContent tile={tiles[0]} />
         </View>
-        <View style={{ width: '50%', height: '100%' }}>
-          <View style={{ height: '50%', padding: 1 }}>
+        <View style={s.previewSplitRight}>
+          <View style={s.previewSplitQuarter}>
             <PreviewTileContent tile={tiles[1]} />
           </View>
-          <View style={{ height: '50%', padding: 1 }}>
+          <View style={s.previewSplitQuarter}>
             <PreviewTileContent tile={tiles[2]} />
           </View>
         </View>
@@ -229,16 +249,9 @@ function OutfitPreviewTile({ tiles }: { tiles: PreviewTile[] }) {
   }
 
   return (
-    <View style={[s.gridImg, { flexDirection: 'row', flexWrap: 'wrap', overflow: 'hidden', backgroundColor: '#f3f3f3' }]}>
+    <View style={[s.gridImg, s.previewQuadContainer]}>
       {tiles.slice(0, 4).map((tile) => (
-        <View
-          key={tile.key}
-          style={{
-            width: '50%',
-            height: '50%',
-            padding: 1,
-          }}
-        >
+        <View key={tile.key} style={s.previewQuadTile}>
           <PreviewTileContent tile={tile} />
         </View>
       ))}
@@ -304,7 +317,7 @@ const Wave = () => (
     height={44}
     viewBox={`0 0 ${W} 44`}
     preserveAspectRatio="none"
-    style={{ position: "absolute", width: "100%", height: "100%" }}
+    style={s.waveSvg}
   >
     <Path
       d={`M0,44 L0,22 Q${W * 0.25},50.6 ${W * 0.5},16.72 Q${W * 0.75},-8.8 ${W},22.88 L${W},44 Z`}
@@ -334,6 +347,9 @@ export default function WardrobeScreen() {
   );
   const [showFilter, setShowFilter] = useState(false);
   const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS);
+  const [quickFilter, setQuickFilter] = useState<"all" | "favorites" | "hidden">("all");
+  const [favoriteItemIds, setFavoriteItemIds] = useState<string[]>([]);
+  const [hiddenItemIds, setHiddenItemIds] = useState<string[]>([]);
   const [uploadingHeaderImage, setUploadingHeaderImage] = useState(false);
   const [outfits, setOutfits] = useState<OutfitSummary[]>([]);
   const [loadingOutfits, setLoadingOutfits] = useState(false);
@@ -425,6 +441,24 @@ export default function WardrobeScreen() {
     }));
 
   const clearFilters = () => setFilters(EMPTY_FILTERS);
+  const clearAllVisibleFilters = () => {
+    clearFilters();
+    setQuickFilter("all");
+  };
+
+  const toggleFavoriteItem = useCallback((id: string) => {
+    setFavoriteItemIds((prev) =>
+      prev.includes(id) ? prev.filter((itemId) => itemId !== id) : [...prev, id],
+    );
+  }, []);
+
+  const toggleHiddenItem = useCallback((id: string) => {
+    setHiddenItemIds((prev) =>
+      prev.includes(id) ? prev.filter((itemId) => itemId !== id) : [...prev, id],
+    );
+  }, []);
+
+  const favoriteCount = favoriteItemIds.length;
 
   const activeFilterCount =
     (filters.category ? 1 : 0) +
@@ -478,41 +512,55 @@ export default function WardrobeScreen() {
     }
   };
 
-  const filtered = items.filter((item) => {
-    const normalizedItemCategories = (item.category ?? []).map((category) => normalizeCategory(category));
+  const filtered = useMemo(() => {
+    const matched = items.filter((item) => {
+      const normalizedItemCategories = (item.category ?? []).map((category) => normalizeCategory(category));
 
-    if (
-      searchQuery &&
-      !item.label.toLowerCase().includes(searchQuery.toLowerCase())
-    )
-      return false;
-    if (activeFilter !== "All" && !normalizedItemCategories.includes(activeFilter))
-      return false;
-    if (filters.category && !normalizedItemCategories.includes(normalizeCategory(filters.category)))
-      return false;
-    if (
-      filters.subcategories.length > 0 &&
-      !filters.subcategories.some((sc) =>
-        item.tags?.map((t) => t.toLowerCase()).includes(sc.toLowerCase()),
+      if (
+        searchQuery &&
+        !item.label.toLowerCase().includes(searchQuery.toLowerCase())
       )
-    )
-      return false;
-    if (
-      filters.colors.length > 0 &&
-      !filters.colors.some((c) => item.colors?.includes(c))
-    )
-      return false;
-    if (
-      filters.seasons.length > 0 &&
-      !filters.seasons.some((se) =>
-        item.tags?.map((t) => t.toLowerCase()).includes(se.toLowerCase()),
+        return false;
+      if (activeFilter !== "All" && !normalizedItemCategories.includes(activeFilter))
+        return false;
+      if (filters.category && !normalizedItemCategories.includes(normalizeCategory(filters.category)))
+        return false;
+      if (
+        filters.subcategories.length > 0 &&
+        !filters.subcategories.some((sc) =>
+          item.tags?.map((t) => t.toLowerCase()).includes(sc.toLowerCase()),
+        )
       )
-    )
-      return false;
-    if (filters.sizes.length > 0 && !filters.sizes.includes(item.size ?? ""))
-      return false;
-    return true;
-  });
+        return false;
+      if (
+        filters.colors.length > 0 &&
+        !filters.colors.some((c) => item.colors?.includes(c))
+      )
+        return false;
+      if (
+        filters.seasons.length > 0 &&
+        !filters.seasons.some((se) =>
+          item.tags?.map((t) => t.toLowerCase()).includes(se.toLowerCase()),
+        )
+      )
+        return false;
+      if (filters.sizes.length > 0 && !filters.sizes.includes(item.size ?? ""))
+        return false;
+      return true;
+    });
+
+    const quickFiltered = matched.filter((item) => {
+      const id = String(item.id);
+      const isFavorite = favoriteItemIds.includes(id);
+      const isHidden = hiddenItemIds.includes(id);
+
+      if (quickFilter === "favorites") return isFavorite;
+      if (quickFilter === "hidden") return isHidden;
+      return true;
+    });
+
+    return quickFiltered.sort((a, b) => getItemAddedTimestamp(b) - getItemAddedTimestamp(a));
+  }, [activeFilter, favoriteItemIds, filters, hiddenItemIds, items, quickFilter, searchQuery]);
 
   return (
     <View style={s.root}>
@@ -521,81 +569,82 @@ export default function WardrobeScreen() {
         translucent
         backgroundColor="transparent"
       />
-
-      {/* ── Header — absolute so it never affects body layout ── */}
-      <View style={s.headerShell} pointerEvents="box-none">
-        <TouchableOpacity
-          style={s.headerImg}
-          onPress={() => setImageMenuFor("bg")}
-          activeOpacity={0.9}
-        >
-          {bgImage ? (
-            <AuthenticatedImage source={{ uri: bgImage }} style={s.bgImage} />
-          ) : (
-            <View style={s.headerDefault} />
-          )}
-          <View style={s.waveWrap}>
-            <Wave />
-          </View>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={s.settingsBtn}
-          onPress={() => router.push("/features/settings" as any)}
-        >
-          <Feather name="settings" size={15} color="#fff" />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={s.profileWrap}
-          onPress={() => setImageMenuFor("profile")}
-        >
-          {profilePic ? (
-            <AuthenticatedImage source={{ uri: profilePic }} style={s.profilePic} />
-          ) : (
-            <View style={[s.profilePic, s.profilePlaceholder]}>
-              <Ionicons name="person" size={36} color="#fff" />
-            </View>
-          )}
-        </TouchableOpacity>
-      </View>
-
-      {/* ── Body — sits on top of header ── */}
-      <View style={s.body}>
-        <View style={s.usernameRow}>
-          <Text style={s.username}>@{username}</Text>
+      <ScrollView
+        style={s.pagesScroll}
+        contentContainerStyle={s.pagesScrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={s.headerShell} pointerEvents="box-none">
           <TouchableOpacity
-            onPress={() => router.push("/features/analytics" as any)}
+            style={s.headerImg}
+            onPress={() => setImageMenuFor("bg")}
+            activeOpacity={0.9}
           >
-            <Text style={s.analyticsLink}>Style Analytics ›</Text>
+            {bgImage ? (
+              <AuthenticatedImage source={{ uri: bgImage }} style={s.bgImage} />
+            ) : (
+              <View style={s.headerDefault} />
+            )}
+            <View style={s.waveWrap}>
+              <Wave />
+            </View>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={s.settingsBtn}
+            onPress={() => router.push("/features/settings" as any)}
+          >
+            <Feather name="settings" size={15} color="#fff" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={s.profileWrap}
+            onPress={() => setImageMenuFor("profile")}
+          >
+            {profilePic ? (
+              <AuthenticatedImage source={{ uri: profilePic }} style={s.profilePic} />
+            ) : (
+              <View style={[s.profilePic, s.profilePlaceholder]}>
+                <Ionicons name="person" size={36} color="#fff" />
+              </View>
+            )}
           </TouchableOpacity>
         </View>
-        {uploadingHeaderImage ? (
-          <Text style={{ color: "#777", marginBottom: 8 }}>Uploading image...</Text>
-        ) : null}
 
-        <View style={s.statsCard}>
-          <TouchableOpacity style={s.statItem} onPress={() => switchTab(0)}>
-            <Text style={s.statNum}>{counts.items}</Text>
-            <Text style={[s.statLabel, activeTopTab === 0 && s.statLabelPink]}>
-              Items
-            </Text>
-          </TouchableOpacity>
-          <View style={s.statDivider} />
-          <TouchableOpacity style={s.statItem} onPress={() => switchTab(1)}>
-            <Text style={s.statNum}>{counts.outfits}</Text>
-            <Text style={[s.statLabel, activeTopTab === 1 && s.statLabelPink]}>
-              Outfits
-            </Text>
-          </TouchableOpacity>
-          <View style={s.statDivider} />
-          <TouchableOpacity style={s.statItem} onPress={() => switchTab(2)}>
-            <Text style={s.statNum}>{counts.lookbooks}</Text>
-            <Text style={[s.statLabel, activeTopTab === 2 && s.statLabelPink]}>
-              Lookbooks
-            </Text>
-          </TouchableOpacity>
-        </View>
+        <View style={s.body}>
+          <View style={s.usernameRow}>
+            <Text style={s.username}>@{username}</Text>
+            <TouchableOpacity
+              onPress={() => router.push("/features/analytics" as any)}
+            >
+              <Text style={s.analyticsLink}>Style Analytics ›</Text>
+            </TouchableOpacity>
+          </View>
+          {uploadingHeaderImage ? (
+            <Text style={s.uploadingHeaderTxt}>Uploading image...</Text>
+          ) : null}
 
-        <ScrollView style={s.pagesScroll} showsVerticalScrollIndicator={false}>
+          <View style={s.statsCard}>
+            <TouchableOpacity style={s.statItem} onPress={() => switchTab(0)}>
+              <Text style={s.statNum}>{counts.items}</Text>
+              <Text style={[s.statLabel, activeTopTab === 0 && s.statLabelPink]}>
+                Items
+              </Text>
+            </TouchableOpacity>
+            <View style={s.statDivider} />
+            <TouchableOpacity style={s.statItem} onPress={() => switchTab(1)}>
+              <Text style={s.statNum}>{counts.outfits}</Text>
+              <Text style={[s.statLabel, activeTopTab === 1 && s.statLabelPink]}>
+                Outfits
+              </Text>
+            </TouchableOpacity>
+            <View style={s.statDivider} />
+            <TouchableOpacity style={s.statItem} onPress={() => switchTab(2)}>
+              <Text style={s.statNum}>{counts.lookbooks}</Text>
+              <Text style={[s.statLabel, activeTopTab === 2 && s.statLabelPink]}>
+                Lookbooks
+              </Text>
+            </TouchableOpacity>
+          </View>
+
           {activeTopTab === 0 && (
             <>
               <ScrollView
@@ -634,11 +683,36 @@ export default function WardrobeScreen() {
                     />
                   </View>
                 </View>
-                <TouchableOpacity style={s.iconBtn}>
-                  <Ionicons name="star" size={18} color="#333" />
+                <TouchableOpacity
+                  style={[s.iconBtn, quickFilter === "hidden" && s.iconBtnActive]}
+                  onPress={() =>
+                    setQuickFilter((prev) => (prev === "hidden" ? "all" : "hidden"))
+                  }
+                >
+                  <Ionicons
+                    name={quickFilter === "hidden" ? "eye-off" : "eye-off-outline"}
+                    size={19}
+                    color={quickFilter === "hidden" ? "#fff" : "#000"}
+                  />
                 </TouchableOpacity>
-                <TouchableOpacity style={s.iconBtn}>
-                  <Ionicons name="eye-off-outline" size={19} color="#000" />
+                <TouchableOpacity
+                  style={[s.iconBtn, quickFilter === "favorites" && s.iconBtnActive]}
+                  onPress={() =>
+                    setQuickFilter((prev) =>
+                      prev === "favorites" ? "all" : "favorites",
+                    )
+                  }
+                >
+                  <Ionicons
+                    name={quickFilter === "favorites" ? "star" : "star-outline"}
+                    size={18}
+                    color={quickFilter === "favorites" ? "#fff" : "#333"}
+                  />
+                  {favoriteCount > 0 && (
+                    <View style={s.badge}>
+                      <Text style={s.badgeTxt}>{favoriteCount}</Text>
+                    </View>
+                  )}
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[s.iconBtn, activeFilterCount > 0 && s.iconBtnActive]}
@@ -656,11 +730,6 @@ export default function WardrobeScreen() {
                   )}
                 </TouchableOpacity>
               </View>
-              {!loading && items.length > 0 && (
-                <Text style={s.resultsCountTxt}>
-                  {filtered.length} {filtered.length === 1 ? "result" : "results"}
-                </Text>
-              )}
               {activeFilterCount > 0 && (
                 <ScrollView
                   horizontal
@@ -717,7 +786,7 @@ export default function WardrobeScreen() {
               ) : filtered.length === 0 ? (
                 <View style={s.emptyState}>
                   <Text style={s.emptyTitle}>No items match</Text>
-                  <TouchableOpacity style={s.clearBtn} onPress={clearFilters}>
+                  <TouchableOpacity style={s.clearBtn} onPress={clearAllVisibleFilters}>
                     <Text style={s.clearBtnTxt}>Clear Filters</Text>
                   </TouchableOpacity>
                 </View>
@@ -727,6 +796,10 @@ export default function WardrobeScreen() {
                     <GridItem
                       key={item.id}
                       item={item}
+                      starred={favoriteItemIds.includes(String(item.id))}
+                      hidden={hiddenItemIds.includes(String(item.id))}
+                      onToggleStar={() => toggleFavoriteItem(String(item.id))}
+                      onToggleHidden={() => toggleHiddenItem(String(item.id))}
                       onPress={() =>
                         router.push({
                           pathname: "/wardrobe/item-detail" as any,
@@ -787,7 +860,7 @@ export default function WardrobeScreen() {
                       <Text style={s.gridLabel} numberOfLines={1}>
                         {outfit.name || `Outfit • ${itemCount} items`}
                       </Text>
-                      <Text style={{ position: "absolute", bottom: 18, left: 8, fontSize: 9, color: "#bbb" }}>
+                      <Text style={s.outfitDateText}>
                         {dateLabel}
                       </Text>
                     </TouchableOpacity>
@@ -843,27 +916,15 @@ export default function WardrobeScreen() {
                     >
                       <OutfitPreviewTile tiles={previewTiles} />
                       <Text
-                        style={{
-                          position: "absolute",
-                          top: 8,
-                          left: 8,
-                          right: 8,
-                          fontSize: 10,
-                          fontWeight: "700",
-                          color: "#1a1a1a",
-                          backgroundColor: "rgba(255,255,255,0.92)",
-                          borderRadius: 8,
-                          paddingHorizontal: 6,
-                          paddingVertical: 3,
-                        }}
+                        style={s.lookbookName}
                         numberOfLines={1}
                       >
                         {displayName}
                       </Text>
-                      <Text style={{ position: "absolute", bottom: 18, left: 8, fontSize: 9, color: "#888" }}>
+                      <Text style={s.lookbookCountText}>
                         {itemCount} item{itemCount === 1 ? "" : "s"}
                       </Text>
-                      <Text style={{ position: "absolute", bottom: 4, left: 8, fontSize: 9, color: "#bbb" }}>
+                      <Text style={s.lookbookDateText}>
                         {dateLabel}
                       </Text>
                     </TouchableOpacity>
@@ -872,8 +933,8 @@ export default function WardrobeScreen() {
               </View>
             )
           )}
-        </ScrollView>
-      </View>
+        </View>
+      </ScrollView>
 
       {/* ── Filter Modal ── */}
       <Modal

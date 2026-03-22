@@ -5,6 +5,19 @@ const path = require('path');
 const envPath = path.resolve(__dirname, '../.env');
 const backendEnvPath = path.resolve(__dirname, '../../../.env');
 
+function readEnvValue(filePath, key) {
+  try {
+    if (!fs.existsSync(filePath)) return null;
+    const content = fs.readFileSync(filePath, 'utf8');
+    const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const match = content.match(new RegExp(`^${escaped}\\s*=\\s*(.+)\\s*$`, 'm'));
+    if (!match) return null;
+    return String(match[1]).replace(/^"|"$/g, '').replace(/^'|'$/g, '').trim();
+  } catch {
+    return null;
+  }
+}
+
 function readBackendUploadMaxMb() {
   try {
     if (!fs.existsSync(backendEnvPath)) return '5';
@@ -70,11 +83,21 @@ function getLocalIp() {
 function writeEnv(ip) {
   const url = `http://${ip}:5000`;
   const uploadMaxMb = readBackendUploadMaxMb();
-  const content = [
+  const removeBgApiKey =
+    readEnvValue(envPath, 'EXPO_PUBLIC_REMOVE_BG_API_KEY')
+    || readEnvValue(backendEnvPath, 'REMOVE_BG_API_KEY');
+
+  const lines = [
     `EXPO_PUBLIC_API_BASE_URL=${url}`,
     `EXPO_PUBLIC_IMAGE_UPLOAD_MAX_MB=${uploadMaxMb}`,
-    '',
-  ].join('\n');
+  ];
+
+  if (removeBgApiKey) {
+    lines.push(`EXPO_PUBLIC_REMOVE_BG_API_KEY=${removeBgApiKey}`);
+  }
+
+  lines.push('');
+  const content = lines.join('\n');
   fs.writeFileSync(envPath, content, { encoding: 'utf8' });
   console.log(`Updated ${path.relative(process.cwd(), envPath)} to ${url} (upload max ${uploadMaxMb}MB)`);
 }

@@ -13,11 +13,22 @@ import {
 } from "../../constants/imageUpload";
 import { buildApiUrl, buildAuthHeaders, buildImageUrl } from "../../constants/api";
 import { getUploadErrorMessage, uploadMultipartWithRetry } from "../../services/uploadRequest";
+import { removeBackgroundFromImageUri } from "../../services/removeBackground";
 import { useWardrobe, type ClothingItem } from "../../context/wardrobeContext";
 import OutfitPreviewCollage from "../../components/OutfitPreviewCollage";
 import { s } from "../../Styles/wardrobe/item-detail.styles";
 
 const DETAIL_TABS = ["Details", "Styles", "Stats"];
+const CATEGORY_OPTIONS = [
+  "Tops",
+  "Bottoms",
+  "Dresses",
+  "Outerwear",
+  "Footwear",
+  "Accessories",
+  "Bags",
+  "Swimwear",
+];
 
 const COLOR_OPTIONS = [
   { label: "Black", hex: "#111111" }, { label: "White", hex: "#FFFFFF" },
@@ -99,9 +110,8 @@ export default function ItemDetailScreen() {
   const [activeTab, setActiveTab] = useState("Details");
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [showTagInput, setShowTagInput] = useState(false);
+  const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [newTag, setNewTag] = useState("");
-  const [editingName, setEditingName] = useState(false);
-  const [nameVal, setNameVal] = useState(item.label ?? "");
   const [editingSize, setEditingSize] = useState(false);
   const [editingBrand, setEditingBrand] = useState(false);
   const [editingPrice, setEditingPrice] = useState(false);
@@ -111,6 +121,7 @@ export default function ItemDetailScreen() {
     item.totalCost !== undefined && item.totalCost !== null ? String(item.totalCost) : ""
   );
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [removingBackground, setRemovingBackground] = useState(false);
   const [savingDetails, setSavingDetails] = useState(false);
   const [savingColor, setSavingColor] = useState(false);
   const [deletingItem, setDeletingItem] = useState(false);
@@ -260,6 +271,7 @@ export default function ItemDetailScreen() {
       },
       body: JSON.stringify({
         name: item.label,
+        category: item.category?.[0] ?? null,
         size: item.size ?? null,
         brand: item.brand ?? null,
         purchasePrice: typeof item.totalCost === "number" ? item.totalCost : null,
@@ -277,6 +289,7 @@ export default function ItemDetailScreen() {
     const updatedItem = {
       ...item,
       label: garment.name ?? item.label,
+      category: garment.category ? [garment.category] : (item.category ?? []),
       size: garment.size ?? undefined,
       brand: garment.brand ?? undefined,
       tags: Array.isArray(garment.tags) ? garment.tags : (item.tags ?? []),
@@ -424,6 +437,67 @@ export default function ItemDetailScreen() {
     }
   };
 
+  const redoBackgroundRemoval = async () => {
+    if (uploadingImage) return;
+    if (!item.image) {
+      Alert.alert("No image", "This item does not have an image yet.");
+      return;
+    }
+
+    try {
+      const token = await SecureStore.getItemAsync("userToken");
+      if (!token) {
+        Alert.alert("Session expired", "Please log in again.");
+        return;
+      }
+
+      setUploadingImage(true);
+      setRemovingBackground(true);
+
+      const processedUri = await removeBackgroundFromImageUri(item.image, {
+        sourceHeaders: buildAuthHeaders(token),
+        filename: `item-${item.id}-removebg.jpg`,
+      });
+
+      const formData = new FormData();
+      formData.append("image", {
+        uri: processedUri,
+        name: `item-${Date.now()}-removebg.png`,
+        type: "image/png",
+      } as any);
+
+      const updatedGarment = await uploadMultipartWithRetry<any>({
+        endpoint: `/api/garments/${item.id}`,
+        method: "PUT",
+        token,
+        formData,
+        timeoutMs: 25000,
+        retries: 1,
+        fallbackMessage: "Unable to update image.",
+      });
+
+      const remoteImage = updatedGarment.imageUrl ? buildImageUrl(updatedGarment.imageUrl) : null;
+      const updatedItem = { ...item, image: remoteImage };
+      setItem(updatedItem);
+      updateItem(updatedItem);
+
+      Alert.alert("Done", "Background was removed and item photo was replaced.");
+    } catch (error: any) {
+      Alert.alert("Background removal failed", getUploadErrorMessage(error, "Unable to redo background removal."));
+    } finally {
+      setRemovingBackground(false);
+      setUploadingImage(false);
+    }
+  };
+
+  const openImageMenu = () => {
+    Alert.alert("Image Options", "Choose an action", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Redo Background Removal", onPress: redoBackgroundRemoval },
+      { text: "Replace Item Photo", onPress: pickImage },
+    ]);
+  };
+
   const cpw = (item.timesWorn ?? 0) > 0
     ? ((item.totalCost ?? 0) / item.timesWorn!).toFixed(2)
     : (item.totalCost ?? 0).toFixed(2);
@@ -434,8 +508,11 @@ export default function ItemDetailScreen() {
         <TouchableOpacity style={s.topBtn} onPress={() => router.back()}>
           <Ionicons name="close" size={20} color="#222" />
         </TouchableOpacity>
-        <View style={{ flex: 1 }} />
-        <TouchableOpacity style={s.topBtn} onPress={() => Share.share({ message: `Check out my ${item.label}!` })}>
+        <View style={s.topSpacer} />
+        <TouchableOpacity style={s.topBtn} onPress={openImageMenu}>
+          <Ionicons name="menu-outline" size={22} color="#222" />
+        </TouchableOpacity>
+        <TouchableOpacity style={s.topBtn} onPress={() => Share.share({ message: `Check out my ${item.label || "item"}!` })}>
           <Ionicons name="share-outline" size={20} color="#222" />
         </TouchableOpacity>
       </View>
@@ -452,8 +529,8 @@ export default function ItemDetailScreen() {
           <Text style={s.cpwText}>cost/wear ${cpw}</Text>
         </View>
         {uploadingImage ? (
-          <View style={s.cpwPill}>
-            <Text style={s.cpwText}>Uploading image...</Text>
+          <View style={[s.cpwPill, s.processingPill]}>
+            <Text style={s.cpwText}>{removingBackground ? "Removing background..." : "Uploading image..."}</Text>
           </View>
         ) : null}
         <View style={s.imageActions}>
@@ -463,8 +540,8 @@ export default function ItemDetailScreen() {
           ])}>
             <Ionicons name="trash-outline" size={22} color="#666" />
           </TouchableOpacity>
-          <TouchableOpacity onPress={pickImage}>
-            <Ionicons name="arrow-down-circle-outline" size={22} color="#666" />
+          <TouchableOpacity onPress={openImageMenu}>
+            <Ionicons name="ellipsis-horizontal" size={22} color="#666" />
           </TouchableOpacity>
         </View>
       </TouchableOpacity>
@@ -482,45 +559,35 @@ export default function ItemDetailScreen() {
         {activeTab === "Details" && (
           <View>
             <View style={s.row}>
-              <Text style={s.rowLabel}>Name</Text>
-              {editingName ? (
-                <View style={s.inlineRow}>
-                  <TextInput
-                    autoFocus
-                    style={s.inlineInput}
-                    value={nameVal}
-                    onChangeText={setNameVal}
-                    placeholder="Item name"
-                    placeholderTextColor="#bbb"
-                  />
-                  <TouchableOpacity
-                    style={s.inlineSave}
-                    onPress={() => {
-                      const trimmed = nameVal.trim();
-                      update({ label: trimmed || item.label });
-                      setNameVal(trimmed || item.label);
-                      setEditingName(false);
-                    }}
-                  >
-                    <Text style={s.inlineSaveText}>Save</Text>
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <TouchableOpacity style={s.addBtn} onPress={() => setEditingName(true)}>
-                  <Text style={s.addBtnText}>{item.label || "ADD"}</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-            <View style={s.divider} />
-
-            <View style={s.row}>
               <Text style={s.rowLabel}>Category</Text>
-              <View style={s.categoryPill}>
+              <TouchableOpacity style={s.categoryPill} onPress={() => setShowCategoryPicker((v) => !v)}>
                 <Text style={s.categoryText}>
                   {(item.category?.length ? item.category : ["UNCATEGORIZED"]).join(" > ")}
                 </Text>
-              </View>
+              </TouchableOpacity>
             </View>
+            {showCategoryPicker && (
+              <View style={s.colorPicker}>
+                {CATEGORY_OPTIONS.map((category) => {
+                  const selected = item.category?.[0] === category;
+                  return (
+                    <TouchableOpacity
+                      key={category}
+                      style={[
+                        s.addBtn,
+                        selected && s.addBtnActive,
+                      ]}
+                      onPress={() => {
+                        update({ category: [category] });
+                        setShowCategoryPicker(false);
+                      }}
+                    >
+                      <Text style={[s.addBtnText, selected && s.addBtnTextActive]}>{category}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
             <View style={s.divider} />
 
             <View>
@@ -535,7 +602,7 @@ export default function ItemDetailScreen() {
                   <View key={i} style={[s.swatch, { backgroundColor: resolveColorHex(c) }, resolveColorHex(c) === "#FFFFFF" && s.swatchBorder]} />
                 ))}
               </View>
-              {savingColor ? <Text style={{ color: "#777", fontSize: 12 }}>Saving color...</Text> : null}
+              {savingColor ? <Text style={s.colorSavingText}>Saving color...</Text> : null}
               {showColorPicker && (
                 <View style={s.colorPicker}>
                   {COLOR_OPTIONS.map(({ label, hex }) => (
@@ -654,7 +721,7 @@ export default function ItemDetailScreen() {
                 ))}
                 {showTagInput && (
                   <View style={s.inlineRow}>
-                    <TextInput autoFocus style={[s.inlineInput, { width: 100 }]} value={newTag}
+                    <TextInput autoFocus style={[s.inlineInput, s.tagInlineInput]} value={newTag}
                       onChangeText={setNewTag} onSubmitEditing={addTag}
                       placeholder="new tag" placeholderTextColor="#bbb" />
                     <TouchableOpacity style={s.inlineSave} onPress={addTag}>
@@ -667,7 +734,7 @@ export default function ItemDetailScreen() {
             <View style={s.divider} />
 
             <TouchableOpacity
-              style={[s.pinkBtn, { marginHorizontal: 20, opacity: (savingDetails || deletingItem) ? 0.7 : 1 }]}
+              style={[s.pinkBtn, s.pinkBtnDetails, (savingDetails || deletingItem) && s.disabledOpacity]}
               onPress={saveItemDetails}
               disabled={savingDetails || deletingItem}
             >
@@ -724,7 +791,7 @@ export default function ItemDetailScreen() {
         )}
 
         {activeTab === "Stats" && (
-          <View style={{ padding: 20 }}>
+          <View style={s.statsSection}>
             <View style={s.statsGrid}>
               <View style={s.statCard}>
                 <Text style={s.statVal}>${cpw}</Text>
@@ -744,7 +811,7 @@ export default function ItemDetailScreen() {
               </View>
             </View>
             <TouchableOpacity
-              style={[s.pinkBtn, { marginTop: 16, opacity: markingWorn ? 0.7 : 1 }]}
+              style={[s.pinkBtn, s.pinkBtnSpaced, markingWorn && s.disabledOpacity]}
               onPress={markWorn}
               disabled={markingWorn}
             >
@@ -752,7 +819,7 @@ export default function ItemDetailScreen() {
             </TouchableOpacity>
           </View>
         )}
-        <View style={{ height: 40 }} />
+        <View style={s.bottomSpacer} />
       </ScrollView>
     </SafeAreaView>
   );

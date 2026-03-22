@@ -12,11 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { buildApiUrl, buildAuthHeaders } from '@/constants/api';
-
-const COLORS = {
-  white: '#FFFFFF', offWhite: '#F6F6F6', lightGray: '#D9D9D9',
-  lightPink: '#FB92BD', hotPink: '#F0507B', text: '#1A1A1A', subText: '#888888',
-};
+import { COLORS } from '@/constants/theme';
 
 // The shape of one activity item from your backend
 type ActivityItem = {
@@ -89,13 +85,13 @@ export default function ActivityFeedScreen() {
           <Ionicons name="chevron-back" size={22} color={COLORS.hotPink} />
         </TouchableOpacity>
         <Text style={styles.pageTitle}>Activity Feed</Text>
-        <View style={{ width: 36 }} />
+        <View style={styles.headerSpacer} />
       </View>
 
       <Text style={styles.pageSubtitle}>Everything you've been up to 👀</Text>
 
       {loading ? (
-        <ActivityIndicator size="large" color={COLORS.hotPink} style={{ marginTop: 40 }} />
+        <ActivityIndicator size="large" color={COLORS.hotPink} style={styles.loadingIndicator} />
       ) : activities.length === 0 ? (
         // ── Empty state ──
         <View style={styles.emptyState}>
@@ -153,6 +149,8 @@ const styles = StyleSheet.create({
 
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
   backBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: COLORS.white, justifyContent: 'center', alignItems: 'center' },
+  headerSpacer: { width: 36 },
+  loadingIndicator: { marginTop: 40 },
   pageTitle: { fontSize: 18, fontWeight: '700', color: COLORS.text },
   pageSubtitle: { fontSize: 13, color: COLORS.subText, marginBottom: 8 },
 

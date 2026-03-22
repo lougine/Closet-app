@@ -163,6 +163,15 @@ export const styles = StyleSheet.create({
     height: 380,
     marginTop: 20,
   },
+  outfitImagePlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  outfitSavedText: {
+    marginTop: 8,
+    color: COLORS.subText,
+    fontSize: 12,
+  },
   outfitMetaRow: {
     marginTop: 16,
     width: '90%',
