@@ -14,16 +14,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-
-const COLORS = {
-  white: '#FFFFFF',
-  offWhite: '#F6F6F6',
-  lightGray: '#D9D9D9',
-  lightPink: '#FB92BD',
-  hotPink: '#F0507B',
-  text: '#1A1A1A',
-  subText: '#888888',
-};
+import { COLORS } from '@/constants/theme';
 
 // TODO: If you have a hosted privacy policy URL, replace the text sections
 // below with a WebView pointing to that URL instead.
@@ -42,7 +33,7 @@ export default function PrivacyPolicyScreen() {
           <Ionicons name="chevron-back" size={22} color={COLORS.hotPink} />
         </TouchableOpacity>
         <Text style={styles.pageTitle}>Privacy & Policy</Text>
-        <View style={{ width: 36 }} />
+        <View style={styles.headerSpacer} />
       </View>
 
       <Text style={styles.lastUpdated}>Last updated: February 2026</Text>
@@ -110,6 +101,7 @@ const styles = StyleSheet.create({
 
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
   backBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: COLORS.white, justifyContent: 'center', alignItems: 'center' },
+  headerSpacer: { width: 36 },
   pageTitle: { fontSize: 18, fontWeight: '700', color: COLORS.text },
   lastUpdated: { fontSize: 12, color: COLORS.subText },
 

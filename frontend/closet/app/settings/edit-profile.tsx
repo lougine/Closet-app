@@ -25,23 +25,13 @@ import {
   IMAGE_UPLOAD_QUALITY,
   validateImageFileSize,
 } from '@/constants/imageUpload';
+import { COLORS } from '@/constants/theme';
 import {
   fetchCurrentUserProfile,
   updateDisplayName,
   uploadProfileImage,
 } from '@/services/userProfileService';
 import { getUploadErrorMessage } from '@/services/uploadRequest';
-
-// ─── COLORS ───────────────────────────────────────────────────────────────────
-const COLORS = {
-  white: '#FFFFFF',
-  offWhite: '#F6F6F6',
-  lightGray: '#D9D9D9',
-  lightPink: '#FB92BD',
-  hotPink: '#F0507B',
-  text: '#1A1A1A',
-  subText: '#888888',
-};
 
 // ─── COMPONENT ────────────────────────────────────────────────────────────────
 export default function EditProfileScreen() {
@@ -188,7 +178,7 @@ export default function EditProfileScreen() {
           <Ionicons name="chevron-back" size={22} color={COLORS.hotPink} />
         </TouchableOpacity>
         <Text style={styles.pageTitle}>Edit Profile</Text>
-        <View style={{ width: 36 }} />{/* spacer to center the title */}
+        <View style={styles.headerSpacer} />{/* spacer to center the title */}
       </View>
 
       {/* ── Profile picture ── */}
@@ -265,6 +255,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  headerSpacer: { width: 36 },
   pageTitle: { fontSize: 18, fontWeight: '700', color: COLORS.text },
 
   // ── Profile picture ────────────────────────────────────────────────────────

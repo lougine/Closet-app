@@ -25,6 +25,9 @@ export default function MonthScreen() {
 
   const grid = getMonthGrid(year, month);
   const cellSize = Math.floor((SW - 32) / 7);
+  const weekHeaderCellWidth = useMemo(() => ({ width: cellSize }), [cellSize]);
+  const gridCellSize = useMemo(() => ({ width: cellSize, height: cellSize + 10 }), [cellSize]);
+  const thumbSize = useMemo(() => ({ width: cellSize - 8, height: cellSize - 8 }), [cellSize]);
 
   const mostWorn = getMostWornThisMonth(outfits, year, month);
   const streak = getStreak(outfitMap);
@@ -128,7 +131,7 @@ export default function MonthScreen() {
 
       <View style={styles.weekHeaderRow}>
         {DAYS_SHORT.map((d) => (
-          <Text key={d} style={[styles.weekHeaderCell, { width: cellSize }]}>
+          <Text key={d} style={[styles.weekHeaderCell, weekHeaderCellWidth]}>
             {d}
           </Text>
         ))}
@@ -140,7 +143,7 @@ export default function MonthScreen() {
             return (
               <View
                 key={`blank-${i}`}
-                style={{ width: cellSize, height: cellSize + 10 }}
+                style={[styles.blankCell, gridCellSize]}
               />
             );
 
@@ -155,7 +158,7 @@ export default function MonthScreen() {
               key={key}
               style={[
                 styles.gridCell,
-                { width: cellSize, height: cellSize + 10 },
+                gridCellSize,
                 shouldMute && styles.gridCellMuted,
               ]}
               onPress={() => {
@@ -190,7 +193,7 @@ export default function MonthScreen() {
                   outfit={outfit}
                   style={[
                     styles.gridThumb,
-                    { width: cellSize - 8, height: cellSize - 8 },
+                    thumbSize,
                   ]}
                 />
               )}

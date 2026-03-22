@@ -1,63 +1,25 @@
-// app/(tabs)/analytics.tsx
-// Closet Insights page — shows wardrobe analytics in a beautiful scrollable layout.
-//
-// Sections (top to bottom):
-//   1. Pink wavy header — "Closet Insights ✨"
-//   2. Wardrobe Usage — horizontal progress bar
-//   3. Outfits Worn — donut ring stat
-//   4. What's in my wardrobe — category breakdown (tops, bottoms, etc.)
-//   5. Colours — pie chart of wardrobe colours
-//   6. My Usage — most worn / least worn / never worn items
-//
-// All API calls are marked TODO — wire them up when backend is ready.
-
 import React, { useEffect, useState } from 'react';
-import {
-  View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, Dimensions, ActivityIndicator,
-} from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Dimensions, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import * as SecureStore from 'expo-secure-store';
 import AuthenticatedImage from '@/components/AuthenticatedImage';
 import { buildApiUrl, buildAuthHeaders, buildImageUrl } from '@/constants/api';
-import Svg, {
-  Circle, G, Path, Text as SvgText,
-} from 'react-native-svg';
+import { COLORS } from '@/constants/theme';
+import Svg, { Circle, G, Path, Text as SvgText,} from 'react-native-svg';
+import { styles } from '../../Styles/features/analystics.styles';
 
-// ─── COLORS ───────────────────────────────────────────────────────────────────
-const COLORS = {
-  white: '#FFFFFF',
-  offWhite: '#F6F6F6',
-  lightGray: '#D9D9D9',
-  lightPink: '#FB92BD',
-  hotPink: '#F0507B',
-  text: '#1A1A1A',
-  subText: '#888888',
-};
-
-// Colors used for the category and colour charts
 const CHART_COLORS = [
-  '#F0507B', '#FB92BD', '#FF8FAB', '#FFB3C6',
+  '#0051ff', '#ff62a4', '#00ff91', '#FFB3C6',
   '#D9D9D9', '#A8DADC', '#7EC8E3', '#B8B8FF',
   '#C8E6C9', '#FFD180', '#FFAB91', '#CE93D8',
 ];
 
 const NAMED_COLOUR_TO_HEX: Record<string, string> = {
-  black: '#000000',
-  white: '#FFFFFF',
-  blue: '#3B82F6',
-  green: '#22C55E',
-  red: '#EF4444',
-  beige: '#D6C6A9',
-  navy: '#1E3A8A',
-  gray: '#9CA3AF',
-  grey: '#9CA3AF',
-  brown: '#8B5E3C',
-  pink: '#EC4899',
-  purple: '#8B5CF6',
-  yellow: '#EAB308',
-  orange: '#F97316',
+  black: '#000000', white: '#FFFFFF', blue: '#3B82F6', green: '#22C55E', 
+  red: '#EF4444', beige: '#D6C6A9', navy: '#1E3A8A', gray: '#9CA3AF', 
+  grey: '#9CA3AF', brown: '#8B5E3C', pink: '#EC4899', purple: '#8B5CF6',
+  yellow: '#EAB308', orange: '#F97316',
 };
 
 const { width: SW } = Dimensions.get('window');
@@ -65,85 +27,22 @@ const TREND_RANGE_OPTIONS = [3, 6, 12] as const;
 type TrendRangeMonths = (typeof TREND_RANGE_OPTIONS)[number];
 const ANALYTICS_TREND_RANGE_KEY = 'analyticsTrendRangeMonths';
 
-// ─── TYPES ────────────────────────────────────────────────────────────────────
+type OverviewStats = { totalItems: number; wardrobeUsagePercent: number;  
+  outfitsWorn: number; totalOutfits: number; totalWearEvents?: number; averageWearPerItem?: number};
 
-// Overall wardrobe stats returned by GET /analytics/overview
-type OverviewStats = {
-  totalItems: number;
-  wardrobeUsagePercent: number;  // 0–100, % of items worn at least once
-  outfitsWorn: number;           // how many outfits logged in calendar
-  totalOutfits: number;          // total outfits saved
-  totalWearEvents?: number;
-  averageWearPerItem?: number;
-};
-
-// One wardrobe category e.g. { name: 'Tops', count: 42 }
-type CategoryStat = {
-  name: string;
-  count: number;
-};
-
-// One colour entry e.g. { colour: '#000000', label: 'Black', count: 30 }
-type ColourStat = {
-  colour: string;
-  label: string;
-  count: number;
-};
-
-// One clothing item for most/least worn lists
-type WornItem = {
-  _id: string;
-  name: string;
-  imageUrl: string;
-  wearCount: number;      // separate wearCount field on the garment document
-  category: string;
-};
-
-type CostPerWearItem = WornItem & {
-  purchasePrice?: number | null;
-  costPerWear?: number | null;
-};
-
-type CostPerWearSummary = {
-  trackedItems: number;
-  averageCostPerWear: number;
-  minCostPerWear: number;
-  maxCostPerWear: number;
-};
-
-type CostPerWearResponse = {
-  items: CostPerWearItem[];
-  summary: CostPerWearSummary;
-};
-
-type MonthlyTrend = {
-  month: string;
-  wearCount: number;
-};
-
-type DayTrend = {
-  day: string;
-  dayNumber: number;
-  wearCount: number;
-};
-
-type CategoryTrend = {
-  category: string;
-  wearCount: number;
-};
-
-type UsageTrendsResponse = {
-  rangeMonths: number;
-  rangeStart?: string;
-  monthly: MonthlyTrend[];
-  dayOfWeek: DayTrend[];
-  byCategory: CategoryTrend[];
+type CategoryStat = { name: string; count: number};
+type ColourStat = { colour: string; label: string; count: number};
+type WornItem = { _id: string; name: string; imageUrl: string; wearCount: number; category: string};
+type CostPerWearItem = WornItem & { purchasePrice?: number | null; costPerWear?: number | null};
+type CostPerWearSummary = { trackedItems: number; averageCostPerWear: number; minCostPerWear: number; maxCostPerWear: number};
+type CostPerWearResponse = { items: CostPerWearItem[]; summary: CostPerWearSummary};
+type MonthlyTrend = { month: string; wearCount: number };
+type DayTrend = { day: string; dayNumber: number; wearCount: number};
+type CategoryTrend = { category: string; wearCount: number};
+type UsageTrendsResponse = { rangeMonths: number; rangeStart?: string; monthly: MonthlyTrend[]; dayOfWeek: DayTrend[]; byCategory: CategoryTrend[]; 
   summary?: {
-    totalWearEventsInRange: number;
-    mostActiveDay: {
-      day: string;
-      dayNumber: number;
-      wearCount: number;
+    totalWearEventsInRange: number; mostActiveDay: {
+      day: string; dayNumber: number; wearCount: number;
     } | null;
   };
 };
@@ -176,14 +75,11 @@ function toDrawableColour(rawValue: string | null | undefined, fallback: string)
   return mapped || fallback;
 }
 
-// ─── HELPERS ──────────────────────────────────────────────────────────────────
-
-// Builds SVG pie/donut chart data from an array of counts
 function buildPieSlices(data: { count: number; colour: string }[], radius: number, cx: number, cy: number) {
   const total = data.reduce((s, d) => s + d.count, 0);
   if (total === 0) return [];
 
-  let startAngle = -Math.PI / 2; // start from top
+  let startAngle = -Math.PI / 2;
   return data.map((d) => {
     const angle = (d.count / total) * 2 * Math.PI;
     const endAngle = startAngle + angle;
@@ -198,7 +94,6 @@ function buildPieSlices(data: { count: number; colour: string }[], radius: numbe
   });
 }
 
-// ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 export default function AnalyticsScreen() {
   const [overview, setOverview] = useState<OverviewStats | null>(null);
   const [categories, setCategories] = useState<CategoryStat[]>([]);
@@ -290,21 +185,13 @@ export default function AnalyticsScreen() {
         imageUrl: item.imageUrl ? buildImageUrl(item.imageUrl) : item.imageUrl,
       }));
 
-      // Fetch all analytics in parallel for speed
       const [overviewRes, catRes, colourRes, mostRes, leastRes, neverRes, costRes] = await Promise.all([
-        // GET /analytics/overview → { totalItems, wardrobeUsagePercent, outfitsWorn, totalOutfits }
         fetch(buildApiUrl('/api/analytics/overview'), { headers }),
-        // GET /analytics/categories → [{ name, count }] for Tops/Bottoms/etc.
         fetch(buildApiUrl('/api/analytics/categories'), { headers }),
-        // GET /analytics/colours → [{ colour (hex), label, count }]
         fetch(buildApiUrl('/api/analytics/colours'), { headers }),
-        // GET /analytics/most-worn?limit=6 → top 6 items sorted by wearCount desc
         fetch(buildApiUrl('/api/analytics/most-worn?limit=6'), { headers }),
-        // GET /analytics/least-worn?limit=6 → items with wearCount > 0, sorted asc
         fetch(buildApiUrl('/api/analytics/least-worn?limit=6'), { headers }),
-        // GET /analytics/never-worn?limit=6 → items where wearCount === 0
         fetch(buildApiUrl('/api/analytics/never-worn?limit=6'), { headers }),
-        // GET /analytics/cost-per-wear?limit=20
         fetch(buildApiUrl('/api/analytics/cost-per-wear?limit=20'), { headers }),
       ]);
 
@@ -331,7 +218,6 @@ export default function AnalyticsScreen() {
     );
   }
 
-  // ── Derived values ─────────────────────────────────────────────────────────
   const usagePercent = overview?.wardrobeUsagePercent ?? 0;
   const outfitsWorn = overview?.outfitsWorn ?? 0;
   const totalOutfits = overview?.totalOutfits ?? 0;
@@ -363,17 +249,13 @@ export default function AnalyticsScreen() {
     ),
   }));
 
-  // Top 2 colours for the "favourite colours" label
   const topColours = [...normalizedColours].sort((a, b) => b.count - a.count).slice(0, 2);
-
-  // Pie chart data for colours
   const colourPieData = normalizedColours.map((c, i) => ({
     count: c.count,
     colour: c.chartColour || CHART_COLORS[i % CHART_COLORS.length],
   }));
   const pieSlices = buildPieSlices(colourPieData, 80, 100, 100);
 
-  // Donut ring for outfits worn (drawn as two arcs)
   const DONUT_R = 54;
   const DONUT_CX = 70;
   const DONUT_CY = 70;
@@ -384,17 +266,12 @@ export default function AnalyticsScreen() {
     <ScrollView style={styles.scroll} contentContainerStyle={styles.container}
       showsVerticalScrollIndicator={false}>
 
-      {/* ══════════════════════════════════════════════════════
-          HEADER — light pink block with SVG wave bottom edge
-          Title sits inside the pink area above the wave
-          ══════════════════════════════════════════════════════ */}
       <View style={styles.headerBg}>
-        <Text style={styles.headerTitle}>Closet Insights ✨</Text>
-        <Text style={styles.headerSub}>Everything your wardrobe is telling you</Text>
+        <Text style={styles.headerTitle}>Analytics</Text>
         <Svg
           width={SW} height={80}
           viewBox="0 0 1440 320"
-          style={{ marginBottom: -1 }}
+          style={styles.headerWaveSvg}
           preserveAspectRatio="none"
         >
           <Path
@@ -403,37 +280,26 @@ export default function AnalyticsScreen() {
           />
         </Svg>
       </View>
-
-      {/* ══════════════════════════════════════════════════════
-          ROW 1 — Wardrobe Usage + Outfits Worn side by side
-          ══════════════════════════════════════════════════════ */}
       <View style={styles.row}>
-
-        {/* ── Wardrobe Usage card ── */}
         <View style={[styles.card, styles.halfCard]}>
           <Text style={styles.cardLabel}>Wardrobe Usage</Text>
           <Text style={styles.bigStat}>{usagePercent}%</Text>
-          {/* Progress bar */}
           <View style={styles.progressTrack}>
             <View style={[styles.progressFill, { width: `${usagePercent}%` }]} />
           </View>
           <Text style={styles.cardSub}>of items worn</Text>
           <Text style={styles.secondarySub}>Avg wears/item: {averageWearPerItem}</Text>
         </View>
-
-        {/* ── Outfits Worn donut card ── */}
         <View style={[styles.card, styles.halfCard, { alignItems: 'center' }]}>
           <Text style={styles.cardLabel}>Outfits Worn</Text>
-          {/* SVG donut ring */}
           <Svg width={140} height={140} viewBox="0 0 140 140">
-            {/* Background ring (grey) */}
             <Circle
               cx={70} cy={70} r={DONUT_R}
               stroke={COLORS.lightGray}
               strokeWidth={12}
               fill="none"
             />
-            {/* Filled arc (hot pink) */}
+
             <Circle
               cx={70} cy={70} r={DONUT_R}
               stroke={COLORS.hotPink}
@@ -441,10 +307,8 @@ export default function AnalyticsScreen() {
               fill="none"
               strokeDasharray={`${filledDash} ${circumference}`}
               strokeLinecap="round"
-              // rotate so it starts from the top
               transform="rotate(-90 70 70)"
             />
-            {/* Center text */}
             <SvgText x={70} y={66} textAnchor="middle"
               fontSize={22} fontWeight="800" fill={COLORS.text}>
               {outfitPercent}%
@@ -458,9 +322,6 @@ export default function AnalyticsScreen() {
         </View>
       </View>
 
-      {/* ══════════════════════════════════════════════════════
-          SECTION 2 — What's in my wardrobe
-          ══════════════════════════════════════════════════════ */}
       <TouchableOpacity
         style={styles.sectionHeader}
         onPress={() => setWardrobeExpanded(!wardrobeExpanded)}
@@ -475,27 +336,19 @@ export default function AnalyticsScreen() {
 
       {wardrobeExpanded && (
         <View style={styles.card}>
-          {/* Total item count pill */}
           <View style={styles.totalPill}>
             <Text style={styles.totalPillText}>{totalItems} total items</Text>
           </View>
 
-          {/* Category rows */}
-          {/* Categories come from backend but we define the expected ones here */}
-          {/* TODO: backend should return these category names exactly:
-              Tops, Bottoms, Dresses, Footwear, Bags, Accessories
-              Add more if needed — they'll appear automatically */}
           {categories.length > 0 ? categories.map((cat, i) => {
             const pct = totalItems > 0 ? Math.round((cat.count / totalItems) * 100) : 0;
             const barColor = CHART_COLORS[i % CHART_COLORS.length];
             return (
               <View key={cat.name} style={styles.categoryRow}>
-                {/* Category name + count */}
                 <View style={styles.categoryLeft}>
                   <View style={[styles.categoryDot, { backgroundColor: barColor }]} />
                   <Text style={styles.categoryName}>{cat.name}</Text>
                 </View>
-                {/* Mini bar */}
                 <View style={styles.categoryBarTrack}>
                   <View style={[styles.categoryBarFill, {
                     width: `${pct}%`, backgroundColor: barColor,
@@ -505,7 +358,6 @@ export default function AnalyticsScreen() {
               </View>
             );
           }) : (
-            // Fallback if no data yet — shows the expected categories as empty
             ['Tops', 'Bottoms', 'Dresses', 'Footwear', 'Bags', 'Accessories'].map((name, i) => (
               <View key={name} style={styles.categoryRow}>
                 <View style={styles.categoryLeft}>
@@ -522,25 +374,18 @@ export default function AnalyticsScreen() {
         </View>
       )}
 
-      {/* ══════════════════════════════════════════════════════
-          SECTION 3 — Colours pie chart
-          ══════════════════════════════════════════════════════ */}
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Colours 🎨</Text>
+        <Text style={styles.cardTitle}>Colours</Text>
 
         {colours.length > 0 ? (
           <>
             <View style={styles.colourChartWrap}>
-              {/* Pie chart */}
               <Svg width={200} height={200} viewBox="0 0 200 200">
                 {pieSlices.map((slice, i) => (
                   <Path key={i} d={slice.path} fill={slice.colour} />
                 ))}
-                {/* White circle in middle to make it a donut */}
                 <Circle cx={100} cy={100} r={50} fill={COLORS.white} />
               </Svg>
-
-              {/* Colour legend on the right */}
               <View style={styles.colourLegend}>
                 {normalizedColours.slice(0, 6).map((c, i) => (
                   <View key={i} style={styles.legendRow}>
@@ -552,8 +397,6 @@ export default function AnalyticsScreen() {
                 ))}
               </View>
             </View>
-
-            {/* Top 2 favourite colours callout */}
             {topColours.length >= 2 && (
               <Text style={styles.favouriteColoursText}>
                 Your favourites are{' '}
@@ -574,10 +417,6 @@ export default function AnalyticsScreen() {
           </View>
         )}
       </View>
-
-      {/* ══════════════════════════════════════════════════════
-          SECTION 4 — My Usage
-          ══════════════════════════════════════════════════════ */}
       <TouchableOpacity
         style={[styles.sectionHeader, { backgroundColor: COLORS.hotPink }]}
         onPress={() => setUsageExpanded(!usageExpanded)}
@@ -592,35 +431,28 @@ export default function AnalyticsScreen() {
 
       {usageExpanded && (
         <>
-          {/* ── Most worn ── */}
           <UsageSection
-            title="Most worn 🔥"
+            title="Most worn"
             subtitle="Your go-to pieces"
             items={mostWorn}
             accentColor={COLORS.hotPink}
           />
-
-          {/* ── Least worn ── */}
           <UsageSection
-            title="Least worn 👀"
+            title="Least worn"
             subtitle="Give these some love"
             items={leastWorn}
             accentColor={COLORS.lightPink}
           />
-
-          {/* ── Never worn ── */}
           <UsageSection
-            title="Never worn 🏷️"
+            title="Never worn"
             subtitle="Still has the tags on?"
             items={neverWorn}
             accentColor={COLORS.lightGray}
           />
-
-          {/* ── Cost per wear insight ── */}
           <View style={styles.insightCard}>
             <Ionicons name="bulb-outline" size={22} color={COLORS.hotPink} />
             <View style={styles.insightText}>
-              <Text style={styles.insightTitle}>Cost Per Wear 💸</Text>
+              <Text style={styles.insightTitle}>Cost Per Wear </Text>
               <Text style={styles.insightBody}>
                 Tracked items: {costSummary?.trackedItems ?? 0} · Avg CPW: ${costSummary?.averageCostPerWear ?? 0}
               </Text>
@@ -632,10 +464,9 @@ export default function AnalyticsScreen() {
             </View>
           </View>
 
-          {/* ── Usage trends ── */}
           <View style={styles.card}>
             <View style={styles.trendHeaderRow}>
-              <Text style={styles.cardTitle}>Usage Trends 📈</Text>
+              <Text style={styles.cardTitle}>Usage Trends </Text>
               <View style={styles.trendSelectorWrap}>
                 {TREND_RANGE_OPTIONS.map((months) => {
                   const selected = months === selectedTrendMonths;
@@ -662,12 +493,12 @@ export default function AnalyticsScreen() {
             {monthlyTrends.length > 0 ? (
               <>
                 {monthlyTrends.map((entry) => {
-                  const width = maxMonthlyWear > 0 ? `${Math.round((entry.wearCount / maxMonthlyWear) * 100)}%` : '0%';
+                  const widthPercent = maxMonthlyWear > 0 ? (entry.wearCount / maxMonthlyWear) * 100 : 0;
                   return (
                     <View key={entry.month} style={styles.trendRow}>
                       <Text style={styles.trendLabel}>{formatTrendMonth(entry.month)}</Text>
                       <View style={styles.trendTrack}>
-                        <View style={[styles.trendFill, { width }]} />
+                        <View style={[styles.trendFill, { width: `${widthPercent}%` as any }]} />
                       </View>
                       <Text style={styles.trendValue}>{entry.wearCount}</Text>
                     </View>
@@ -702,12 +533,11 @@ export default function AnalyticsScreen() {
         </>
       )}
 
-      <View style={{ height: 100 }} />{/* bottom padding for tab bar */}
+      <View style={styles.bottomSpacer} />
     </ScrollView>
   );
 }
 
-// ─── Usage section component (most/least/never worn grid) ─────────────────────
 function UsageSection({
   title, subtitle, items, accentColor,
 }: {
@@ -720,7 +550,6 @@ function UsageSection({
           <Text style={styles.usageTitle}>{title}</Text>
           <Text style={styles.usageSub}>{subtitle}</Text>
         </View>
-        {/* Accent line */}
         <View style={[styles.accentLine, { backgroundColor: accentColor }]} />
       </View>
 
@@ -729,7 +558,6 @@ function UsageSection({
           <Text style={styles.emptyText}>No items yet</Text>
         </View>
       ) : (
-        // 3-column grid of item thumbnails
         <View style={styles.itemGrid}>
           {items.map((item) => (
             <View key={item._id} style={styles.itemCell}>
@@ -740,7 +568,6 @@ function UsageSection({
                   <Ionicons name="shirt-outline" size={22} color={COLORS.lightGray} />
                 </View>
               )}
-              {/* Wear count badge */}
               <View style={[styles.wearBadge, { backgroundColor: accentColor }]}>
                 <Text style={styles.wearBadgeText}>×{item.wearCount}</Text>
               </View>
@@ -752,251 +579,3 @@ function UsageSection({
     </View>
   );
 }
-
-// ─── STYLES ───────────────────────────────────────────────────────────────────
-const ITEM_SIZE = (SW - 40 - 24) / 3; // 3 columns with padding
-
-const styles = StyleSheet.create({
-  scroll: { flex: 1, backgroundColor: COLORS.white },
-  container: { paddingBottom: 20 },
-  loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.offWhite },
-
-  // ── Header — wave image as background, title overlaid on top ────────────────
-  headerBg: {
-    backgroundColor: COLORS.lightPink,
-    paddingTop: 60,
-    paddingHorizontal: 24,
-    paddingBottom: 0,
-    marginBottom: 16,
-  },
-  headerTitle: { fontSize: 26, fontWeight: '800', color: COLORS.white, marginBottom: 4 },
-  headerSub: { fontSize: 13, color: 'rgba(255,255,255,0.85)', marginBottom: 16 },
-
-  // ── Generic card ───────────────────────────────────────────────────────────
-  card: {
-    backgroundColor: COLORS.white,
-    borderRadius: 20,
-    padding: 18,
-    marginHorizontal: 20,
-    marginBottom: 14,
-    shadowColor: COLORS.hotPink,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 3,
-    gap: 10,
-    borderWidth: 1,
-    borderColor: COLORS.offWhite,
-  },
-  cardLabel: { fontSize: 12, fontWeight: '600', color: COLORS.subText, textTransform: 'uppercase', letterSpacing: 0.8 },
-  cardTitle: { fontSize: 16, fontWeight: '700', color: COLORS.text },
-  cardSub: { fontSize: 12, color: COLORS.subText },
-  secondarySub: { fontSize: 11, color: COLORS.subText, marginTop: 2 },
-
-  // ── Side by side row ───────────────────────────────────────────────────────
-  row: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    gap: 12,
-    marginBottom: 14,
-  },
-  halfCard: {
-    flex: 1,
-    marginHorizontal: 0,  // override card margin since row handles it
-  },
-
-  // ── Big stat number ────────────────────────────────────────────────────────
-  bigStat: { fontSize: 36, fontWeight: '800', color: COLORS.hotPink },
-
-  // ── Progress bar ───────────────────────────────────────────────────────────
-  progressTrack: {
-    height: 8, borderRadius: 4,
-    backgroundColor: COLORS.lightGray,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%', borderRadius: 4,
-    backgroundColor: COLORS.hotPink,
-  },
-
-  // ── Section collapsible header ─────────────────────────────────────────────
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: COLORS.lightPink,
-    marginHorizontal: 20,
-    borderRadius: 16,
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    marginBottom: 10,
-  },
-  sectionHeaderText: { fontSize: 15, fontWeight: '700', color: COLORS.white },
-
-  // ── Wardrobe categories ────────────────────────────────────────────────────
-  totalPill: {
-    alignSelf: 'flex-start',
-    backgroundColor: COLORS.offWhite,
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-  },
-  totalPillText: { fontSize: 12, fontWeight: '600', color: COLORS.subText },
-  categoryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  categoryLeft: { flexDirection: 'row', alignItems: 'center', gap: 6, width: 110 },
-  categoryDot: { width: 10, height: 10, borderRadius: 5 },
-  categoryName: { fontSize: 14, fontWeight: '500', color: COLORS.text },
-  categoryBarTrack: {
-    flex: 1, height: 8, borderRadius: 4,
-    backgroundColor: COLORS.offWhite, overflow: 'hidden',
-  },
-  categoryBarFill: { height: '100%', borderRadius: 4, minWidth: 4 },
-  categoryCount: { fontSize: 13, fontWeight: '600', color: COLORS.subText, width: 28, textAlign: 'right' },
-
-  // ── Colour chart ───────────────────────────────────────────────────────────
-  colourChartWrap: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  colourLegend: { flex: 1, paddingLeft: 12, gap: 6 },
-  legendRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  legendDot: { width: 10, height: 10, borderRadius: 5 },
-  legendLabel: { fontSize: 12, color: COLORS.text, fontWeight: '500' },
-  favouriteColoursText: {
-    fontSize: 13, color: COLORS.subText,
-    textAlign: 'center', lineHeight: 20,
-  },
-  colourBold: { fontWeight: '800' },
-
-  // ── Usage sections ─────────────────────────────────────────────────────────
-  usageSection: {
-    marginHorizontal: 20,
-    marginBottom: 14,
-  },
-  usageTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-  },
-  usageTitle: { fontSize: 16, fontWeight: '700', color: COLORS.text },
-  usageSub: { fontSize: 12, color: COLORS.subText, marginTop: 2 },
-  accentLine: { width: 40, height: 3, borderRadius: 2 },
-
-  // ── Item grid ──────────────────────────────────────────────────────────────
-  itemGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  itemCell: {
-    width: ITEM_SIZE,
-    alignItems: 'center',
-    gap: 4,
-  },
-  itemThumb: {
-    width: ITEM_SIZE,
-    height: ITEM_SIZE,
-    borderRadius: 14,
-    backgroundColor: COLORS.offWhite,
-  },
-  itemThumbEmpty: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  wearBadge: {
-    position: 'absolute',
-    top: 6, right: 6,
-    borderRadius: 10,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  wearBadgeText: { fontSize: 10, fontWeight: '700', color: COLORS.white },
-  itemName: { fontSize: 11, color: COLORS.subText, textAlign: 'center', width: ITEM_SIZE },
-
-  // ── Insight tip card ───────────────────────────────────────────────────────
-  insightCard: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: '#FFF0F4',
-    borderRadius: 16,
-    padding: 16,
-    marginHorizontal: 20,
-    marginBottom: 14,
-    gap: 12,
-    borderLeftWidth: 3,
-    borderLeftColor: COLORS.hotPink,
-  },
-  insightText: { flex: 1 },
-  insightTitle: { fontSize: 14, fontWeight: '700', color: COLORS.text },
-  insightBody: { fontSize: 13, color: COLORS.subText, marginTop: 2, lineHeight: 20 },
-
-  // ── Trend styles ──────────────────────────────────────────────────────────
-  trendHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
-  },
-  trendSelectorWrap: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  trendSelectorPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-    backgroundColor: COLORS.offWhite,
-    borderWidth: 1,
-    borderColor: COLORS.lightGray,
-  },
-  trendSelectorPillActive: {
-    backgroundColor: COLORS.hotPink,
-    borderColor: COLORS.hotPink,
-  },
-  trendSelectorText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: COLORS.subText,
-  },
-  trendSelectorTextActive: {
-    color: COLORS.white,
-  },
-  trendLoadingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  trendTitle: { fontSize: 13, fontWeight: '700', color: COLORS.text, marginTop: 8 },
-  trendRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  trendLabel: { width: 56, fontSize: 12, color: COLORS.subText },
-  trendTrack: {
-    flex: 1,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: COLORS.offWhite,
-    overflow: 'hidden',
-  },
-  trendFill: {
-    height: '100%',
-    borderRadius: 4,
-    backgroundColor: COLORS.hotPink,
-  },
-  trendValue: { width: 28, textAlign: 'right', fontSize: 12, color: COLORS.text, fontWeight: '700' },
-  dayTrendWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
-  dayChip: {
-    backgroundColor: COLORS.offWhite,
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    minWidth: 58,
-    alignItems: 'center',
-  },
-  dayChipTitle: { fontSize: 11, color: COLORS.subText, fontWeight: '600' },
-  dayChipValue: { fontSize: 13, color: COLORS.text, fontWeight: '700' },
-
-  // ── Empty state ────────────────────────────────────────────────────────────
-  emptyState: { alignItems: 'center', paddingVertical: 20, gap: 8 },
-  emptyText: { fontSize: 13, color: COLORS.subText },
-});

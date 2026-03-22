@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleProp, View, ViewStyle } from 'react-native';
 import { buildImageUrl } from '@/constants/api';
 import AuthenticatedImage from './AuthenticatedImage';
+import { s } from '@/Styles/components/outfit-preview-collage.styles';
 
 type OutfitPreviewSource = {
   previewImage?: string | null;
@@ -47,22 +48,22 @@ const buildTiles = (outfit?: OutfitPreviewSource | null) => {
 
 const TileContent = ({ tile }: { tile: Tile }) => {
   if (!tile.uri) {
-    return <View style={{ width: '100%', height: '100%', backgroundColor: '#ececec' }} />;
+    return <View style={s.tileEmpty} />;
   }
 
-  return <AuthenticatedImage source={{ uri: tile.uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />;
+  return <AuthenticatedImage source={{ uri: tile.uri }} style={s.tileImage} resizeMode="cover" />;
 };
 
 export default function OutfitPreviewCollage({ outfit, style }: OutfitPreviewCollageProps) {
   const tiles = buildTiles(outfit);
 
   if (tiles.length === 0) {
-    return <View style={[style, { backgroundColor: '#f2f2f2' }]} />;
+    return <View style={[style, s.emptyFallback]} />;
   }
 
   if (tiles.length === 1) {
     if (!tiles[0].uri) {
-      return <View style={[style, { backgroundColor: '#ececec' }]} />;
+      return <View style={[style, s.singleFallback]} />;
     }
 
     return (
@@ -76,9 +77,9 @@ export default function OutfitPreviewCollage({ outfit, style }: OutfitPreviewCol
 
   if (tiles.length === 2) {
     return (
-      <View style={[style, { flexDirection: 'row', overflow: 'hidden', backgroundColor: '#f2f2f2' }]}>
+      <View style={[style, s.splitRow]}>
         {tiles.map((tile) => (
-          <View key={tile.key} style={{ width: '50%', height: '100%', padding: 1 }}>
+          <View key={tile.key} style={s.splitHalf}>
             <TileContent tile={tile} />
           </View>
         ))}
@@ -88,15 +89,15 @@ export default function OutfitPreviewCollage({ outfit, style }: OutfitPreviewCol
 
   if (tiles.length === 3) {
     return (
-      <View style={[style, { flexDirection: 'row', overflow: 'hidden', backgroundColor: '#f2f2f2' }]}>
-        <View style={{ width: '50%', height: '100%', padding: 1 }}>
+      <View style={[style, s.splitRow]}>
+        <View style={s.splitHalf}>
           <TileContent tile={tiles[0]} />
         </View>
-        <View style={{ width: '50%', height: '100%' }}>
-          <View style={{ height: '50%', padding: 1 }}>
+        <View style={s.splitRight}>
+          <View style={s.splitQuarter}>
             <TileContent tile={tiles[1]} />
           </View>
-          <View style={{ height: '50%', padding: 1 }}>
+          <View style={s.splitQuarter}>
             <TileContent tile={tiles[2]} />
           </View>
         </View>
@@ -105,9 +106,9 @@ export default function OutfitPreviewCollage({ outfit, style }: OutfitPreviewCol
   }
 
   return (
-    <View style={[style, { flexDirection: 'row', flexWrap: 'wrap', overflow: 'hidden', backgroundColor: '#f2f2f2' }]}>
+    <View style={[style, s.quadWrap]}>
       {tiles.slice(0, 4).map((tile) => (
-        <View key={tile.key} style={{ width: '50%', height: '50%', padding: 1 }}>
+        <View key={tile.key} style={s.quadTile}>
           <TileContent tile={tile} />
         </View>
       ))}

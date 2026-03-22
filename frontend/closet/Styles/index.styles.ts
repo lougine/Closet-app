@@ -14,19 +14,12 @@ export const s = StyleSheet.create({
     backgroundColor: BODY_BG,
   },
   headerShell: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
     height: HEADER_H,
     overflow: "visible",
-    zIndex: 0,
+    marginBottom: PIC_SIZE / 6 + 8,
   },
   headerImg: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
+    width: "100%",
     height: HEADER_H,
     overflow: "hidden",
   },
@@ -43,6 +36,11 @@ export const s = StyleSheet.create({
     left: 0,
     right: 0,
     height: WAVE_H,
+  },
+  waveSvg: {
+    position: "absolute",
+    width: "100%",
+    height: "100%",
   },
   settingsBtn: {
     position: "absolute",
@@ -73,18 +71,17 @@ export const s = StyleSheet.create({
     justifyContent: "center",
   },
   body: {
-    flex: 1,
     backgroundColor: "transparent",
-    paddingTop: HEADER_H - PIC_SIZE / 2,
+    paddingTop: 0,
   },
   usernameRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingTop: PIC_SIZE / 2 + 14,
+    paddingTop: 6,
     paddingBottom: 4,
     paddingHorizontal: 16,
-    marginBottom: 5,
+    marginBottom: 6,
   },
   username: {
     fontSize: 15,
@@ -139,6 +136,9 @@ export const s = StyleSheet.create({
   pagesScroll: {
     flex: 1,
   },
+  pagesScrollContent: {
+    paddingBottom: 20,
+  },
   itemsPage: {
     width: W,
     flex: 1,
@@ -183,13 +183,6 @@ export const s = StyleSheet.create({
     paddingVertical: 6,
     gap: 8,
   },
-  resultsCountTxt: {
-    fontSize: 12,
-    color: "#777",
-    fontWeight: "500",
-    paddingHorizontal: 14,
-    paddingBottom: 4,
-  },
   searchRow: {
     flex: 1,
   },
@@ -207,6 +200,10 @@ export const s = StyleSheet.create({
     flex: 1,
     fontSize: 13,
     color: "#333",
+  },
+  uploadingHeaderTxt: {
+    color: "#777",
+    marginBottom: 8,
   },
   iconBtn: {
     width: 36,
@@ -296,6 +293,44 @@ export const s = StyleSheet.create({
     height: "88%",
     borderRadius: 8,
   },
+  previewTileEmpty: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#ececec",
+  },
+  previewTileImage: {
+    width: "100%",
+    height: "100%",
+  },
+  previewSplitContainer: {
+    flexDirection: "row",
+    overflow: "hidden",
+    backgroundColor: "#f3f3f3",
+  },
+  previewSplitHalf: {
+    width: "50%",
+    height: "100%",
+    padding: 1,
+  },
+  previewSplitRight: {
+    width: "50%",
+    height: "100%",
+  },
+  previewSplitQuarter: {
+    height: "50%",
+    padding: 1,
+  },
+  previewQuadContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    overflow: "hidden",
+    backgroundColor: "#f3f3f3",
+  },
+  previewQuadTile: {
+    width: "50%",
+    height: "50%",
+    padding: 1,
+  },
   gridEmpty: {
     width: "100%",
     height: "88%",
@@ -308,6 +343,40 @@ export const s = StyleSheet.create({
     left: 8,
     fontSize: 9,
     color: "#999",
+  },
+  outfitDateText: {
+    position: "absolute",
+    bottom: 18,
+    left: 8,
+    fontSize: 9,
+    color: "#bbb",
+  },
+  lookbookName: {
+    position: "absolute",
+    top: 8,
+    left: 8,
+    right: 8,
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#1a1a1a",
+    backgroundColor: "rgba(255,255,255,0.92)",
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+  },
+  lookbookCountText: {
+    position: "absolute",
+    bottom: 18,
+    left: 8,
+    fontSize: 9,
+    color: "#888",
+  },
+  lookbookDateText: {
+    position: "absolute",
+    bottom: 4,
+    left: 8,
+    fontSize: 9,
+    color: "#bbb",
   },
   gridStarBtn: {
     position: "absolute",

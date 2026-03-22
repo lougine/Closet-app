@@ -107,6 +107,7 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
   },
+  blankCell: {},
 
   gridCell: {
     alignItems: 'center',

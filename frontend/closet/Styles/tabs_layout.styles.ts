@@ -1,11 +1,21 @@
 import { StyleSheet } from "react-native";
 
 export const styles = StyleSheet.create({
+  fabOverlay: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    zIndex: 90,
+  },
   floatingContainer: {
     position: "absolute",
     bottom: 45,
     alignSelf: "center",
     alignItems: "center",
+    zIndex: 100,
   },
   actionWrapper: { 
     position: "absolute", 
@@ -30,6 +40,9 @@ export const styles = StyleSheet.create({
     color: "#000", 
     fontWeight: "500" 
   },
+  actionIcon: {
+    marginRight: 10,
+  },
   floatingButton: {
     width: 60,
     height: 60,
@@ -52,6 +65,9 @@ export const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.45)",
     justifyContent: "flex-end",
+  },
+  sheetDismiss: {
+    flex: 1,
   },
   sheet: {
     backgroundColor: "#fff",
@@ -114,5 +130,34 @@ export const styles = StyleSheet.create({
     fontSize: 15, 
     color: "#FF4F81", 
     fontWeight: "600" 
+  },
+  focusedTabIcon: {
+    tintColor: "#F0507B",
+  },
+  communityIcon: {
+    width: 40,
+    height: 40,
+    tintColor: "#fff",
+    top: 12,
+  },
+  calendarIcon: {
+    width: 55,
+    height: 55,
+    tintColor: "#fff",
+    top: 10,
+    right: 20,
+  },
+  stylingIcon: {
+    width: 50,
+    height: 50,
+    tintColor: "#fff",
+    top: 12,
+    left: 20,
+  },
+  wardrobeIcon: {
+    width: 40,
+    height: 40,
+    tintColor: "#fff",
+    top: 12,
   },
 });

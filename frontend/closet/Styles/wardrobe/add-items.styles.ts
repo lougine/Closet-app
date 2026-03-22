@@ -35,11 +35,22 @@ export const s = StyleSheet.create({
     paddingHorizontal: 20, 
     paddingVertical: 8 
 },
+  saveBtnDisabled: {
+    opacity: 0.6,
+  },
   saveBtnText: { 
     color: "#fff", 
     fontWeight: "600", 
     fontSize: 14 
 },
+  uploadStatusText: {
+    textAlign: "center",
+    color: "#666",
+    marginTop: 6,
+  },
+  flexOne: {
+    flex: 1,
+  },
   scroll: { 
     flex: 1 
 },
@@ -68,6 +79,25 @@ export const s = StyleSheet.create({
     fontSize: 13, 
     color: "#bbb" 
 },
+  removeBgBtn: {
+    marginBottom: 14,
+    backgroundColor: PINK,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  removeBgBtnDisabled: {
+    opacity: 0.65,
+  },
+  removeBgBtnText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 14,
+  },
   section: { 
     backgroundColor: "#fff", 
     borderRadius: 16, 
@@ -110,6 +140,15 @@ export const s = StyleSheet.create({
     color: "#1a1a1a", 
     backgroundColor: "#fafafa" 
 },
+  inputRowText: {
+    flex: 1,
+    borderLeftWidth: 0,
+    borderTopLeftRadius: 0,
+    borderBottomLeftRadius: 0,
+  },
+  flexInput: {
+    flex: 1,
+  },
   chipRow: { 
     flexDirection: "row", 
     flexWrap: "wrap", 
@@ -222,4 +261,7 @@ export const s = StyleSheet.create({
     fontSize: 17, 
     lineHeight: 19 
 },
+  bottomSpacer: {
+    height: 60,
+  },
 });

@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
+import * as FileSystem from "expo-file-system";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
@@ -15,6 +16,7 @@ import {
 } from "../../constants/imageUpload";
 import { buildApiUrl, buildImageUrl } from "../../constants/api";
 import { getUploadErrorMessage, uploadMultipartWithRetry } from "../../services/uploadRequest";
+import { removeBackgroundFromImageUri } from "../../services/removeBackground";
 import { useWardrobe } from "../../context/wardrobeContext";
 import { s } from "../../Styles/wardrobe/add-items.styles";
 
@@ -41,9 +43,15 @@ const CATEGORY_BG: Record<string, string> = {
 };
 
 interface ItemForm {
-  name: string; category: string; colors: string[]; brand: string;
+  category: string; colors: string[]; brand: string;
   size: string; tags: string[]; cost: string; datePurchased: string;
 }
+
+const getAutoItemName = (category: string) => {
+  const base = category?.trim() || "Item";
+  const stamp = new Date().toISOString().slice(0, 10);
+  return `${base} ${stamp}`;
+};
 
 export default function AddItemsScreen() {
   const router = useRouter();
@@ -53,12 +61,13 @@ export default function AddItemsScreen() {
   const [image, setImage] = useState<string | null>(imageParam ?? null);
   const [imageFileSize, setImageFileSize] = useState<number | null>(null);
   const [form, setForm] = useState<ItemForm>({
-    name: "", category: "", colors: [], brand: "",
+    category: "", colors: [], brand: "",
     size: "", tags: [], cost: "", datePurchased: "",
   });
   const [tagInput, setTagInput] = useState("");
   const [saving, setSaving] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
+  const [processingBackground, setProcessingBackground] = useState(false);
 
   useEffect(() => {
     if (!source) return;
@@ -113,6 +122,26 @@ export default function AddItemsScreen() {
   const removeTag = (tag: string) =>
     update("tags", form.tags.filter((t) => t !== tag));
 
+  const handleRemoveBackground = async () => {
+    if (!image || processingBackground || saving) return;
+
+    try {
+      setProcessingBackground(true);
+      setUploadStatus("Removing background...");
+
+      const processedUri = await removeBackgroundFromImageUri(image);
+      setImage(processedUri);
+
+      const processedInfo = await FileSystem.getInfoAsync(processedUri);
+      setImageFileSize(processedInfo.exists ? (processedInfo as any).size ?? null : null);
+    } catch (error) {
+      Alert.alert("Background removal failed", getUploadErrorMessage(error, "Unable to remove background."));
+    } finally {
+      setUploadStatus(null);
+      setProcessingBackground(false);
+    }
+  };
+
   const parsePurchasePrice = () => {
     const trimmed = form.cost.trim();
     if (!trimmed) return null;
@@ -124,7 +153,6 @@ export default function AddItemsScreen() {
   };
 
   const handleSave = async () => {
-    if (!form.name.trim()) { Alert.alert("Missing name", "Please give this item a name."); return; }
     if (!form.category) { Alert.alert("Missing category", "Please select a category."); return; }
 
     const sizeError = validateImageFileSize(imageFileSize, "garment");
@@ -146,6 +174,7 @@ export default function AddItemsScreen() {
 
       let res;
       const purchasePrice = parsePurchasePrice();
+      const autoName = getAutoItemName(form.category);
 
       if (image) {
         setUploadStatus("Uploading image...");
@@ -160,7 +189,7 @@ export default function AddItemsScreen() {
         } as any);
 
         // Add form data
-        formData.append('name', form.name.trim());
+        formData.append('name', autoName);
         formData.append('category', form.category);
         if (form.colors.length > 0) {
           formData.append('color', form.colors[0]);
@@ -187,7 +216,7 @@ export default function AddItemsScreen() {
         setUploadStatus(null);
         // No image, send as JSON
         const garmentData = {
-          name: form.name.trim(),
+          name: autoName,
           category: form.category,
           color: form.colors.length > 0 ? form.colors[0] : undefined,
           purchasePrice: purchasePrice ?? undefined,
@@ -215,7 +244,7 @@ export default function AddItemsScreen() {
       addItem({
         id: savedGarment._id, // MongoDB _id is a string
         image: savedGarment.imageUrl ? buildImageUrl(savedGarment.imageUrl) : null,
-        label: savedGarment.name,
+        label: savedGarment.name || autoName,
         bg: CATEGORY_BG[form.category] ?? "#fce4ec",
         category: [form.category],
         colors: form.colors,
@@ -246,14 +275,14 @@ export default function AddItemsScreen() {
           <Ionicons name="chevron-back" size={22} color="#1a1a1a" />
         </TouchableOpacity>
         <Text style={s.headerTitle}>Add Item</Text>
-        <TouchableOpacity style={[s.saveBtn, saving && { opacity: 0.6 }]} onPress={handleSave} disabled={saving}>
+        <TouchableOpacity style={[s.saveBtn, saving && s.saveBtnDisabled]} onPress={handleSave} disabled={saving}>
           {saving ? <ActivityIndicator size="small" color="#fff" /> : <Text style={s.saveBtnText}>Save</Text>}
         </TouchableOpacity>
       </View>
 
-      {uploadStatus ? <Text style={{ textAlign: "center", color: "#666", marginTop: 6 }}>{uploadStatus}</Text> : null}
+      {uploadStatus ? <Text style={s.uploadStatusText}>{uploadStatus}</Text> : null}
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <KeyboardAvoidingView style={s.flexOne} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <ScrollView style={s.scroll} contentContainerStyle={s.scrollContent}
           showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
@@ -268,10 +297,18 @@ export default function AddItemsScreen() {
             )}
           </View>
 
-          <Section title="Item Name" required>
-            <TextInput style={s.textInput} value={form.name} onChangeText={(v) => update("name", v)}
-              placeholder="e.g. Black Leather Jacket" placeholderTextColor="#bbb" returnKeyType="done" />
-          </Section>
+          {image ? (
+            <TouchableOpacity
+              style={[s.removeBgBtn, (processingBackground || saving) && s.removeBgBtnDisabled]}
+              onPress={handleRemoveBackground}
+              disabled={processingBackground || saving}
+            >
+              <Ionicons name="cut-outline" size={16} color="#fff" />
+              <Text style={s.removeBgBtnText}>
+                {processingBackground ? "Removing Background..." : "Remove Background"}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
 
           <Section title="Category" required>
             <View style={s.chipRow}>
@@ -316,7 +353,7 @@ export default function AddItemsScreen() {
           <Section title="Cost">
             <View style={s.inputRow}>
               <Text style={s.currencySymbol}>$</Text>
-              <TextInput style={[s.textInput, { flex: 1, borderLeftWidth: 0, borderTopLeftRadius: 0, borderBottomLeftRadius: 0 }]}
+              <TextInput style={[s.textInput, s.inputRowText]}
                 value={form.cost} onChangeText={(v) => update("cost", v.replace(/[^0-9.]/g, ""))}
                 placeholder="0.00" placeholderTextColor="#bbb" keyboardType="decimal-pad" />
             </View>
@@ -329,7 +366,7 @@ export default function AddItemsScreen() {
 
           <Section title="Tags">
             <View style={s.tagInputRow}>
-              <TextInput style={[s.textInput, { flex: 1 }]} value={tagInput} onChangeText={setTagInput}
+              <TextInput style={[s.textInput, s.flexInput]} value={tagInput} onChangeText={setTagInput}
                 onSubmitEditing={addTag} placeholder="e.g. y2k, casual, summer"
                 placeholderTextColor="#bbb" returnKeyType="done" />
               <TouchableOpacity style={s.tagAddBtn} onPress={addTag}>
@@ -350,7 +387,7 @@ export default function AddItemsScreen() {
             )}
           </Section>
 
-          <View style={{ height: 60 }} />
+          <View style={s.bottomSpacer} />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

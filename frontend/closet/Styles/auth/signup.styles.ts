@@ -9,6 +9,11 @@ export const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     zIndex: 10,
+    width: '100%',
+    height: 160,
+  },
+  scrollContent: {
+    paddingTop: 160,
   },
   contentContainer: {
     paddingHorizontal: 35,
@@ -55,6 +60,9 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 50,
     borderRadius: 25,
     marginTop: 15,
+  },
+  signUpButtonDisabled: {
+    opacity: 0.6,
   },
   signUpButtonText: {
     color: '#FFF',
