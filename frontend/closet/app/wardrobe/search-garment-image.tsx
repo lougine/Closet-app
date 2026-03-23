@@ -90,7 +90,7 @@ export default function SearchGarmentImageScreen() {
     try {
       setSearching(true);
       const found = await searchGarmentImages(normalizedQuery, token, 10);
-      setResults(found);
+      setResults(found.length >= 3 ? found : []);
       setSearched(true);
     } catch (error) {
       Alert.alert('Search failed', getFriendlySearchError(error));
@@ -172,7 +172,7 @@ export default function SearchGarmentImageScreen() {
 
       {searched && results.length === 0 && !searching ? (
         <View style={styles.emptyState}>
-          <Text style={styles.emptyTitle}>No image results found</Text>
+          <Text style={styles.emptyTitle}>No good results found, try rephrasing</Text>
           <Text style={styles.emptySubtitle}>Try a clearer name like white linen shirt.</Text>
         </View>
       ) : null}
