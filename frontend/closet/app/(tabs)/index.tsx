@@ -2,8 +2,8 @@ import { Feather, Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useFocusEffect, useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, Dimensions, Modal, ScrollView, StatusBar, Text, TextInput, TouchableOpacity, View, ActivityIndicator } from "react-native";
+import React, { useCallback, useMemo, useState } from "react";
+import { Alert, Dimensions, Modal, ScrollView, StatusBar, Text, TextInput, TouchableOpacity, View, ActivityIndicator, RefreshControl } from "react-native";
 import Svg, { Path } from "react-native-svg";
 import { useWardrobe } from "../../context/wardrobeContext";
 import AuthenticatedImage from "../../components/AuthenticatedImage";
@@ -341,6 +341,7 @@ export default function WardrobeScreen() {
   const [uploadingHeaderImage, setUploadingHeaderImage] = useState(false);
   const [outfits, setOutfits] = useState<OutfitSummary[]>([]);
   const [loadingOutfits, setLoadingOutfits] = useState(false);
+  const [pullRefreshing, setPullRefreshing] = useState(false);
 
   const fetchUserHeaderImages = useCallback(async () => {
     try {
@@ -397,11 +398,25 @@ export default function WardrobeScreen() {
     }, [fetchOutfits, fetchUserHeaderImages, refreshItems]),
   );
 
-  useEffect(() => {
-    if (activeTopTab === 1 || activeTopTab === 2) {
-      fetchOutfits();
+  const onPullRefresh = useCallback(async () => {
+    if (pullRefreshing) return;
+
+    try {
+      setPullRefreshing(true);
+
+      if (activeTopTab === 0) {
+        await Promise.all([
+          Promise.resolve(refreshItems()),
+          fetchUserHeaderImages(),
+        ]);
+        return;
+      }
+
+      await fetchOutfits();
+    } finally {
+      setPullRefreshing(false);
     }
-  }, [activeTopTab, counts.outfits, counts.lookbooks, fetchOutfits]);
+  }, [activeTopTab, fetchOutfits, fetchUserHeaderImages, pullRefreshing, refreshItems]);
 
   const savedOutfits = outfits.filter((outfit) => !outfit.isLookbook);
   const savedLookbooks = outfits.filter((outfit) => outfit.isLookbook);
@@ -561,6 +576,14 @@ export default function WardrobeScreen() {
         style={s.pagesScroll}
         contentContainerStyle={s.pagesScrollContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={pullRefreshing}
+            onRefresh={onPullRefresh}
+            tintColor="#E91E63"
+            colors={["#E91E63"]}
+          />
+        }
       >
         <View style={s.headerShell} pointerEvents="box-none">
           <TouchableOpacity

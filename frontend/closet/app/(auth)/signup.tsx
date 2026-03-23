@@ -51,7 +51,7 @@ export default function SignUpScreen() {
       setLoading(true);
       const appToken = await exchangeGoogleAccessTokenForAppToken(accessToken);
       await persistAuthTokenAndHydrateWardrobe(appToken, refreshItems);
-      router.replace('/(tabs)');
+      router.replace('/signupdetails');
     } catch (e) {
       console.error(e);
       Alert.alert('Google sign up failed', 'Unable to sign up with Google right now.');
@@ -96,7 +96,7 @@ export default function SignUpScreen() {
       const data = await res.json().catch(() => null);
       if (data?.token) {
         await persistAuthTokenAndHydrateWardrobe(data.token, refreshItems);
-        router.replace('/(tabs)');
+        router.replace('/signupdetails');
       } else {
         router.push('/(auth)/login');
       }

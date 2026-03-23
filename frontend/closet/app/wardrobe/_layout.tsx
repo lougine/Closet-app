@@ -6,6 +6,7 @@ export default function WardrobeLayout() {
     <SafeAreaView style={{ flex: 1 }} edges={["left", "right"]}>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="add-items" />
+        <Stack.Screen name="search-garment-image" />
         <Stack.Screen name="item-detail" />
         <Stack.Screen name="outfit" />
         <Stack.Screen name="outfit-detail" />
