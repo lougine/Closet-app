@@ -16,6 +16,5 @@
   "exclude": [
     "node_modules",
     "frontend/closet/node_modules"
-  ],
-  "extends": "expo/tsconfig.base"
+  ]
 }
