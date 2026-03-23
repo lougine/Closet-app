@@ -1,8 +1,3 @@
-// app/settings/edit-profile.tsx
-// Edit Profile page — lets user change their profile picture and username.
-// Profile picture: choose from camera roll OR take a new photo.
-// Username: text input with save button.
-
 import React, { useEffect, useState } from 'react';
 import {
   View,

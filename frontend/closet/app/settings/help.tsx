@@ -1,7 +1,3 @@
-// app/settings/help.tsx
-// Help page — user can describe their issue and send it directly
-// to your support email via the device's native mail app.
-// Also has FAQ accordion section for common questions.
 
 import React, { useState } from 'react';
 import {

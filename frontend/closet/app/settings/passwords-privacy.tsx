@@ -1,8 +1,3 @@
-// app/settings/passwords-privacy.tsx
-// Passwords & Privacy page — change password + privacy toggles.
-// Change password: current password + new password + confirm.
-// Privacy: toggle profile visibility and data sharing preferences.
-
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,

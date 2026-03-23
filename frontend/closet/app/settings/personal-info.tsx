@@ -1,14 +1,3 @@
-// app/settings/personal-info.tsx
-// Personal Information page — lets user fill in body/lifestyle details.
-// Fields: age, height (cm), weight (kg), body type, style preference.
-// All saved via PUT /users/me to your backend.
-//
-// Changes from previous version:
-//   • Age restricted to max 3 digits (0–120)
-//   • Height restricted to max 3 digits (0–999 cm, reasonable 50–250)
-//   • Weight restricted to max 3 digits (0–999 kg, reasonable 20–300)
-//   • "Failed to load" error now silent — shows empty fields instead of toast
-
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,

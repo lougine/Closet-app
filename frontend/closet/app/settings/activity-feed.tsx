@@ -1,8 +1,3 @@
-// app/settings/activity-feed.tsx
-// Activity Feed page — shows a chronological log of the user's activity:
-// outfits logged, streaks reached, items added to wardrobe, etc.
-// Data comes from GET /users/me/activity on your backend.
-
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,

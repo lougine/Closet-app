@@ -15,20 +15,8 @@ import { fc, s } from "../../Styles/index.styles";
 
 const { width: W } = Dimensions.get("window");
 
-function GridItem({
-  item,
-  onPress,
-  starred,
-  hidden,
-  onToggleStar,
-  onToggleHidden,
-}: {
-  item: any;
-  onPress: () => void;
-  starred: boolean;
-  hidden: boolean;
-  onToggleStar: () => void;
-  onToggleHidden: () => void;
+function GridItem({ item, onPress, starred, hidden, onToggleStar, onToggleHidden}: {
+  item: any;  onPress: () => void; starred: boolean; hidden: boolean; onToggleStar: () => void; onToggleHidden: () => void;
 }) {
   return (
     <TouchableOpacity style={s.gridItem} onPress={onPress}>
