@@ -8,6 +8,67 @@ const { buildImageMetadata } = require('../utils/imageMetadata');
 const SERPER_IMAGE_SEARCH_URL = 'https://google.serper.dev/images';
 const REMOVE_BG_API_URL = 'https://api.remove.bg/v1.0/removebg';
 
+const BLOCKED_IMAGE_HOST_TOKENS = [
+  'pinterest',
+  'pinimg',
+  'facebook',
+  'instagram',
+  'tiktok',
+  'x.com',
+  'twitter',
+  'reddit',
+  'tumblr',
+  'snapchat',
+  'youtube',
+  'temu',
+  'aliexpress',
+];
+
+const PREFERRED_SOURCE_TOKENS = [
+  'zara',
+  'hm.com',
+  'uniqlo',
+  'asos',
+  'mango',
+  'farfetch',
+  'shopify',
+  'amazon',
+  'walmart',
+  'target',
+  'nike',
+  'adidas',
+  'nordstrom',
+  'gap',
+  'forever21',
+  'shein',
+  'macys',
+  'revolve',
+  'mytheresa',
+  'net-a-porter',
+  'cdn',
+  'ecommerce',
+  'shop',
+  'store',
+  'product',
+];
+
+const RELEVANCE_TOKENS = [
+  'product',
+  'ecommerce',
+  'white background',
+  'isolated',
+  'studio',
+  'fashion',
+  'catalog',
+  'front view',
+  'full length',
+  'flat lay',
+  'ghost mannequin',
+  'packshot',
+  'lookbook',
+  'apparel',
+];
+
 exports.uploadImage = createImageUpload("image");
 
 const parseThirdPartyErrorMessage = async (response, fallbackMessage) => {
@@ -25,6 +86,28 @@ const parseThirdPartyErrorMessage = async (response, fallbackMessage) => {
   }
 
   return fallbackMessage;
+};
+
+const scoreImage = (img) => {
+  const imageUrl = typeof img?.imageUrl === 'string' ? img.imageUrl : '';
+  const link = typeof img?.link === 'string'
+    ? img.link
+    : (typeof img?.sourceUrl === 'string' ? img.sourceUrl : '');
+
+  const url = `${imageUrl}${link}`.toLowerCase();
+  const context = `${typeof img?.title === 'string' ? img.title : ''}${typeof img?.snippet === 'string' ? img.snippet : ''}`.toLowerCase();
+
+  if (BLOCKED_IMAGE_HOST_TOKENS.some((token) => url.includes(token))) return -1;
+
+  let score = 0;
+
+  if (PREFERRED_SOURCE_TOKENS.some((token) => url.includes(token))) score += 10;
+
+  score += RELEVANCE_TOKENS.filter((token) => context.includes(token)).length * 2;
+
+  if (imageUrl.startsWith('https')) score += 1;
+
+  return score;
 };
 
 exports.searchGarmentReferenceImages = async (req, res) => {
@@ -64,14 +147,37 @@ exports.searchGarmentReferenceImages = async (req, res) => {
 
     const payload = await response.json();
     const images = Array.isArray(payload?.images) ? payload.images : [];
+    const cappedCount = Math.min(Math.max(num, 1), 20);
 
     const normalized = images
       .map((image) => ({
         imageUrl: image?.imageUrl,
-        sourceUrl: image?.sourceUrl,
+        sourceUrl: image?.sourceUrl || image?.link,
         title: image?.title,
+        snippet: image?.snippet,
+        link: image?.link || image?.sourceUrl,
       }))
-      .filter((image) => typeof image.imageUrl === 'string' && image.imageUrl.trim());
+      .filter((image) => typeof image.imageUrl === 'string' && image.imageUrl.trim())
+      .filter((image) => {
+        const url = `${image.imageUrl}${image.link || ''}`.toLowerCase();
+        return !BLOCKED_IMAGE_HOST_TOKENS.some((token) => url.includes(token));
+      })
+      .map((image) => ({ ...image, score: scoreImage(image) }))
+      .filter((image) => image.score >= 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, cappedCount)
+      .map((image) => ({
+        imageUrl: image.imageUrl,
+        sourceUrl: image.sourceUrl,
+        title: image.title,
+      }));
+
+    if (normalized.length < 3) {
+      return res.json({
+        images: [],
+        message: 'No good results found, try rephrasing',
+      });
+    }
 
     return res.json({ images: normalized });
   } catch (error) {
