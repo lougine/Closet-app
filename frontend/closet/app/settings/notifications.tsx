@@ -1,8 +1,3 @@
-// app/settings/notifications.tsx
-// Notifications & Reminders page — toggle switches for different notification types.
-// Settings are saved locally AND sent to backend so push notifications
-// can be enabled/disabled server-side too.
-
 import React, { useEffect, useState } from 'react';
 import {
   View,

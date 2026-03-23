@@ -1,33 +1,14 @@
-// app/settings/privacy-policy.tsx
-// Privacy & Policy page — shows the app's privacy policy text.
-// If you have an external URL for the policy, you can swap the text
-// for a WebView or just a link. For now it's a readable scrollable text page.
-
 import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  Linking,
-} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Linking} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { COLORS } from '@/constants/theme';
-
-// TODO: If you have a hosted privacy policy URL, replace the text sections
-// below with a WebView pointing to that URL instead.
-// import { WebView } from 'react-native-webview';
-// const PRIVACY_URL = 'https://closetdripp.com/privacy';
 
 export default function PrivacyPolicyScreen() {
   const router = useRouter();
 
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
-
-      {/* ── Header ── */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={22} color={COLORS.hotPink} />

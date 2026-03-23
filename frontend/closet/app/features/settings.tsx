@@ -1,55 +1,15 @@
-// app/(tabs)/settings.tsx
-// Main Settings screen — pink header, profile banner card, settings list.
-//
-// Profile card (matches the reference pic):
-//   • Full-width banner image at the top of the card (like Instagram)
-//   • User taps the banner → action sheet → pick a preset color/gradient
-//     OR upload their own photo from camera roll
-//   • Circular avatar overlapping the bottom edge of the banner
-//   • Username + "Edit profile" link below
-//
-// Other notes:
-//   • "Failed to fetch" errors are caught silently — no toast shown
-//   • Activity Feed row replaced with Dark Mode toggle switch
-//   • Logout router path is fixed (was a Windows absolute path)
-
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import AuthenticatedImage from '@/components/AuthenticatedImage';
-import {
-  IMAGE_UPLOAD_ASPECT,
-  IMAGE_UPLOAD_QUALITY,
-  validateImageFileSize,
-} from '@/constants/imageUpload';
+import { IMAGE_UPLOAD_ASPECT, IMAGE_UPLOAD_QUALITY, validateImageFileSize} from '@/constants/imageUpload';
 import { COLORS } from '@/constants/theme';
-import {
-  fetchCurrentUserProfile,
-  saveBannerPreset,
-  type UserProfile,
-  uploadBannerImage,
-} from '@/services/userProfileService';
+import {fetchCurrentUserProfile, saveBannerPreset, type UserProfile, uploadBannerImage} from '@/services/userProfileService';
 import { getUploadErrorMessage } from '@/services/uploadRequest';
 import React, { useEffect, useState } from 'react';
-import {
-  ActionSheetIOS,
-  Alert,
-  Linking,
-  Modal, Platform,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ActionSheetIOS, Alert, Linking, Modal, Platform, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View} from 'react-native';
 
-// ─── BANNER PRESETS ───────────────────────────────────────────────────────────
-// Color presets the user can choose for their profile banner.
-// Each preset has two colors — displayed as a top/bottom split to simulate a gradient.
-// To add real gradients: install expo-linear-gradient and swap the bannerFill View
-// for a <LinearGradient colors={[preset.colors[0], preset.colors[1]]} style={...} />
 const BANNER_PRESETS = [
   { id: 'pink',     label: 'Pink',      colors: ['#FB92BD', '#F0507B'] },
   { id: 'rose',     label: 'Rose',      colors: ['#FFB3C6', '#FF6B9D'] },
@@ -61,21 +21,17 @@ const BANNER_PRESETS = [
   { id: 'charcoal', label: 'Charcoal',  colors: ['#888888', '#2C2C2C'] },
 ];
 
-// ─── COMPONENT ────────────────────────────────────────────────────────────────
 export default function SettingsScreen() {
   const router = useRouter();
   const [user, setUser] = useState<UserProfile | null>(null);
   const [darkMode, setDarkMode] = useState(false);
 
-  // Banner — either a local/remote URI or a preset color id
   const [bannerUri, setBannerUri] = useState<string | null>(null);
   const [bannerPreset, setBannerPreset] = useState<string>('pink');
   const [pickerVisible, setPickerVisible] = useState(false);
   const [uploadingBanner, setUploadingBanner] = useState(false);
 
-  useEffect(() => {
-    fetchUser();
-  }, []);
+  useEffect(() => { fetchUser();}, []);
 
   async function fetchUser() {
     try {
@@ -84,7 +40,6 @@ export default function SettingsScreen() {
       if (profile.bannerImage) setBannerUri(profile.bannerImage);
       if (profile.bannerPreset) setBannerPreset(profile.bannerPreset);
     } catch {
-      // Network error — silently degrade, no toast
       console.warn('Settings: could not load user (offline?)');
     }
   }
@@ -97,14 +52,13 @@ export default function SettingsScreen() {
 
     setUser((prev) => (prev ? {
       ...prev,
-      bannerImage: updatedBanner ?? undefined,
+      bannerImage: updatedBanner ?? null,
       profilePicture: updatedProfile ?? prev.profilePicture,
     } : prev));
     setBannerUri(updatedBanner);
     setUploadingBanner(false);
   }
-
-  // ── Banner tap — shows action sheet with preset vs upload options ──────────
+  
   function handleBannerPress() {
     if (Platform.OS === 'ios') {
       ActionSheetIOS.showActionSheetWithOptions(

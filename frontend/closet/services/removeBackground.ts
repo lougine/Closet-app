@@ -1,4 +1,4 @@
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 
 const REMOVE_BG_API_URL = "https://api.remove.bg/v1.0/removebg";
 const REMOVE_BG_API_KEY = process.env.EXPO_PUBLIC_REMOVE_BG_API_KEY;
@@ -38,7 +38,7 @@ const ensureLocalImageUri = async (sourceUri: string, sourceHeaders?: Record<str
   }
 
   const ext = inferExtensionFromUri(sourceUri);
-  const downloadUri = `${FileSystem.cacheDirectory}removebg-source-${Date.now()}.${ext}`;
+  const downloadUri = `${FileSystem.documentDirectory}removebg-source-${Date.now()}.${ext}`;
   const result = await FileSystem.downloadAsync(sourceUri, downloadUri, {
     headers: sourceHeaders,
   });
@@ -112,7 +112,7 @@ export async function removeBackgroundFromImageUri(
   const arrayBuffer = await removeBgResponse.arrayBuffer();
   const base64 = arrayBufferToBase64(arrayBuffer);
   const extension = inferExtension(mimeType);
-  const outputUri = `${FileSystem.cacheDirectory}removebg-${Date.now()}.${extension}`;
+  const outputUri = `${FileSystem.documentDirectory}removebg-${Date.now()}.${extension}`;
 
   await FileSystem.writeAsStringAsync(outputUri, base64, {
     encoding: FileSystem.EncodingType.Base64,

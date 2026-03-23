@@ -2,18 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import React, { useCallback, useMemo, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Image,
-  RefreshControl,
-  ScrollView,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { ActivityIndicator, Alert, FlatList, Image, RefreshControl, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
 import AuthenticatedImage from "../../components/AuthenticatedImage";
 import { buildApiUrl, buildAuthHeaders, buildImageUrl } from "../../constants/api";
 import styles from "../../Styles/communityStyles";
@@ -171,7 +160,6 @@ const CommunityScreen: React.FC = () => {
       fetchFeed();
     }, [fetchFeed])
   );
-
   const onRefresh = () => {
     setRefreshing(true);
     setHasMore(true);
