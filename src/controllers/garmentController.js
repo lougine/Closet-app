@@ -5,7 +5,139 @@ const { createImageUpload } = require("../middleware/imageUploadMiddleware");
 const { deleteImageByUrl } = require("../utils/imageFileUtils");
 const { buildImageMetadata } = require('../utils/imageMetadata');
 
+const SERPER_IMAGE_SEARCH_URL = 'https://google.serper.dev/images';
+const REMOVE_BG_API_URL = 'https://api.remove.bg/v1.0/removebg';
+
 exports.uploadImage = createImageUpload("image");
+
+const parseThirdPartyErrorMessage = async (response, fallbackMessage) => {
+  try {
+    const payload = await response.json();
+    const firstError = Array.isArray(payload?.errors) ? payload.errors[0] : null;
+    if (typeof firstError?.title === 'string' && firstError.title.trim()) {
+      return firstError.title;
+    }
+    if (typeof payload?.message === 'string' && payload.message.trim()) {
+      return payload.message;
+    }
+  } catch (error) {
+    // Ignore parsing errors and use fallback message.
+  }
+
+  return fallbackMessage;
+};
+
+exports.searchGarmentReferenceImages = async (req, res) => {
+  const query = typeof req.body?.q === 'string' ? req.body.q.trim() : '';
+  const num = Number(req.body?.num) || 10;
+
+  if (!query) {
+    return res.status(400).json({ message: 'Search query is required.' });
+  }
+
+  if (!process.env.SERPER_API_KEY) {
+    return res.status(500).json({ message: 'Serper API key is not configured.' });
+  }
+
+  try {
+    const response = await fetch(SERPER_IMAGE_SEARCH_URL, {
+      method: 'POST',
+      headers: {
+        'X-API-KEY': process.env.SERPER_API_KEY,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        q: `${query} product photography white background fashion ecommerce`,
+        num: Math.min(Math.max(num, 1), 20),
+      }),
+    });
+
+    if (!response.ok) {
+      const message = await parseThirdPartyErrorMessage(response, 'Image search failed.');
+      if (response.status === 401 || response.status === 403) {
+        return res.status(502).json({
+          message: 'Serper API key is invalid or missing. Update SERPER_API_KEY in backend .env and restart server.',
+        });
+      }
+      return res.status(response.status).json({ message });
+    }
+
+    const payload = await response.json();
+    const images = Array.isArray(payload?.images) ? payload.images : [];
+
+    const normalized = images
+      .map((image) => ({
+        imageUrl: image?.imageUrl,
+        sourceUrl: image?.sourceUrl,
+        title: image?.title,
+      }))
+      .filter((image) => typeof image.imageUrl === 'string' && image.imageUrl.trim());
+
+    return res.json({ images: normalized });
+  } catch (error) {
+    return res.status(502).json({
+      message: 'Unable to reach image search provider right now.',
+      error: error.message,
+    });
+  }
+};
+
+exports.removeGarmentImageBackgroundByUrl = async (req, res) => {
+  const imageUrl = typeof req.body?.imageUrl === 'string' ? req.body.imageUrl.trim() : '';
+  const size = req.body?.size === 'auto' ? 'auto' : 'preview';
+
+  if (!imageUrl) {
+    return res.status(400).json({ message: 'imageUrl is required.' });
+  }
+
+  if (!process.env.REMOVE_BG_API_KEY) {
+    return res.status(500).json({ message: 'Remove.bg API key is not configured.' });
+  }
+
+  try {
+    const body = new URLSearchParams();
+    body.append('image_url', imageUrl);
+    body.append('size', size);
+
+    const response = await fetch(REMOVE_BG_API_URL, {
+      method: 'POST',
+      headers: {
+        'X-Api-Key': process.env.REMOVE_BG_API_KEY,
+        Accept: 'image/png',
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: body.toString(),
+    });
+
+    if (!response.ok) {
+      const message = await parseThirdPartyErrorMessage(
+        response,
+        'Background removal failed. Please try again.',
+      );
+
+      const retryAfter = response.headers.get('retry-after');
+      return res.status(response.status).json({
+        message,
+        retryAfterSeconds: retryAfter ? Number(retryAfter) || undefined : undefined,
+      });
+    }
+
+    const mimeType = response.headers.get('content-type') || 'image/png';
+    const outputBuffer = Buffer.from(await response.arrayBuffer());
+    const base64 = outputBuffer.toString('base64');
+
+    return res.json({
+      mimeType,
+      base64,
+      dataUrl: `data:${mimeType};base64,${base64}`,
+    });
+  } catch (error) {
+    return res.status(502).json({
+      message: 'Unable to reach background removal provider right now.',
+      error: error.message,
+    });
+  }
+};
 
 exports.createGarment = async (req, res) => {
   try {

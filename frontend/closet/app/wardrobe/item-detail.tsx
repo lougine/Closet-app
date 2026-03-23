@@ -1,7 +1,7 @@
 import { Feather, Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import * as SecureStore from "expo-secure-store";
 import { Alert, ScrollView, Share, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -99,7 +99,15 @@ const outfitIncludesItem = (outfit: ItemOutfitSummary, itemId: string) => {
 
 export default function ItemDetailScreen() {
   const router = useRouter();
-  const { itemJson } = useLocalSearchParams<{ itemJson: string }>();
+  const {
+    itemJson,
+    searchedImageUri,
+    searchedImageAt,
+  } = useLocalSearchParams<{
+    itemJson: string;
+    searchedImageUri?: string;
+    searchedImageAt?: string;
+  }>();
   const { updateItem, refreshItems } = useWardrobe();
 
   const initialItem: ClothingItem = itemJson
@@ -128,6 +136,7 @@ export default function ItemDetailScreen() {
   const [markingWorn, setMarkingWorn] = useState(false);
   const [relatedOutfits, setRelatedOutfits] = useState<ItemOutfitSummary[]>([]);
   const [loadingRelatedOutfits, setLoadingRelatedOutfits] = useState(false);
+  const [appliedSearchedImageMarker, setAppliedSearchedImageMarker] = useState<string | null>(null);
 
   const fetchRelatedOutfits = async () => {
     try {
@@ -307,7 +316,7 @@ export default function ItemDetailScreen() {
       setSavingDetails(true);
       await persistItemDetails();
       await refreshItems();
-      Alert.alert("Saved", "Item changes were updated.");
+      router.replace("/(tabs)" as any);
     } catch (error: any) {
       Alert.alert("Save failed", getUploadErrorMessage(error, "Unable to save item changes."));
     } finally {
@@ -383,21 +392,7 @@ export default function ItemDetailScreen() {
     }
   };
 
-  const pickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      allowsEditing: true,
-      aspect: IMAGE_UPLOAD_ASPECT.garment,
-      quality: IMAGE_UPLOAD_QUALITY.itemDetail,
-    });
-    if (result.canceled || !result.assets[0]) return;
-
-    const sizeError = validateImageFileSize(result.assets[0].fileSize, "itemDetail");
-    if (sizeError) {
-      Alert.alert(sizeError.title, sizeError.body);
-      return;
-    }
-
-    const localUri = result.assets[0].uri;
+  const replaceItemPhotoWithUri = useCallback(async (localUri: string) => {
     update({ image: localUri });
 
     try {
@@ -435,7 +430,44 @@ export default function ItemDetailScreen() {
     } finally {
       setUploadingImage(false);
     }
+  }, [item, updateItem]);
+
+  const pickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      allowsEditing: true,
+      aspect: IMAGE_UPLOAD_ASPECT.garment,
+      quality: IMAGE_UPLOAD_QUALITY.itemDetail,
+    });
+    if (result.canceled || !result.assets[0]) return;
+
+    const sizeError = validateImageFileSize(result.assets[0].fileSize, "itemDetail");
+    if (sizeError) {
+      Alert.alert(sizeError.title, sizeError.body);
+      return;
+    }
+
+    await replaceItemPhotoWithUri(result.assets[0].uri);
   };
+
+  const openWebSearchForImage = () => {
+    router.push({
+      pathname: "/wardrobe/search-garment-image" as any,
+      params: {
+        mode: "existing",
+        itemJson: JSON.stringify(item),
+      },
+    });
+  };
+
+  useEffect(() => {
+    if (!searchedImageUri) return;
+
+    const marker = searchedImageAt || searchedImageUri;
+    if (appliedSearchedImageMarker === marker) return;
+
+    setAppliedSearchedImageMarker(marker);
+    void replaceItemPhotoWithUri(searchedImageUri);
+  }, [searchedImageUri, searchedImageAt, appliedSearchedImageMarker, replaceItemPhotoWithUri]);
 
   const redoBackgroundRemoval = async () => {
     if (uploadingImage) return;
@@ -495,6 +527,7 @@ export default function ItemDetailScreen() {
       { text: "Cancel", style: "cancel" },
       { text: "Redo Background Removal", onPress: redoBackgroundRemoval },
       { text: "Replace Item Photo", onPress: pickImage },
+      { text: "Search Web Photo", onPress: openWebSearchForImage },
     ]);
   };
 
@@ -509,15 +542,12 @@ export default function ItemDetailScreen() {
           <Ionicons name="close" size={20} color="#222" />
         </TouchableOpacity>
         <View style={s.topSpacer} />
-        <TouchableOpacity style={s.topBtn} onPress={openImageMenu}>
-          <Ionicons name="menu-outline" size={22} color="#222" />
-        </TouchableOpacity>
         <TouchableOpacity style={s.topBtn} onPress={() => Share.share({ message: `Check out my ${item.label || "item"}!` })}>
           <Ionicons name="share-outline" size={20} color="#222" />
         </TouchableOpacity>
       </View>
 
-      <TouchableOpacity style={s.imageWrap} onPress={pickImage} activeOpacity={0.9}>
+      <TouchableOpacity style={s.imageWrap} activeOpacity={1}>
         {item.image ? (
           <AuthenticatedImage source={{ uri: item.image }} style={s.image} resizeMode="contain" />
         ) : (

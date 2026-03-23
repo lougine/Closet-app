@@ -53,6 +53,11 @@ function ExpandableFAB() {
     setTimeout(() => router.push({ pathname: "/wardrobe/add-items" as any, params: { source: "gallery" } }), 300);
   };
 
+  const launchSearchByName = async () => {
+    setShowAddSheet(false);
+    setTimeout(() => router.push('/wardrobe/search-garment-image' as any), 300);
+  };
+
   return (
     <>
       {open && (
@@ -111,6 +116,12 @@ function ExpandableFAB() {
               <View>
                 <Text style={styles.sheetBtnLabel}>Choose from Gallery</Text>
                 <Text style={styles.sheetBtnSub}>Pick an existing photo</Text>
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.sheetBtn} onPress={launchSearchByName}>
+              <View>
+                <Text style={styles.sheetBtnLabel}>Search by Name</Text>
+                <Text style={styles.sheetBtnSub}>Find a garment image online</Text>
               </View>
             </TouchableOpacity>
             <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowAddSheet(false)}>

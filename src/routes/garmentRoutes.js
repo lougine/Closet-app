@@ -8,6 +8,8 @@ const { imageUploadErrorHandler } = require("../middleware/imageUploadMiddleware
 router.use(authMiddleware);
 
 router.get("/", garmentController.getGarments);
+router.post('/search-images', garmentController.searchGarmentReferenceImages);
+router.post('/remove-background-url', garmentController.removeGarmentImageBackgroundByUrl);
 
 router.post(
 	"/",
