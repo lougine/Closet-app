@@ -1,6 +1,6 @@
 import { Feather, Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import * as SecureStore from "expo-secure-store";
 import { Alert, Animated, Dimensions, FlatList, Image, Modal, ScrollView, StatusBar, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from "react-native";
 import AuthenticatedImage from "../../../components/AuthenticatedImage";
@@ -18,6 +18,7 @@ type Mode      = typeof MODES[number];
 const PANEL_FILTER_TABS = ["All", "Outerwear", "Tops", "Bottoms", "Footwear", "Accessories"];
 const RANDOMIZE_ROW_CARD_WIDTH = Math.min(220, Math.max(156, W * 0.52));
 const RANDOMIZE_ROW_CARD_GAP = 8;
+const INDEX_REFRESH_AFTER_RANDOMIZE_SAVE_KEY = "indexRefreshAfterRandomizeSave";
 const CATEGORY_TREE: Record<string, string[]> = {
   Tops: ["T-Shirt", "Blouse", "Crop Top", "Tank Top", "Shirt", "Hoodie", "Sweater", "Cardigan"],
   Bottoms: ["Jeans", "Skirt", "Shorts", "Trousers", "Leggings", "Cargo Pants", "Sweatpants"],
@@ -131,6 +132,16 @@ function WardrobePanel({
   const [quickFilter, setQuickFilter] = useState<"all" | "favorites" | "hidden">("all");
   const [favoriteItemIds, setFavoriteItemIds] = useState<string[]>([]);
   const [hiddenItemIds, setHiddenItemIds] = useState<string[]>([]);
+  const [updatingPreferenceIds, setUpdatingPreferenceIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    setFavoriteItemIds(
+      items.filter((item) => item.isFavorite).map((item) => String(item.id)),
+    );
+    setHiddenItemIds(
+      items.filter((item) => item.isHidden).map((item) => String(item.id)),
+    );
+  }, [items]);
 
   const setCategory = (cat: string) =>
     setFilters((prev) => ({
@@ -160,13 +171,98 @@ function WardrobePanel({
     + filters.seasons.length
     + filters.sizes.length;
 
-  const toggleFavorite = (itemId: string) => {
-    setFavoriteItemIds((prev) => (prev.includes(itemId) ? prev.filter((id) => id !== itemId) : [...prev, itemId]));
-  };
+  const persistGarmentPreference = useCallback(
+    async (id: string, updates: { isFavorite?: boolean; isHidden?: boolean }) => {
+      const token = await SecureStore.getItemAsync("userToken");
+      if (!token) {
+        throw new Error("Not authenticated");
+      }
 
-  const toggleHidden = (itemId: string) => {
-    setHiddenItemIds((prev) => (prev.includes(itemId) ? prev.filter((id) => id !== itemId) : [...prev, itemId]));
-  };
+      const url = buildApiUrl(`/api/garments/${id}/preferences`);
+      const headers = {
+        ...buildAuthHeaders(token),
+        "Content-Type": "application/json",
+      };
+      const body = JSON.stringify(updates);
+
+      let response = await fetch(url, {
+        method: "PATCH",
+        headers,
+        body,
+      });
+
+      // Fallback for environments/proxies that block PATCH.
+      if (response.status === 404 || response.status === 405) {
+        response = await fetch(url, {
+          method: "PUT",
+          headers,
+          body,
+        });
+      }
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.message || "Failed to update garment preference");
+      }
+    },
+    [],
+  );
+
+  const toggleFavorite = useCallback(
+    async (itemId: string) => {
+      if (updatingPreferenceIds.includes(itemId)) return;
+
+      const wasFavorite = favoriteItemIds.includes(itemId);
+      const nextFavorite = !wasFavorite;
+
+      setFavoriteItemIds((prev) =>
+        nextFavorite ? [...prev, itemId] : prev.filter((id) => id !== itemId),
+      );
+      setUpdatingPreferenceIds((prev) => [...prev, itemId]);
+
+      try {
+        await persistGarmentPreference(itemId, { isFavorite: nextFavorite });
+      } catch (error: any) {
+        setFavoriteItemIds((prev) =>
+          wasFavorite
+            ? (prev.includes(itemId) ? prev : [...prev, itemId])
+            : prev.filter((id) => id !== itemId),
+        );
+        Alert.alert("Update failed", error?.message || "Could not update favorite status.");
+      } finally {
+        setUpdatingPreferenceIds((prev) => prev.filter((id) => id !== itemId));
+      }
+    },
+    [favoriteItemIds, persistGarmentPreference, updatingPreferenceIds],
+  );
+
+  const toggleHidden = useCallback(
+    async (itemId: string) => {
+      if (updatingPreferenceIds.includes(itemId)) return;
+
+      const wasHidden = hiddenItemIds.includes(itemId);
+      const nextHidden = !wasHidden;
+
+      setHiddenItemIds((prev) =>
+        nextHidden ? [...prev, itemId] : prev.filter((id) => id !== itemId),
+      );
+      setUpdatingPreferenceIds((prev) => [...prev, itemId]);
+
+      try {
+        await persistGarmentPreference(itemId, { isHidden: nextHidden });
+      } catch (error: any) {
+        setHiddenItemIds((prev) =>
+          wasHidden
+            ? (prev.includes(itemId) ? prev : [...prev, itemId])
+            : prev.filter((id) => id !== itemId),
+        );
+        Alert.alert("Update failed", error?.message || "Could not update hidden status.");
+      } finally {
+        setUpdatingPreferenceIds((prev) => prev.filter((id) => id !== itemId));
+      }
+    },
+    [hiddenItemIds, persistGarmentPreference, updatingPreferenceIds],
+  );
 
   const cycleQuickFilter = (target: "favorites" | "hidden") => {
     setQuickFilter((prev) => {
@@ -705,6 +801,10 @@ export default function StylingScreen() {
         throw new Error(errorPayload?.message || "Could not save outfit");
       }
 
+      if (mode === "Randomize") {
+        await SecureStore.setItemAsync(INDEX_REFRESH_AFTER_RANDOMIZE_SAVE_KEY, "1");
+      }
+
       setMainOutfitSaved(true);
       Alert.alert("Saved", "Outfit has been saved.");
     } catch (error: any) {
@@ -714,7 +814,7 @@ export default function StylingScreen() {
     }
   };
 
-  const saveOutfitToCalendar = () => {
+  const saveOutfitToCalendar = async () => {
     if (selected.length === 0) {
       Alert.alert("No outfit selected", "Generate or select an outfit first.");
       return;
@@ -724,6 +824,10 @@ export default function StylingScreen() {
     const outfitName = selectedRecommendation?.name || `${mode} Outfit`;
 
     setLastSavedOutfitId(JSON.stringify(selected));
+
+    if (mode === "Randomize") {
+      await SecureStore.setItemAsync(INDEX_REFRESH_AFTER_RANDOMIZE_SAVE_KEY, "1");
+    }
 
     router.push({
       pathname: "/(tabs)/calendar/month",

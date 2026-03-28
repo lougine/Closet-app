@@ -50,6 +50,16 @@ const garmentSchema = new mongoose.Schema({
     default: null,
   },
 
+  isFavorite: {
+    type: Boolean,
+    default: false,
+  },
+
+  isHidden: {
+    type: Boolean,
+    default: false,
+  },
+
   owner: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",

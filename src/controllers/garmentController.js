@@ -342,6 +342,44 @@ exports.getGarmentById = async (req, res) => {
   }
 };
 
+exports.updateGarmentPreferences = async (req, res) => {
+  try {
+    const updates = {};
+
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'isFavorite')) {
+      updates.isFavorite = Boolean(req.body.isFavorite);
+    }
+
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'isHidden')) {
+      updates.isHidden = Boolean(req.body.isHidden);
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ message: 'No preference fields provided.' });
+    }
+
+    const garment = await Garment.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        owner: req.user.userId,
+      },
+      updates,
+      {
+        new: true,
+        runValidators: true,
+      },
+    );
+
+    if (!garment) {
+      return res.status(404).json({ message: 'Garment not found' });
+    }
+
+    res.json(garment);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 
 exports.updateGarment = async (req, res) => {
   try {

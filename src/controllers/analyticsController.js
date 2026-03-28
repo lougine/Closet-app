@@ -113,7 +113,7 @@ exports.getOverview = async (req, res) => {
       isLookbook: { $ne: true },
     };
 
-    const [totalItems, outfitStats, usageStats] = await Promise.all([
+    const [totalItems, outfitStats, usageStats, wornCurrentGarmentsStats] = await Promise.all([
       Garment.countDocuments({ owner: ownerObjectId }),
       Outfit.aggregate([
         { $match: nonLookbookOutfitFilter },
@@ -176,6 +176,48 @@ exports.getOverview = async (req, res) => {
           },
         },
       ]),
+      Garment.aggregate([
+        { $match: { owner: ownerObjectId } },
+        {
+          $lookup: {
+            from: 'usages',
+            let: { garmentId: '$_id' },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $and: [
+                      { $eq: ['$garment', '$$garmentId'] },
+                      { $eq: ['$user', ownerObjectId] },
+                    ],
+                  },
+                },
+              },
+              { $limit: 1 },
+            ],
+            as: 'usageHit',
+          },
+        },
+        {
+          $project: {
+            isWorn: { $gt: [{ $size: '$usageHit' }, 0] },
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            wornGarmentCount: {
+              $sum: { $cond: ['$isWorn', 1, 0] },
+            },
+          },
+        },
+        {
+          $project: {
+            _id: 0,
+            wornGarmentCount: 1,
+          },
+        },
+      ]),
     ]);
 
     const outfitTotals = outfitStats[0] || {
@@ -188,9 +230,14 @@ exports.getOverview = async (req, res) => {
       wornGarmentCount: 0,
     };
 
+    const wornCurrentGarments = wornCurrentGarmentsStats[0]?.wornGarmentCount || 0;
+    const safeWornCount = Math.max(0, Math.min(totalItems, wornCurrentGarments));
+
     const wardrobeUsagePercent = totalItems === 0
       ? 0
-      : Math.round((stats.wornGarmentCount / totalItems) * 100);
+      : (safeWornCount === totalItems
+        ? 100
+        : Math.floor((safeWornCount / totalItems) * 100));
 
     res.json({
       totalItems,

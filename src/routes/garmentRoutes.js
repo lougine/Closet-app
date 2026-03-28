@@ -18,6 +18,8 @@ router.post(
 	garmentController.createGarment,
 );
 router.get("/:id", garmentController.getGarmentById);
+router.patch('/:id/preferences', garmentController.updateGarmentPreferences);
+router.put('/:id/preferences', garmentController.updateGarmentPreferences);
 router.put(
 	"/:id",
 	garmentController.uploadImage,
