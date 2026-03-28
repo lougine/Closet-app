@@ -5,6 +5,7 @@ import * as SecureStore from "expo-secure-store";
 import { Alert, Dimensions, FlatList, SafeAreaView, StatusBar, Text, TextInput, TouchableOpacity, View } from "react-native";
 import AuthenticatedImage from "../../components/AuthenticatedImage";
 import { buildApiUrl, buildAuthHeaders } from "../../constants/api";
+import { useAppTheme } from "../../context/themeContext";
 import { useWardrobe } from "../../context/wardrobeContext";
 import { s, s2 } from "../../Styles/wardrobe/lookbook.styles";
 
@@ -25,7 +26,26 @@ const parseStoredLookbookIds = (rawValue: string | null) => {
 
 export default function LookbookScreen() {
   const router = useRouter();
+  const { isDarkMode } = useAppTheme();
   const { items, refreshItems } = useWardrobe();
+
+  const theme = isDarkMode
+    ? {
+        screen: "#121212",
+        panel: "#1E1E1E",
+        text: "#F2F2F2",
+        subText: "#A8A8A8",
+        border: "#343434",
+        inputBg: "#242424",
+      }
+    : {
+        screen: "#fafafa",
+        panel: "#FFFFFF",
+        text: "#1a1a1a",
+        subText: "#888888",
+        border: "#f0f0f0",
+        inputBg: "#FFFFFF",
+      };
 
   const [name, setName] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
@@ -94,18 +114,18 @@ export default function LookbookScreen() {
   };
 
   return (
-    <SafeAreaView style={s.root}>
-      <StatusBar barStyle="dark-content" />
+    <SafeAreaView style={[s.root, { backgroundColor: theme.screen }] }>
+      <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} />
 
       {/* Header */}
-      <View style={s.header}>
+      <View style={[s.header, { backgroundColor: theme.panel, borderBottomColor: theme.border }] }>
         <TouchableOpacity
           style={s.backBtn}
           onPress={() => (step === "pick" ? setStep("name") : router.back())}
         >
-          <Ionicons name="chevron-back" size={22} color="#1a1a1a" />
+          <Ionicons name="chevron-back" size={22} color={theme.text} />
         </TouchableOpacity>
-        <Text style={s.headerTitle}>Create Lookbook</Text>
+        <Text style={[s.headerTitle, { color: theme.text }]}>Create Lookbook</Text>
 
         {step === "pick" ? (
           <TouchableOpacity
@@ -128,23 +148,23 @@ export default function LookbookScreen() {
 
       {step === "name" && (
         <View style={s.nameStep}>
-          <Text style={s.stepTitle}>Name your lookbook</Text>
-          <Text style={s.stepSubtitle}>
+          <Text style={[s.stepTitle, { color: theme.text }]}>Name your lookbook</Text>
+          <Text style={[s.stepSubtitle, { color: theme.subText }] }>
             Give it a theme like "Summer Fits" or "Work Looks"
           </Text>
 
           <TextInput
-            style={s.nameInput}
+            style={[s.nameInput, { borderColor: theme.border, backgroundColor: theme.inputBg, color: theme.text }]}
             value={name}
             onChangeText={setName}
             placeholder="e.g. Summer Fits"
-            placeholderTextColor="#bbb"
+            placeholderTextColor={theme.subText}
             autoFocus
             returnKeyType="done"
             onSubmitEditing={() => name.trim() && setStep("pick")}
           />
 
-          <Text style={s.suggestLabel}>Suggestions</Text>
+          <Text style={[s.suggestLabel, { color: theme.subText }]}>Suggestions</Text>
 
           <View style={s.suggestRow}>
             {[ "Summer Fits", "Work Looks", "Date Night", "Casual Vibes", "Going Out", "Cosy Season",].map((sugg) => (
@@ -153,7 +173,7 @@ export default function LookbookScreen() {
                 style={s2.chip}
                 onPress={() => setName(sugg)}
               >
-                <Text style={s2.chipText}>{sugg}</Text>
+                <Text style={[s2.chipText, { color: isDarkMode ? "#C7C7C7" : "#555" }]}>{sugg}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -162,9 +182,9 @@ export default function LookbookScreen() {
 
       {step === "pick" && (
         <>
-          <View style={s.pickHeader}>
-            <Text style={s.pickTitle}>"{name}"</Text>
-            <Text style={s.pickSubtitle}>
+          <View style={[s.pickHeader, { backgroundColor: theme.panel, borderBottomColor: theme.border }] }>
+            <Text style={[s.pickTitle, { color: theme.text }]}>"{name}"</Text>
+            <Text style={[s.pickSubtitle, { color: theme.subText }] }>
               {selected.length === 0
                 ? "Tap items to add to this lookbook"
                 : `${selected.length} item${selected.length > 1 ? "s" : ""} selected`}
@@ -174,8 +194,8 @@ export default function LookbookScreen() {
           {items.length === 0 ? (
             <View style={s.emptyState}>
               <Text style={s.emptyEmoji}>🪝</Text>
-              <Text style={s.emptyTitle}>No items yet</Text>
-              <Text style={s.emptySubtitle}>
+              <Text style={[s.emptyTitle, { color: theme.text }]}>No items yet</Text>
+              <Text style={[s.emptySubtitle, { color: theme.subText }] }>
                 Add items to your wardrobe first
               </Text>
             </View>
@@ -219,7 +239,7 @@ export default function LookbookScreen() {
                       </View>
                     )}
 
-                    <Text style={s.gridLabel} numberOfLines={1}>
+                    <Text style={[s.gridLabel, { color: isDarkMode ? "#B8B8B8" : "#999" }]} numberOfLines={1}>
                       {item.label}
                     </Text>
                   </TouchableOpacity>

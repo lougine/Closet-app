@@ -5,6 +5,7 @@ import { uploadMultipartWithRetry } from '@/services/uploadRequest';
 export type UserProfile = {
   _id: string;
   name?: string;
+  email?: string;
   username: string;
   profilePicture: string | null;
   bannerImage: string | null;
@@ -25,6 +26,7 @@ function normalizeUserProfile(payload: any): UserProfile {
   return {
     _id: payload?._id,
     name: payload?.name,
+    email: payload?.email,
     username: payload?.username || payload?.name || 'wizliz',
     profilePicture: payload?.profilePicture ? buildImageUrl(payload.profilePicture) : null,
     bannerImage: payload?.bannerImage ? buildImageUrl(payload.bannerImage) : null,
@@ -49,6 +51,28 @@ export async function fetchCurrentUserProfile(): Promise<UserProfile> {
   });
 
   const payload = await parseResponse(res, 'Failed to load profile.');
+  return normalizeUserProfile(payload);
+}
+
+export async function updateProfileDetails({
+  name,
+  email,
+}: {
+  name: string;
+  email: string;
+}): Promise<UserProfile> {
+  const token = await getRequiredToken();
+
+  const res = await fetch(buildApiUrl('/api/users/me'), {
+    method: 'PUT',
+    headers: {
+      ...buildAuthHeaders(token),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ name, email }),
+  });
+
+  const payload = await parseResponse(res, 'Failed to update profile details.');
   return normalizeUserProfile(payload);
 }
 

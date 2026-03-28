@@ -5,9 +5,28 @@ import { ActivityIndicator, Alert, Image, Modal, RefreshControl, ScrollView, Tex
 import OutfitPreviewCollage from '../../../components/OutfitPreviewCollage';
 import { styles } from '../../../Styles/calendar/day.styles';
 import { COLORS, DAYS_SHORT, getOutfitForDate, getWeekDays, isSameDay, MONTHS, OutfitEntry, toDateKey, useCalendar } from '../../../context/calendar-context';
+import { useAppTheme } from '../../../context/themeContext';
 
 export default function DayScreen() {
   const router = useRouter();
+  const { isDarkMode } = useAppTheme();
+  const theme = isDarkMode
+    ? {
+        screen: '#121212',
+        card: '#1F1F1F',
+        softCard: '#252525',
+        text: '#F2F2F2',
+        subText: '#A7A7A7',
+        border: '#353535',
+      }
+    : {
+        screen: COLORS.white,
+        card: COLORS.offWhite,
+        softCard: COLORS.white,
+        text: COLORS.text,
+        subText: COLORS.subText,
+        border: '#FFD7E5',
+      };
 
   const {
     selectedDate,
@@ -127,28 +146,28 @@ export default function DayScreen() {
 
   if (loading) {
     return (
-      <View style={styles.loadingWrap}>
+      <View style={[styles.loadingWrap, { backgroundColor: theme.screen }]}>
         <ActivityIndicator size="large" color={COLORS.hotPink} />
       </View>
     );
   }
 
   return (
-    <View style={styles.flex}>
-      <View style={styles.headerBg}>
+    <View style={[styles.flex, { backgroundColor: theme.screen }]}>
+      <View style={[styles.headerBg, { backgroundColor: isDarkMode ? '#1A1A1A' : undefined }]}>
         <View style={styles.headerRow}>
           <TouchableOpacity onPress={prevWeek} style={styles.arrowBtn}>
-            <Ionicons name="chevron-back" size={22} color={"#000"} />
+            <Ionicons name="chevron-back" size={22} color={theme.text} />
           </TouchableOpacity>
 
           <TouchableOpacity onPress={goToMonth}>
-            <Text style={styles.monthLabel}>
+            <Text style={[styles.monthLabel, { color: theme.text }] }>
               {MONTHS[selectedDate.getMonth()]} {selectedDate.getFullYear()}
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity onPress={nextWeek} style={styles.arrowBtn}>
-            <Ionicons name="chevron-forward" size={22} color={"#000"} />
+            <Ionicons name="chevron-forward" size={22} color={theme.text} />
           </TouchableOpacity>
         </View>
 
@@ -165,7 +184,12 @@ export default function DayScreen() {
                 onPress={() => setSelectedDate(day)}
               >
                 <Text
-                  style={[styles.dayName, isSelected && styles.dayNameSelected]}
+                  style={[
+                    styles.dayName,
+                    { color: theme.subText },
+                    isSelected && styles.dayNameSelected,
+                    isSelected && { color: theme.text },
+                  ]}
                 >
                   {DAYS_SHORT[day.getDay()]}
                 </Text>
@@ -180,6 +204,7 @@ export default function DayScreen() {
                   <Text
                     style={[
                       styles.dayNumber,
+                      { color: theme.subText },
                       isSelected && styles.dayNumberSelected,
                       isToday && !isSelected && styles.dayNumberToday,
                     ]}
@@ -202,21 +227,21 @@ export default function DayScreen() {
       </View>
 
       <ScrollView
-        style={styles.flex}
+        style={[styles.flex, { backgroundColor: theme.screen }]}
         contentContainerStyle={styles.content}
         refreshControl={
           <RefreshControl refreshing={loading} onRefresh={refetch} tintColor={COLORS.hotPink} />
         }
       >
         <View style={styles.quickActionRow}>
-          <TouchableOpacity style={styles.secondaryQuickBtn} onPress={() => goToNearestOutfit('prev')}>
-            <Ionicons name="chevron-back-circle-outline" size={14} color={COLORS.subText} />
-            <Text style={styles.secondaryQuickText}>Previous look</Text>
+          <TouchableOpacity style={[styles.secondaryQuickBtn, { backgroundColor: theme.softCard }]} onPress={() => goToNearestOutfit('prev')}>
+            <Ionicons name="chevron-back-circle-outline" size={14} color={theme.subText} />
+            <Text style={[styles.secondaryQuickText, { color: theme.subText }]}>Previous look</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.secondaryQuickBtn} onPress={() => goToNearestOutfit('next')}>
-            <Text style={styles.secondaryQuickText}>Next look</Text>
-            <Ionicons name="chevron-forward-circle-outline" size={14} color={COLORS.subText} />
+          <TouchableOpacity style={[styles.secondaryQuickBtn, { backgroundColor: theme.softCard }]} onPress={() => goToNearestOutfit('next')}>
+            <Text style={[styles.secondaryQuickText, { color: theme.subText }]}>Next look</Text>
+            <Ionicons name="chevron-forward-circle-outline" size={14} color={theme.subText} />
           </TouchableOpacity>
         </View>
 
@@ -227,7 +252,7 @@ export default function DayScreen() {
 
   function renderFilledDay() {
     return (
-      <View style={styles.outfitCard}>
+      <View style={[styles.outfitCard, { backgroundColor: theme.card }] }>
         <TouchableOpacity
           style={styles.menuBtn}
           onPress={() => setMenuVisible(true)}
@@ -248,28 +273,28 @@ export default function DayScreen() {
           ) : (
             <View style={[styles.outfitImage, styles.outfitImagePlaceholder]}>
               <Ionicons name="shirt-outline" size={48} color={COLORS.lightGray} />
-              <Text style={styles.outfitSavedText}>Outfit saved</Text>
+              <Text style={[styles.outfitSavedText, { color: theme.subText }]}>Outfit saved</Text>
             </View>
           )}
         </TouchableOpacity>
 
         <View style={styles.outfitMetaRow}>
-          <View style={styles.outfitMetaPill}>
-            <Ionicons name="shirt-outline" size={14} color={COLORS.subText} />
-            <Text style={styles.outfitMetaText}>{selectedOutfit?.garmentIds?.length || 0} items</Text>
+          <View style={[styles.outfitMetaPill, { backgroundColor: theme.softCard }] }>
+            <Ionicons name="shirt-outline" size={14} color={theme.subText} />
+            <Text style={[styles.outfitMetaText, { color: theme.subText }]}>{selectedOutfit?.garmentIds?.length || 0} items</Text>
           </View>
-          <View style={styles.outfitMetaPill}>
-            <Ionicons name="calendar-outline" size={14} color={COLORS.subText} />
-            <Text style={styles.outfitMetaText}>{selectedDate.toLocaleDateString()}</Text>
+          <View style={[styles.outfitMetaPill, { backgroundColor: theme.softCard }] }>
+            <Ionicons name="calendar-outline" size={14} color={theme.subText} />
+            <Text style={[styles.outfitMetaText, { color: theme.subText }]}>{selectedDate.toLocaleDateString()}</Text>
           </View>
         </View>
 
         <View style={styles.outfitActionRow}>
-          <TouchableOpacity style={styles.outfitActionBtn} onPress={() => goToStyling('create')}>
+          <TouchableOpacity style={[styles.outfitActionBtn, { backgroundColor: theme.softCard, borderColor: theme.border }]} onPress={() => goToStyling('create')}>
             <Ionicons name="color-wand-outline" size={16} color={COLORS.hotPink} />
             <Text style={styles.outfitActionText}>Re-style day</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.outfitActionBtn} onPress={() => goToStyling('randomize')}>
+          <TouchableOpacity style={[styles.outfitActionBtn, { backgroundColor: theme.softCard, borderColor: theme.border }]} onPress={() => goToStyling('randomize')}>
             <Ionicons name="shuffle-outline" size={16} color={COLORS.hotPink} />
             <Text style={styles.outfitActionText}>Remix outfit</Text>
           </TouchableOpacity>
@@ -286,7 +311,7 @@ export default function DayScreen() {
             activeOpacity={1}
             onPress={() => setMenuVisible(false)}
           >
-            <View style={styles.menuPopup}>
+            <View style={[styles.menuPopup, { backgroundColor: theme.softCard }] }>
               <TouchableOpacity
                 style={styles.menuItem}
                 onPress={handleEditInStyling}
@@ -296,7 +321,7 @@ export default function DayScreen() {
                   size={18}
                   color={COLORS.subText}
                 />
-                <Text style={styles.menuItemTextNeutral}>Edit in styling</Text>
+                <Text style={[styles.menuItemTextNeutral, { color: theme.text }]}>Edit in styling</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -308,7 +333,7 @@ export default function DayScreen() {
                   size={18}
                   color={COLORS.subText}
                 />
-                <Text style={styles.menuItemTextNeutral}>Duplicate to tomorrow</Text>
+                <Text style={[styles.menuItemTextNeutral, { color: theme.text }]}>Duplicate to tomorrow</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -348,8 +373,8 @@ export default function DayScreen() {
 
     return (
       <View style={styles.emptyDay}>
-        <Text style={styles.emptyTitle}>{title}</Text>
-        <Text style={styles.emptySubtitle}>{subtitle}</Text>
+        <Text style={[styles.emptyTitle, { color: theme.text }]}>{title}</Text>
+        <Text style={[styles.emptySubtitle, { color: theme.subText }]}>{subtitle}</Text>
 
         <View style={styles.optionsBlock}>
           {[
@@ -374,26 +399,26 @@ export default function DayScreen() {
           ].map(({ mode, icon, title, sub }) => (
             <TouchableOpacity
               key={mode}
-              style={styles.optionBtn}
+              style={[styles.optionBtn, { backgroundColor: theme.card }]}
               onPress={() => {
                 if (mode === 'wardrobe') goToStyling('create');
                 else if (mode === 'discover') goToStyling('randomize');
                 else goToStyling(mode);
               }}
             >
-              <View style={styles.optionIconWrap}>
+              <View style={[styles.optionIconWrap, { backgroundColor: theme.softCard }]}>
                 <Ionicons name={icon as any} size={28} color={COLORS.hotPink} />
               </View>
 
               <View style={styles.optionTextWrap}>
-                <Text style={styles.optionTitle}>{title}</Text>
-                <Text style={styles.optionSub}>{sub}</Text>
+                <Text style={[styles.optionTitle, { color: theme.text }]}>{title}</Text>
+                <Text style={[styles.optionSub, { color: theme.subText }]}>{sub}</Text>
               </View>
 
               <Ionicons
                 name="chevron-forward"
                 size={18}
-                color={COLORS.lightGray}
+                color={theme.subText}
               />
             </TouchableOpacity>
           ))}

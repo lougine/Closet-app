@@ -1,6 +1,6 @@
 export const IMAGE_UPLOAD_ASPECT = {
   profile: [1, 1] as [number, number],
-  banner: [16, 7] as [number, number],
+  banner: [9, 5] as [number, number],
   garment: [3, 4] as [number, number],
 };
 

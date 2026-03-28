@@ -25,7 +25,7 @@ const buildTiles = (outfit?: OutfitPreviewSource | null) => {
 
   const addTile = (uri?: string | null, key = '') => {
     if (tiles.length >= 4) return;
-    tiles.push({ key: key || uri, uri });
+    tiles.push({ key: key || uri || `tile-${tiles.length}`, uri });
   };
 
   if (outfit?.isLookbook && outfit?.previewImage) {

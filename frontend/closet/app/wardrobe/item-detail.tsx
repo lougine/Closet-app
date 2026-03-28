@@ -3,7 +3,7 @@ import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import * as SecureStore from "expo-secure-store";
-import { Alert, ScrollView, Share, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Alert, ScrollView, Share, StatusBar, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AuthenticatedImage from "../../components/AuthenticatedImage";
 import {
@@ -14,6 +14,7 @@ import {
 import { buildApiUrl, buildAuthHeaders, buildImageUrl } from "../../constants/api";
 import { getUploadErrorMessage, uploadMultipartWithRetry } from "../../services/uploadRequest";
 import { removeBackgroundFromImageUri } from "../../services/removeBackground";
+import { useAppTheme } from "../../context/themeContext";
 import { useWardrobe, type ClothingItem } from "../../context/wardrobeContext";
 import OutfitPreviewCollage from "../../components/OutfitPreviewCollage";
 import { s } from "../../Styles/wardrobe/item-detail.styles";
@@ -99,6 +100,7 @@ const outfitIncludesItem = (outfit: ItemOutfitSummary, itemId: string) => {
 
 export default function ItemDetailScreen() {
   const router = useRouter();
+  const { isDarkMode } = useAppTheme();
   const {
     itemJson,
     searchedImageUri,
@@ -535,24 +537,46 @@ export default function ItemDetailScreen() {
     ? ((item.totalCost ?? 0) / item.timesWorn!).toFixed(2)
     : (item.totalCost ?? 0).toFixed(2);
 
+  const theme = isDarkMode
+    ? {
+        screen: "#121212",
+        panel: "#1E1E1E",
+        softPanel: "#242424",
+        text: "#F2F2F2",
+        subText: "#A8A8A8",
+        border: "#343434",
+        inputBg: "#2A2A2A",
+      }
+    : {
+        screen: "#FFFFFF",
+        panel: "#FFFFFF",
+        softPanel: "#f0eeea",
+        text: "#1a1a1a",
+        subText: "#888888",
+        border: "#f0f0f0",
+        inputBg: "#FFFFFF",
+      };
+
   return (
-    <SafeAreaView style={s.root}>
+    <SafeAreaView style={[s.root, { backgroundColor: theme.screen }]}>
+      <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} />
+
       <View style={s.topBar}>
         <TouchableOpacity style={s.topBtn} onPress={() => router.back()}>
-          <Ionicons name="close" size={20} color="#222" />
+          <Ionicons name="close" size={20} color={theme.text} />
         </TouchableOpacity>
         <View style={s.topSpacer} />
         <TouchableOpacity style={s.topBtn} onPress={() => Share.share({ message: `Check out my ${item.label || "item"}!` })}>
-          <Ionicons name="share-outline" size={20} color="#222" />
+          <Ionicons name="share-outline" size={20} color={theme.text} />
         </TouchableOpacity>
       </View>
 
-      <TouchableOpacity style={s.imageWrap} activeOpacity={1}>
+      <TouchableOpacity style={[s.imageWrap, { backgroundColor: theme.softPanel }]} activeOpacity={1}>
         {item.image ? (
           <AuthenticatedImage source={{ uri: item.image }} style={s.image} resizeMode="contain" />
         ) : (
           <View style={s.imagePlaceholder}>
-            <Ionicons name="image-outline" size={64} color="#ccc" />
+            <Ionicons name="image-outline" size={64} color={theme.subText} />
           </View>
         )}
         <View style={s.cpwPill}>
@@ -568,30 +592,39 @@ export default function ItemDetailScreen() {
             { text: "Cancel", style: "cancel" },
             { text: "Delete", style: "destructive", onPress: deleteItem },
           ])}>
-            <Ionicons name="trash-outline" size={22} color="#666" />
+            <Ionicons name="trash-outline" size={22} color={theme.subText} />
           </TouchableOpacity>
           <TouchableOpacity onPress={openImageMenu}>
-            <Ionicons name="ellipsis-horizontal" size={22} color="#666" />
+            <Ionicons name="ellipsis-horizontal" size={22} color={theme.subText} />
           </TouchableOpacity>
         </View>
       </TouchableOpacity>
 
-      <View style={s.tabNav}>
+      <View style={[s.tabNav, { borderBottomColor: theme.border }]}>
         {DETAIL_TABS.map((tab) => (
           <TouchableOpacity key={tab} style={s.tabBtn} onPress={() => setActiveTab(tab)}>
-            <Text style={[s.tabBtnText, activeTab === tab && s.tabBtnTextActive]}>{tab}</Text>
-            {activeTab === tab && <View style={s.tabUnderline} />}
+            <Text
+              style={[
+                s.tabBtnText,
+                { color: theme.subText },
+                activeTab === tab && s.tabBtnTextActive,
+                activeTab === tab && { color: theme.text },
+              ]}
+            >
+              {tab}
+            </Text>
+            {activeTab === tab && <View style={[s.tabUnderline, { backgroundColor: theme.text }]} />}
           </TouchableOpacity>
         ))}
       </View>
 
-      <ScrollView style={s.content} showsVerticalScrollIndicator={false}>
+      <ScrollView style={[s.content, { backgroundColor: theme.screen }]} showsVerticalScrollIndicator={false}>
         {activeTab === "Details" && (
           <View>
             <View style={s.row}>
-              <Text style={s.rowLabel}>Category</Text>
-              <TouchableOpacity style={s.categoryPill} onPress={() => setShowCategoryPicker((v) => !v)}>
-                <Text style={s.categoryText}>
+              <Text style={[s.rowLabel, { color: theme.text }]}>Category</Text>
+              <TouchableOpacity style={[s.categoryPill, { backgroundColor: theme.inputBg, borderColor: theme.border }]} onPress={() => setShowCategoryPicker((v) => !v)}>
+                <Text style={[s.categoryText, { color: theme.text }] }>
                   {(item.category?.length ? item.category : ["UNCATEGORIZED"]).join(" > ")}
                 </Text>
               </TouchableOpacity>
@@ -618,13 +651,13 @@ export default function ItemDetailScreen() {
                 })}
               </View>
             )}
-            <View style={s.divider} />
+            <View style={[s.divider, { backgroundColor: theme.border }]} />
 
             <View>
               <View style={s.rowBetween}>
-                <Text style={s.rowLabel}>Colors</Text>
+                <Text style={[s.rowLabel, { color: theme.text }]}>Colors</Text>
                 <TouchableOpacity onPress={() => setShowColorPicker((v) => !v)}>
-                  <Feather name="edit-2" size={15} color="#aaa" />
+                  <Feather name="edit-2" size={15} color={theme.subText} />
                 </TouchableOpacity>
               </View>
               <View style={s.swatches}>
@@ -632,7 +665,7 @@ export default function ItemDetailScreen() {
                   <View key={i} style={[s.swatch, { backgroundColor: resolveColorHex(c) }, resolveColorHex(c) === "#FFFFFF" && s.swatchBorder]} />
                 ))}
               </View>
-              {savingColor ? <Text style={s.colorSavingText}>Saving color...</Text> : null}
+              {savingColor ? <Text style={[s.colorSavingText, { color: theme.subText }]}>Saving color...</Text> : null}
               {showColorPicker && (
                 <View style={s.colorPicker}>
                   {COLOR_OPTIONS.map(({ label, hex }) => (
@@ -644,14 +677,14 @@ export default function ItemDetailScreen() {
                 </View>
               )}
             </View>
-            <View style={s.divider} />
+            <View style={[s.divider, { backgroundColor: theme.border }]} />
 
             <View style={s.row}>
-              <Text style={s.rowLabel}>Size</Text>
+              <Text style={[s.rowLabel, { color: theme.text }]}>Size</Text>
               {editingSize ? (
                 <View style={s.inlineRow}>
-                  <TextInput autoFocus style={s.inlineInput} value={sizeVal} onChangeText={setSizeVal}
-                    placeholder="XS, S, M…" placeholderTextColor="#bbb" />
+                  <TextInput autoFocus style={[s.inlineInput, { backgroundColor: theme.inputBg, borderColor: theme.border, color: theme.text }]} value={sizeVal} onChangeText={setSizeVal}
+                    placeholder="XS, S, M…" placeholderTextColor={theme.subText} />
                   <TouchableOpacity style={s.inlineSave} onPress={() => { update({ size: sizeVal }); setEditingSize(false); }}>
                     <Text style={s.inlineSaveText}>Save</Text>
                   </TouchableOpacity>
@@ -662,14 +695,14 @@ export default function ItemDetailScreen() {
                 </TouchableOpacity>
               )}
             </View>
-            <View style={s.divider} />
+            <View style={[s.divider, { backgroundColor: theme.border }]} />
 
             <View style={s.row}>
-              <Text style={s.rowLabel}>Brand</Text>
+              <Text style={[s.rowLabel, { color: theme.text }]}>Brand</Text>
               {editingBrand ? (
                 <View style={s.inlineRow}>
-                  <TextInput autoFocus style={s.inlineInput} value={brandVal} onChangeText={setBrandVal}
-                    placeholder="e.g. Zara" placeholderTextColor="#bbb" />
+                  <TextInput autoFocus style={[s.inlineInput, { backgroundColor: theme.inputBg, borderColor: theme.border, color: theme.text }]} value={brandVal} onChangeText={setBrandVal}
+                    placeholder="e.g. Zara" placeholderTextColor={theme.subText} />
                   <TouchableOpacity style={s.inlineSave} onPress={() => { update({ brand: brandVal }); setEditingBrand(false); }}>
                     <Text style={s.inlineSaveText}>Save</Text>
                   </TouchableOpacity>
@@ -680,19 +713,19 @@ export default function ItemDetailScreen() {
                 </TouchableOpacity>
               )}
             </View>
-            <View style={s.divider} />
+            <View style={[s.divider, { backgroundColor: theme.border }]} />
 
             <View style={s.row}>
-              <Text style={s.rowLabel}>Price</Text>
+              <Text style={[s.rowLabel, { color: theme.text }]}>Price</Text>
               {editingPrice ? (
                 <View style={s.inlineRow}>
                   <TextInput
                     autoFocus
-                    style={s.inlineInput}
+                    style={[s.inlineInput, { backgroundColor: theme.inputBg, borderColor: theme.border, color: theme.text }]}
                     value={priceVal}
                     onChangeText={(val) => setPriceVal(sanitizePriceInput(val))}
                     placeholder="0.00"
-                    placeholderTextColor="#bbb"
+                    placeholderTextColor={theme.subText}
                     keyboardType="decimal-pad"
                   />
                   <TouchableOpacity
@@ -731,13 +764,13 @@ export default function ItemDetailScreen() {
                 </TouchableOpacity>
               )}
             </View>
-            <View style={s.divider} />
+            <View style={[s.divider, { backgroundColor: theme.border }]} />
 
             <View>
               <View style={s.rowBetween}>
-                <Text style={s.rowLabel}>Tags</Text>
+                <Text style={[s.rowLabel, { color: theme.text }]}>Tags</Text>
                 <TouchableOpacity onPress={() => setShowTagInput((v) => !v)}>
-                  <Feather name="edit-2" size={15} color="#aaa" />
+                  <Feather name="edit-2" size={15} color={theme.subText} />
                 </TouchableOpacity>
               </View>
               <View style={s.tagsWrap}>
@@ -751,9 +784,9 @@ export default function ItemDetailScreen() {
                 ))}
                 {showTagInput && (
                   <View style={s.inlineRow}>
-                    <TextInput autoFocus style={[s.inlineInput, s.tagInlineInput]} value={newTag}
+                    <TextInput autoFocus style={[s.inlineInput, s.tagInlineInput, { backgroundColor: theme.inputBg, borderColor: theme.border, color: theme.text }]} value={newTag}
                       onChangeText={setNewTag} onSubmitEditing={addTag}
-                      placeholder="new tag" placeholderTextColor="#bbb" />
+                      placeholder="new tag" placeholderTextColor={theme.subText} />
                     <TouchableOpacity style={s.inlineSave} onPress={addTag}>
                       <Text style={s.inlineSaveText}>+</Text>
                     </TouchableOpacity>
@@ -761,7 +794,7 @@ export default function ItemDetailScreen() {
                 )}
               </View>
             </View>
-            <View style={s.divider} />
+            <View style={[s.divider, { backgroundColor: theme.border }]} />
 
             <TouchableOpacity
               style={[s.pinkBtn, s.pinkBtnDetails, (savingDetails || deletingItem) && s.disabledOpacity]}
@@ -770,20 +803,20 @@ export default function ItemDetailScreen() {
             >
               <Text style={s.pinkBtnText}>{savingDetails ? "Saving..." : "Save Item Changes"}</Text>
             </TouchableOpacity>
-            <View style={s.divider} />
+            <View style={[s.divider, { backgroundColor: theme.border }]} />
           </View>
         )}
 
         {activeTab === "Styles" && (
           loadingRelatedOutfits ? (
             <View style={s.emptyState}>
-              <Text style={s.emptyTitle}>Loading outfits...</Text>
-              <Text style={s.emptySubtitle}>Fetching styles that include this item</Text>
+              <Text style={[s.emptyTitle, { color: theme.text }]}>Loading outfits...</Text>
+              <Text style={[s.emptySubtitle, { color: theme.subText }]}>Fetching styles that include this item</Text>
             </View>
           ) : relatedOutfits.length === 0 ? (
             <View style={s.emptyState}>
-              <Text style={s.emptyTitle}>No outfits yet</Text>
-              <Text style={s.emptySubtitle}>Add this piece to an outfit to see it here</Text>
+              <Text style={[s.emptyTitle, { color: theme.text }]}>No outfits yet</Text>
+              <Text style={[s.emptySubtitle, { color: theme.subText }]}>Add this piece to an outfit to see it here</Text>
               <TouchableOpacity style={s.pinkBtn} onPress={() => router.push("/wardrobe/outfit" as any)}>
                 <Text style={s.pinkBtnText}>+ Create Outfit</Text>
               </TouchableOpacity>
@@ -797,7 +830,7 @@ export default function ItemDetailScreen() {
                 return (
                   <TouchableOpacity
                     key={outfit._id}
-                    style={s.styleCard}
+                    style={[s.styleCard, { backgroundColor: theme.panel, borderColor: theme.border }]}
                     onPress={() =>
                       router.push({
                         pathname: "/wardrobe/outfit-detail" as any,
@@ -807,11 +840,11 @@ export default function ItemDetailScreen() {
                   >
                     <OutfitPreviewCollage outfit={outfit} style={s.stylePreview} />
                     <View style={s.styleMeta}>
-                      <Text style={s.styleName} numberOfLines={1}>
+                      <Text style={[s.styleName, { color: theme.text }]} numberOfLines={1}>
                         {outfit.name || "Untitled Outfit"}
                       </Text>
-                      <Text style={s.styleSubtext}>{count} items</Text>
-                      <Text style={s.styleSubtext}>{dateLabel}</Text>
+                      <Text style={[s.styleSubtext, { color: theme.subText }]}>{count} items</Text>
+                      <Text style={[s.styleSubtext, { color: theme.subText }]}>{dateLabel}</Text>
                     </View>
                   </TouchableOpacity>
                 );
@@ -823,21 +856,21 @@ export default function ItemDetailScreen() {
         {activeTab === "Stats" && (
           <View style={s.statsSection}>
             <View style={s.statsGrid}>
-              <View style={s.statCard}>
-                <Text style={s.statVal}>${cpw}</Text>
-                <Text style={s.statLbl}>Cost / Wear</Text>
+              <View style={[s.statCard, { backgroundColor: theme.panel, borderColor: theme.border }]}>
+                <Text style={[s.statVal, { color: theme.text }]}>${cpw}</Text>
+                <Text style={[s.statLbl, { color: theme.subText }]}>Cost / Wear</Text>
               </View>
-              <View style={s.statCard}>
-                <Text style={s.statVal}>{item.timesWorn ?? 0}</Text>
-                <Text style={s.statLbl}>Times Worn</Text>
+              <View style={[s.statCard, { backgroundColor: theme.panel, borderColor: theme.border }]}>
+                <Text style={[s.statVal, { color: theme.text }]}>{item.timesWorn ?? 0}</Text>
+                <Text style={[s.statLbl, { color: theme.subText }]}>Times Worn</Text>
               </View>
-              <View style={s.statCard}>
-                <Text style={s.statVal}>${item.totalCost ?? 0}</Text>
-                <Text style={s.statLbl}>Total Cost</Text>
+              <View style={[s.statCard, { backgroundColor: theme.panel, borderColor: theme.border }]}>
+                <Text style={[s.statVal, { color: theme.text }]}>${item.totalCost ?? 0}</Text>
+                <Text style={[s.statLbl, { color: theme.subText }]}>Total Cost</Text>
               </View>
-              <View style={s.statCard}>
-                <Text style={s.statVal}>{item.dateAdded ?? "—"}</Text>
-                <Text style={s.statLbl}>Date Added</Text>
+              <View style={[s.statCard, { backgroundColor: theme.panel, borderColor: theme.border }]}>
+                <Text style={[s.statVal, { color: theme.text }]}>{item.dateAdded ?? "—"}</Text>
+                <Text style={[s.statLbl, { color: theme.subText }]}>Date Added</Text>
               </View>
             </View>
             <TouchableOpacity

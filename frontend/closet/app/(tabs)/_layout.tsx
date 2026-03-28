@@ -5,20 +5,28 @@ import { Animated, Image, Modal, Pressable, Text, TouchableOpacity, View } from 
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { styles } from "../../Styles/tabs_layout.styles";
 import { CalendarProvider } from "../../context/calendar-context";
+import { useAppTheme } from "../../context/themeContext";
 
-function ActionButton({ label, onPress, icon, iconColor }: any) {
+function ActionButton({ label, onPress, icon, iconColor, variant = "pink" }: any) {
   return (
-    <TouchableOpacity style={styles.actionButton} onPress={onPress}>
+    <TouchableOpacity
+      style={[
+        styles.actionButton,
+        variant === "black" && { backgroundColor: "#111111", borderWidth: 1, borderColor: "#2A2A2A" },
+      ]}
+      onPress={onPress}
+    >
       {icon && (
         <IconSymbol name={icon} size={20} color={iconColor || "#B8576A"} style={styles.actionIcon} />
       )}
-      <Text style={styles.actionText}>{label}</Text>
+      <Text style={[styles.actionText, variant === "black" && { color: "#F1F1F1" }]}>{label}</Text>
     </TouchableOpacity>
   );
 }
 
 function ExpandableFAB() {
   const router = useRouter();
+  const { isDarkMode } = useAppTheme();
   const [open, setOpen] = useState(false);
   const [showAddSheet, setShowAddSheet] = useState(false);
   const animation = useRef(new Animated.Value(0)).current;
@@ -68,7 +76,7 @@ function ExpandableFAB() {
             right: 0,
             bottom: 0,
             left: 0,
-            backgroundColor: "rgba(0,0,0,0.6)",
+            backgroundColor: isDarkMode ? "rgba(0,0,0,0.72)" : "rgba(0,0,0,0.6)",
             zIndex: 90,
           }}
           onPress={toggleMenu}
@@ -101,31 +109,31 @@ function ExpandableFAB() {
       </View>
 
       <Modal transparent visible={showAddSheet} animationType="slide" onRequestClose={() => setShowAddSheet(false)}>
-        <View style={styles.sheetOverlay}>
+        <View style={[styles.sheetOverlay, isDarkMode && { backgroundColor: "rgba(0,0,0,0.7)" }]}>
           <TouchableOpacity style={styles.sheetDismiss} activeOpacity={1} onPress={() => setShowAddSheet(false)} />
-          <View style={styles.sheet}>
-            <View style={styles.sheetHandle} />
-            <Text style={styles.sheetTitle}>Add Item</Text>
-            <TouchableOpacity style={styles.sheetBtn} onPress={launchCamera}>
+          <View style={[styles.sheet, isDarkMode && { backgroundColor: "#1B1B1B" }]}>
+            <View style={[styles.sheetHandle, isDarkMode && { backgroundColor: "#4A4A4A" }]} />
+            <Text style={[styles.sheetTitle, isDarkMode && { color: "#F1F1F1" }]}>Add Item</Text>
+            <TouchableOpacity style={[styles.sheetBtn, { backgroundColor: "#111111", borderColor: "#2A2A2A" }]} onPress={launchCamera}>
               <View>
-                <Text style={styles.sheetBtnLabel}>Take a Photo</Text>
-                <Text style={styles.sheetBtnSub}>Use your camera</Text>
+                <Text style={[styles.sheetBtnLabel, { color: "#F1F1F1" }]}>Take a Photo</Text>
+                <Text style={[styles.sheetBtnSub, { color: "#A6A6A6" }]}>Use your camera</Text>
               </View>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.sheetBtn} onPress={launchGallery}>
+            <TouchableOpacity style={[styles.sheetBtn, { backgroundColor: "#111111", borderColor: "#2A2A2A" }]} onPress={launchGallery}>
               <View>
-                <Text style={styles.sheetBtnLabel}>Choose from Gallery</Text>
-                <Text style={styles.sheetBtnSub}>Pick an existing photo</Text>
+                <Text style={[styles.sheetBtnLabel, { color: "#F1F1F1" }]}>Choose from Gallery</Text>
+                <Text style={[styles.sheetBtnSub, { color: "#A6A6A6" }]}>Pick an existing photo</Text>
               </View>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.sheetBtn} onPress={launchSearchByName}>
+            <TouchableOpacity style={[styles.sheetBtn, { backgroundColor: "#111111", borderColor: "#2A2A2A" }]} onPress={launchSearchByName}>
               <View>
-                <Text style={styles.sheetBtnLabel}>Search by Name</Text>
-                <Text style={styles.sheetBtnSub}>Find a garment image online</Text>
+                <Text style={[styles.sheetBtnLabel, { color: "#F1F1F1" }]}>Search by Name</Text>
+                <Text style={[styles.sheetBtnSub, { color: "#A6A6A6" }]}>Find a garment image online</Text>
               </View>
             </TouchableOpacity>
             <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowAddSheet(false)}>
-              <Text style={styles.cancelText}>Cancel</Text>
+              <Text style={[styles.cancelText, isDarkMode && { color: "#F17A95" }]}>Cancel</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -136,22 +144,26 @@ function ExpandableFAB() {
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
+  const { isDarkMode } = useAppTheme();
   const tabBarHeight = 58 + insets.bottom;
 
   return (
     <CalendarProvider>
-      <SafeAreaView style={{ flex: 1 }} edges={["left", "right"]}>
-        <>
+      <SafeAreaView style={{ flex: 1, backgroundColor: isDarkMode ? "#121212" : "#FFFFFF" }} edges={["left", "right"]}>
+        <View style={{ flex: 1, backgroundColor: isDarkMode ? "#121212" : "#FFFFFF" }}>
           <Tabs
             screenOptions={{
               headerShown: false,
               tabBarShowLabel: false,
+              sceneStyle: {
+                backgroundColor: isDarkMode ? "#121212" : "#FFFFFF",
+              },
               tabBarStyle: {
                 position: "absolute",
                 bottom: 0,
                 left: 0,
                 right: 0,
-                backgroundColor: "#1E1E1E",
+                backgroundColor: isDarkMode ? "#0F0F0F" : "#1E1E1E",
                 borderRadius: 0,
                 height: tabBarHeight,
                 paddingBottom: insets.bottom,
@@ -201,7 +213,7 @@ export default function TabLayout() {
             />
           </Tabs>
           <ExpandableFAB />
-        </>
+        </View>
       </SafeAreaView>
     </CalendarProvider>
   );
