@@ -2,7 +2,9 @@ import { Inter_400Regular, Inter_700Bold, useFonts } from '@expo-google-fonts/in
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useState } from 'react';
+import * as SecureStore from 'expo-secure-store';
 import { Dimensions, Image, Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { buildApiUrl, buildAuthHeaders } from '@/constants/api';
 import styles from '../../Styles/auth/signupdetails.styles';
 
 const { width } = Dimensions.get('window');
@@ -29,6 +31,7 @@ export default function ProfileSetupScreen() {
 
   const [selected, setSelected] = useState<Record<string, string>>({});
   const [modalKey, setModalKey] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   if (!fontsLoaded) return null;
 
@@ -38,6 +41,56 @@ export default function ProfileSetupScreen() {
   const selectOption = (key: string, value: string) => {
     setSelected(prev => ({ ...prev, [key]: value }));
     closeModal();
+  };
+
+  const parseNumericValue = (raw: string | undefined) => {
+    if (!raw) return null;
+    const digits = raw.replace(/[^0-9]/g, '');
+    if (!digits) return null;
+    return parseInt(digits, 10);
+  };
+
+  const persistSignupDetails = async () => {
+    const token = await SecureStore.getItemAsync('userToken');
+    if (!token) return;
+
+    const styleWord = selected.styleWords?.trim();
+    const payload = {
+      gender: selected.gender || null,
+      clothingSize: selected.clothingSize || null,
+      shoesSize: selected.shoesSize || null,
+      heightCm: parseNumericValue(selected.height),
+      weightKg: parseNumericValue(selected.weight),
+      outfitFormula: selected.outfitFormula || null,
+      styleWords: styleWord ? [styleWord] : [],
+      closetGoal: selected.closetGoal || null,
+      shoppingFrequency: selected.shoppingFrequency || null,
+    };
+
+    const res = await fetch(buildApiUrl('/api/users/me'), {
+      method: 'PUT',
+      headers: {
+        ...buildAuthHeaders(token),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      throw new Error('Failed to save signup details');
+    }
+  };
+
+  const handleContinue = async () => {
+    try {
+      setSaving(true);
+      await persistSignupDetails();
+    } catch (error) {
+      console.warn('Failed to persist signup details:', error);
+    } finally {
+      setSaving(false);
+      router.push('/(tabs)');
+    }
   };
 
   const Dropdown = ({ optionKey }: { optionKey: string }) => (
@@ -106,8 +159,8 @@ export default function ProfileSetupScreen() {
         <Text style={styles.label}>How often do you buy new clothes?</Text>
         <Dropdown optionKey="shoppingFrequency" />
 
-        <TouchableOpacity style={styles.signUpButton} onPress={() => router.push('/(tabs)')}>
-          <Text style={styles.signUpText}>Sign up</Text>
+        <TouchableOpacity style={styles.signUpButton} onPress={handleContinue} disabled={saving}>
+          <Text style={styles.signUpText}>{saving ? 'Saving...' : 'Sign up'}</Text>
         </TouchableOpacity>
 
         <Image

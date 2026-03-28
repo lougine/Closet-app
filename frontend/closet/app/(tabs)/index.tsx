@@ -1,6 +1,6 @@
 import { Feather, Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Dimensions, Modal, ScrollView, StatusBar, Text, TextInput, TouchableOpacity, View, ActivityIndicator, RefreshControl } from "react-native";
@@ -251,6 +251,7 @@ function OutfitPreviewTile({ tiles }: { tiles: PreviewTile[] }) {
 }
 
 const LOOKBOOK_IDS_KEY = "lookbookIds";
+const INDEX_REFRESH_AFTER_RANDOMIZE_SAVE_KEY = "indexRefreshAfterRandomizeSave";
 
 const toIdString = (value: any) => {
   if (!value) return "";
@@ -356,10 +357,20 @@ export default function WardrobeScreen() {
   const [quickFilter, setQuickFilter] = useState<"all" | "favorites" | "hidden">("all");
   const [favoriteItemIds, setFavoriteItemIds] = useState<string[]>([]);
   const [hiddenItemIds, setHiddenItemIds] = useState<string[]>([]);
+  const [updatingPreferenceIds, setUpdatingPreferenceIds] = useState<string[]>([]);
   const [uploadingHeaderImage, setUploadingHeaderImage] = useState(false);
   const [outfits, setOutfits] = useState<OutfitSummary[]>([]);
   const [loadingOutfits, setLoadingOutfits] = useState(false);
   const [pullRefreshing, setPullRefreshing] = useState(false);
+
+  useEffect(() => {
+    setFavoriteItemIds(
+      items.filter((item) => item.isFavorite).map((item) => String(item.id)),
+    );
+    setHiddenItemIds(
+      items.filter((item) => item.isHidden).map((item) => String(item.id)),
+    );
+  }, [items]);
 
   const fetchUserHeaderImages = useCallback(async () => {
     try {
@@ -414,6 +425,30 @@ export default function WardrobeScreen() {
     fetchOutfits();
   }, [fetchOutfits, fetchUserHeaderImages, refreshItems]);
 
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+
+      const refreshAfterRandomizeSave = async () => {
+        try {
+          const shouldRefresh = await SecureStore.getItemAsync(INDEX_REFRESH_AFTER_RANDOMIZE_SAVE_KEY);
+          if (cancelled || shouldRefresh !== "1") return;
+
+          await SecureStore.deleteItemAsync(INDEX_REFRESH_AFTER_RANDOMIZE_SAVE_KEY);
+          await Promise.all([Promise.resolve(refreshItems()), fetchOutfits()]);
+        } catch (error) {
+          console.warn("Failed to refresh after randomize save:", error);
+        }
+      };
+
+      refreshAfterRandomizeSave();
+
+      return () => {
+        cancelled = true;
+      };
+    }, [fetchOutfits, refreshItems]),
+  );
+
   const onPullRefresh = useCallback(async () => {
     if (pullRefreshing) return;
 
@@ -465,17 +500,102 @@ export default function WardrobeScreen() {
     setQuickFilter("all");
   };
 
-  const toggleFavoriteItem = useCallback((id: string) => {
-    setFavoriteItemIds((prev) =>
-      prev.includes(id) ? prev.filter((itemId) => itemId !== id) : [...prev, id],
-    );
-  }, []);
+  const persistGarmentPreference = useCallback(
+    async (id: string, updates: { isFavorite?: boolean; isHidden?: boolean }) => {
+      const token = await SecureStore.getItemAsync("userToken");
+      if (!token) {
+        throw new Error("Not authenticated");
+      }
 
-  const toggleHiddenItem = useCallback((id: string) => {
-    setHiddenItemIds((prev) =>
-      prev.includes(id) ? prev.filter((itemId) => itemId !== id) : [...prev, id],
-    );
-  }, []);
+      const url = buildApiUrl(`/api/garments/${id}/preferences`);
+      const headers = {
+        ...buildAuthHeaders(token),
+        "Content-Type": "application/json",
+      };
+      const body = JSON.stringify(updates);
+
+      let response = await fetch(url, {
+        method: "PATCH",
+        headers,
+        body,
+      });
+
+      // Fallback for environments/proxies that block PATCH.
+      if (response.status === 404 || response.status === 405) {
+        response = await fetch(url, {
+          method: "PUT",
+          headers,
+          body,
+        });
+      }
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.message || "Failed to update garment preference");
+      }
+    },
+    [],
+  );
+
+  const toggleFavoriteItem = useCallback(
+    async (id: string) => {
+      if (updatingPreferenceIds.includes(id)) return;
+
+      const wasFavorite = favoriteItemIds.includes(id);
+      const nextFavorite = !wasFavorite;
+
+      setFavoriteItemIds((prev) =>
+        nextFavorite ? [...prev, id] : prev.filter((itemId) => itemId !== id),
+      );
+      setUpdatingPreferenceIds((prev) => [...prev, id]);
+
+      try {
+        await persistGarmentPreference(id, { isFavorite: nextFavorite });
+      } catch (error: any) {
+        setFavoriteItemIds((prev) =>
+          wasFavorite
+            ? (prev.includes(id) ? prev : [...prev, id])
+            : prev.filter((itemId) => itemId !== id),
+        );
+        Alert.alert("Update failed", error?.message || "Could not update favorite status.");
+      } finally {
+        setUpdatingPreferenceIds((prev) =>
+          prev.filter((itemId) => itemId !== id),
+        );
+      }
+    },
+    [favoriteItemIds, persistGarmentPreference, updatingPreferenceIds],
+  );
+
+  const toggleHiddenItem = useCallback(
+    async (id: string) => {
+      if (updatingPreferenceIds.includes(id)) return;
+
+      const wasHidden = hiddenItemIds.includes(id);
+      const nextHidden = !wasHidden;
+
+      setHiddenItemIds((prev) =>
+        nextHidden ? [...prev, id] : prev.filter((itemId) => itemId !== id),
+      );
+      setUpdatingPreferenceIds((prev) => [...prev, id]);
+
+      try {
+        await persistGarmentPreference(id, { isHidden: nextHidden });
+      } catch (error: any) {
+        setHiddenItemIds((prev) =>
+          wasHidden
+            ? (prev.includes(id) ? prev : [...prev, id])
+            : prev.filter((itemId) => itemId !== id),
+        );
+        Alert.alert("Update failed", error?.message || "Could not update hidden status.");
+      } finally {
+        setUpdatingPreferenceIds((prev) =>
+          prev.filter((itemId) => itemId !== id),
+        );
+      }
+    },
+    [hiddenItemIds, persistGarmentPreference, updatingPreferenceIds],
+  );
 
   const favoriteCount = favoriteItemIds.length;
 

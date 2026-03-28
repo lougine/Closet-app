@@ -36,6 +36,8 @@ export interface ClothingItem {
   totalCost?: number;
   dateAdded?: string;
   createdAt?: string;
+  isFavorite?: boolean;
+  isHidden?: boolean;
 }
 
 interface WardrobeContextType {
@@ -122,6 +124,8 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
           timesWorn: Number(garment.wearCount) || 0,
           totalCost: Number(garment.purchasePrice) || 0,
           createdAt: garment.createdAt,
+          isFavorite: Boolean(garment.isFavorite),
+          isHidden: Boolean(garment.isHidden),
           dateAdded: garment.createdAt ? new Date(garment.createdAt).toLocaleDateString("en-US", { month: "short", year: "numeric" }) : undefined,
         }));
 

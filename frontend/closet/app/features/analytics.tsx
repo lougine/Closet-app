@@ -226,10 +226,12 @@ export default function AnalyticsScreen() {
     );
   }
 
-  const usagePercent = overview?.wardrobeUsagePercent ?? 0;
+  const usagePercentRaw = overview?.wardrobeUsagePercent ?? 0;
+  const usagePercent = Math.max(0, Math.min(100, usagePercentRaw));
   const outfitsWorn = overview?.outfitsWorn ?? 0;
   const totalOutfits = overview?.totalOutfits ?? 0;
-  const outfitPercent = totalOutfits > 0 ? Math.round((outfitsWorn / totalOutfits) * 100) : 0;
+  const outfitPercentRaw = totalOutfits > 0 ? Math.round((outfitsWorn / totalOutfits) * 100) : 0;
+  const outfitPercent = Math.max(0, Math.min(100, outfitPercentRaw));
   const totalItems = overview?.totalItems ?? 0;
   const totalWearEvents = overview?.totalWearEvents ?? 0;
   const averageWearPerItem = overview?.averageWearPerItem ?? 0;
