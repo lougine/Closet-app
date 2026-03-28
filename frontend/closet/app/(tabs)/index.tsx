@@ -1,8 +1,8 @@
 import { Feather, Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
-import { useFocusEffect, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Dimensions, Modal, ScrollView, StatusBar, Text, TextInput, TouchableOpacity, View, ActivityIndicator, RefreshControl } from "react-native";
 import Svg, { Path } from "react-native-svg";
 import { useWardrobe } from "../../context/wardrobeContext";
@@ -417,13 +417,11 @@ export default function WardrobeScreen() {
     }
   }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      refreshItems();
-      fetchUserHeaderImages();
-      fetchOutfits();
-    }, [fetchOutfits, fetchUserHeaderImages, refreshItems]),
-  );
+  useEffect(() => {
+    refreshItems();
+    fetchUserHeaderImages();
+    fetchOutfits();
+  }, [fetchOutfits, fetchUserHeaderImages, refreshItems]);
 
   const onPullRefresh = useCallback(async () => {
     if (pullRefreshing) return;
