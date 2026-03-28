@@ -230,7 +230,11 @@ export default function AnalyticsScreen() {
   const usagePercent = Math.max(0, Math.min(100, usagePercentRaw));
   const outfitsWorn = overview?.outfitsWorn ?? 0;
   const totalOutfits = overview?.totalOutfits ?? 0;
-  const outfitPercentRaw = totalOutfits > 0 ? Math.round((outfitsWorn / totalOutfits) * 100) : 0;
+  const outfitPercentRaw = totalOutfits > 0
+    ? (outfitsWorn === totalOutfits
+      ? 100
+      : Math.floor((outfitsWorn / totalOutfits) * 100))
+    : 0;
   const outfitPercent = Math.max(0, Math.min(100, outfitPercentRaw));
   const totalItems = overview?.totalItems ?? 0;
   const totalWearEvents = overview?.totalWearEvents ?? 0;
