@@ -3,15 +3,15 @@ import { COLORS } from '../../context/calendar-context';
 
 export const { width: SW } = Dimensions.get('window');
 
-const HEADER_H = 150;
+const HEADER_H = 140;
 
 export const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: COLORS.white },
+  flex: { flex: 1, backgroundColor: '#F6F6F6' },
   loadingWrap: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: COLORS.white,
+    backgroundColor: '#F6F6F6',
   },
   headerBg: {
     height: HEADER_H,
@@ -30,24 +30,27 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingTop: 56,
+    paddingTop: 50,
     paddingBottom: 8,
     zIndex: 1,
   },
-  arrowBtn: { padding: 4 },
+  arrowBtn: { 
+    padding: 4 
+  },
   monthLabel: {
     fontSize: 18,
     fontWeight: '700',
     color: '#000',
     letterSpacing: 0.3,
+    marginTop: 15,
   },
   weekStrip: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     paddingHorizontal: 10,
-    paddingBottom: 8,
+    paddingBottom: 4,
     zIndex: 1,
-    marginTop: 35,
+    marginTop: 5,
   },
   dayColumn: {
     alignItems: 'center',
@@ -56,7 +59,7 @@ export const styles = StyleSheet.create({
   },
   dayName: {
     fontSize: 14,
-    color: 'rgb(0,0,0)',
+    color: '#444444',
     fontWeight: '600',
   },
   dayNameSelected: {
@@ -80,11 +83,11 @@ export const styles = StyleSheet.create({
   dayNumber: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#716767',
+    color: '#3a3838',
   },
   dayNumberSelected: {
-    color: '#716767',
-    fontWeight: '500',
+    color: '#534c4c',
+    fontWeight: '600',
   },
   dayNumberToday: {
     color: "#F0507B",
@@ -94,37 +97,22 @@ export const styles = StyleSheet.create({
     width: 5,
     height: 5,
     borderRadius: 3,
-    backgroundColor: 'rgba(255,255,255,0.8)',
   },
   content: {
     flexGrow: 1,
     paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingTop: 120,
     paddingBottom: 40,
   },
   quickActionRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: 8,
-    marginBottom: 10,
-  },
-  quickActionBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    borderRadius: 12,
-    backgroundColor: '#FFF1F6',
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    borderWidth: 1,
-    borderColor: '#FFD7E5',
-  },
-  quickActionText: {
-    fontSize: 12,
-    color: COLORS.hotPink,
-    fontWeight: '600',
+    marginTop: 2,
+    marginBottom: 6,
+    paddingHorizontal: 20,
+    zIndex: 1,
+    transform: [{ translateY: 0 }],
   },
   secondaryQuickBtn: {
     flex: 1,
@@ -132,15 +120,15 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    borderRadius: 12,
-    backgroundColor: COLORS.offWhite,
-    paddingVertical: 10,
-    paddingHorizontal: 8,
+    borderRadius: 24,
+    backgroundColor: '#F0507B',
+    paddingVertical: 8,
+    paddingHorizontal: 10,
   },
   secondaryQuickText: {
-    fontSize: 12,
-    color: COLORS.subText,
-    fontWeight: '600',
+    fontSize: 11,
+    color: '#FFFFFF',
+    fontWeight: '500',
   },
   outfitCard: {
     flex: 1,
@@ -176,7 +164,7 @@ export const styles = StyleSheet.create({
     marginTop: 16,
     width: '90%',
     flexDirection: 'row',
-    gap: 8,
+    gap: 4,
   },
   outfitMetaPill: {
     flex: 1,
@@ -198,7 +186,7 @@ export const styles = StyleSheet.create({
     marginTop: 12,
     width: '90%',
     flexDirection: 'row',
-    gap: 8,
+    gap: 4,
   },
   outfitActionBtn: {
     flex: 1,
@@ -209,8 +197,7 @@ export const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: COLORS.white,
     borderWidth: 1,
-    borderColor: '#FFD7E5',
-    paddingVertical: 10,
+    paddingVertical: 8,
     paddingHorizontal: 8,
   },
   outfitActionText: {
@@ -254,8 +241,9 @@ export const styles = StyleSheet.create({
   },
   emptyDay: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     gap: 14,
+    marginTop: 40,
   },
   emptyTitle: {
     fontSize: 22,
@@ -270,37 +258,46 @@ export const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 8,
   },
-  optionsBlock: { gap: 12 },
+  optionsBlock: {
+    gap: 12,
+  },
   optionBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 35,
+    backgroundColor: '#FB92BD',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    width: '72%',
+    alignSelf: 'center',
+  },
+  optionTextWrap: { 
+    width: '100%', 
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.offWhite,
-    borderRadius: 18,
-    padding: 16,
-    gap: 14,
-  },
-  optionIconWrap: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    backgroundColor: COLORS.white,
     justifyContent: 'center',
+  },
+  optionTextGroup: {
+    alignItems: 'flex-start',
+  },
+  optionTitleRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: COLORS.hotPink,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 2,
   },
-  optionTextWrap: { flex: 1 },
+  optionIcon: {
+    marginRight: 8,
+  },
   optionTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
-    color: COLORS.text,
+    color: '#FFFFFF',
+    textAlign: 'left',
   },
-  optionSub: {
-    fontSize: 12,
-    color: COLORS.subText,
+  optionSubtitle: {
     marginTop: 2,
+    fontSize: 11,
+    color: '#FFE6EF',
+    fontWeight: '500',
+    textAlign: 'left',
   },
 });

@@ -139,6 +139,17 @@ export const s = StyleSheet.create({
   pagesScrollContent: {
     paddingBottom: 20,
   },
+  pullRefreshIndicator: {
+    alignSelf: "center",
+    marginTop: 10,
+    marginBottom: 2,
+    width: 36,
+    height: 36,
+    borderRadius: 999,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   itemsPage: {
     width: W,
     flex: 1,

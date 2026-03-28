@@ -6,6 +6,7 @@ import * as ImagePicker from 'expo-image-picker';
 import AuthenticatedImage from '@/components/AuthenticatedImage';
 import { IMAGE_UPLOAD_ASPECT, IMAGE_UPLOAD_QUALITY, validateImageFileSize} from '@/constants/imageUpload';
 import { COLORS } from '@/constants/theme';
+import { getAppTheme } from '@/constants/appTheme';
 import { useAppTheme } from '@/context/themeContext';
 import { styles } from '../../Styles/settings/edit-profile.styles';
 import { fetchCurrentUserProfile, updateProfileDetails, uploadBannerImage, uploadProfileImage } from '../../services/userProfileService';
@@ -25,24 +26,8 @@ export default function EditProfileScreen() {
   const [saving, setSaving] = useState(false);
   const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
   const [uploadingBanner, setUploadingBanner] = useState(false);
-
-  const theme = isDarkMode
-    ? {
-        screen: '#121212',
-        card: '#1E1E1E',
-        text: '#F2F2F2',
-        subText: '#A8A8A8',
-        border: '#343434',
-        inputBorder: '#444444',
-      }
-    : {
-        screen: COLORS.offWhite,
-        card: COLORS.white,
-        text: COLORS.text,
-        subText: COLORS.subText,
-        border: COLORS.offWhite,
-        inputBorder: COLORS.lightGray,
-      };
+  const baseTheme = getAppTheme(isDarkMode);
+  const theme = { ...baseTheme, inputBorder: isDarkMode ? '#444444' : COLORS.lightGray };
 
   useEffect(() => {
     fetchUser();

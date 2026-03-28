@@ -1,32 +1,29 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, Image, Modal, RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Modal, PanResponder, RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import OutfitPreviewCollage from '../../../components/OutfitPreviewCollage';
 import { styles } from '../../../Styles/calendar/day.styles';
 import { COLORS, DAYS_SHORT, getOutfitForDate, getWeekDays, isSameDay, MONTHS, OutfitEntry, toDateKey, useCalendar } from '../../../context/calendar-context';
 import { useAppTheme } from '../../../context/themeContext';
+import { getAppTheme } from '../../../constants/appTheme';
 
 export default function DayScreen() {
   const router = useRouter();
   const { isDarkMode } = useAppTheme();
-  const theme = isDarkMode
-    ? {
-        screen: '#121212',
-        card: '#1F1F1F',
-        softCard: '#252525',
-        text: '#F2F2F2',
-        subText: '#A7A7A7',
-        border: '#353535',
-      }
-    : {
-        screen: COLORS.white,
-        card: COLORS.offWhite,
-        softCard: COLORS.white,
-        text: COLORS.text,
-        subText: COLORS.subText,
-        border: '#FFD7E5',
-      };
+  const theme = getAppTheme(isDarkMode, {
+    dark: {
+      card: '#1F1F1F',
+      subText: '#A7A7A7',
+      border: '#353535',
+    },
+    light: {
+      screen: '#F6F6F6',
+      card: '#F6F6F6',
+      softCard: '#F6F6F6',
+      border: '#FFD7E5',
+    },
+  });
 
   const {
     selectedDate,
@@ -40,6 +37,17 @@ export default function DayScreen() {
   } = useCalendar();
 
   const [menuVisible, setMenuVisible] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  async function handlePullRefresh() {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    try {
+      await refetch();
+    } finally {
+      setIsRefreshing(false);
+    }
+  }
 
   const selectedOutfit = getOutfitForDate(outfitMap, selectedDate);
   const weekDays = getWeekDays(selectedDate);
@@ -54,6 +62,13 @@ export default function DayScreen() {
   function nextWeek() {
     const d = new Date(selectedDate);
     d.setDate(d.getDate() + 7);
+    setSelectedDate(d);
+    setCurrentMonth(new Date(d.getFullYear(), d.getMonth(), 1));
+  }
+
+  function goToAdjacentDay(direction: 'next' | 'prev') {
+    const d = new Date(selectedDate);
+    d.setDate(d.getDate() + (direction === 'next' ? 1 : -1));
     setSelectedDate(d);
     setCurrentMonth(new Date(d.getFullYear(), d.getMonth(), 1));
   }
@@ -83,11 +98,19 @@ export default function DayScreen() {
     router.push('/(tabs)/calendar/month');
   }
 
-  function goToStyling(mode: 'create' | 'discover' | 'randomize') {
+  function goToStyling(mode: 'create' | 'discover' | 'randomize' | 'ai-recommended', outfit?: OutfitEntry) {
     router.push({
       pathname: '/(tabs)/styling',
-      params: { mode, date: toDateKey(selectedDate) },
+      params: { 
+        mode, 
+        date: toDateKey(selectedDate),
+        outfitJson: outfit ? JSON.stringify(outfit) : undefined,
+      },
     });
+  }
+
+  function goToOutfitsIndex() {
+    router.push({ pathname: '/(tabs)' as any });
   }
 
   function openOutfitDetail(outfit: OutfitEntry) {
@@ -141,10 +164,32 @@ export default function DayScreen() {
 
   function handleEditInStyling() {
     setMenuVisible(false);
-    goToStyling('create');
+    goToStyling('create', selectedOutfit);
   }
 
-  if (loading) {
+  const panResponder = PanResponder.create({
+    onMoveShouldSetPanResponderCapture: (_, gestureState) => {
+      const horizontalDistance = Math.abs(gestureState.dx);
+      const verticalDistance = Math.abs(gestureState.dy);
+      return horizontalDistance > 14 && horizontalDistance > verticalDistance;
+    },
+    onMoveShouldSetPanResponder: (_, gestureState) => {
+      const isHorizontalSwipe = Math.abs(gestureState.dx) > 18 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.2;
+      return isHorizontalSwipe;
+    },
+    onPanResponderTerminationRequest: () => false,
+    onPanResponderRelease: (_, gestureState) => {
+      if (gestureState.dx <= -50) {
+        goToAdjacentDay('next');
+        return;
+      }
+      if (gestureState.dx >= 50) {
+        goToAdjacentDay('prev');
+      }
+    },
+  });
+
+  if (loading && !isRefreshing) {
     return (
       <View style={[styles.loadingWrap, { backgroundColor: theme.screen }]}>
         <ActivityIndicator size="large" color={COLORS.hotPink} />
@@ -153,7 +198,7 @@ export default function DayScreen() {
   }
 
   return (
-    <View style={[styles.flex, { backgroundColor: theme.screen }]}>
+    <View style={[styles.flex, { backgroundColor: theme.screen }]} {...panResponder.panHandlers}>
       <View style={[styles.headerBg, { backgroundColor: isDarkMode ? '#1A1A1A' : undefined }]}>
         <View style={styles.headerRow}>
           <TouchableOpacity onPress={prevWeek} style={styles.arrowBtn}>
@@ -181,14 +226,14 @@ export default function DayScreen() {
               <TouchableOpacity
                 key={i}
                 style={styles.dayColumn}
-                onPress={() => setSelectedDate(day)}
+                onPress={() => {
+                  setSelectedDate(day);
+                }}
               >
                 <Text
                   style={[
                     styles.dayName,
-                    { color: theme.subText },
                     isSelected && styles.dayNameSelected,
-                    isSelected && { color: theme.text },
                   ]}
                 >
                   {DAYS_SHORT[day.getDay()]}
@@ -219,6 +264,18 @@ export default function DayScreen() {
           })}
         </View>
 
+        <View style={styles.quickActionRow}>
+          <TouchableOpacity style={styles.secondaryQuickBtn} onPress={() => goToNearestOutfit('prev')}>
+            <Ionicons name="chevron-back-circle-outline" size={14} color="#FFFFFF" />
+            <Text style={styles.secondaryQuickText}>Previous look</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.secondaryQuickBtn} onPress={() => goToNearestOutfit('next')}>
+            <Text style={styles.secondaryQuickText}>Next look</Text>
+            <Ionicons name="chevron-forward-circle-outline" size={14} color="#FFFFFF" />
+          </TouchableOpacity>
+        </View>
+
         <Image
           source={require('../../../assets/images/calendar.png')}
           style={styles.headerWave}
@@ -230,22 +287,18 @@ export default function DayScreen() {
         style={[styles.flex, { backgroundColor: theme.screen }]}
         contentContainerStyle={styles.content}
         refreshControl={
-          <RefreshControl refreshing={loading} onRefresh={refetch} tintColor={COLORS.hotPink} />
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handlePullRefresh}
+            tintColor="#F0507B"
+            colors={["#F0507B"]}
+            progressViewOffset={140}
+          />
         }
       >
-        <View style={styles.quickActionRow}>
-          <TouchableOpacity style={[styles.secondaryQuickBtn, { backgroundColor: theme.softCard }]} onPress={() => goToNearestOutfit('prev')}>
-            <Ionicons name="chevron-back-circle-outline" size={14} color={theme.subText} />
-            <Text style={[styles.secondaryQuickText, { color: theme.subText }]}>Previous look</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={[styles.secondaryQuickBtn, { backgroundColor: theme.softCard }]} onPress={() => goToNearestOutfit('next')}>
-            <Text style={[styles.secondaryQuickText, { color: theme.subText }]}>Next look</Text>
-            <Ionicons name="chevron-forward-circle-outline" size={14} color={theme.subText} />
-          </TouchableOpacity>
+        <View>
+          {selectedOutfit ? renderFilledDay() : renderEmptyDay()}
         </View>
-
-        {selectedOutfit ? renderFilledDay() : renderEmptyDay()}
       </ScrollView>
     </View>
   );
@@ -379,47 +432,45 @@ export default function DayScreen() {
         <View style={styles.optionsBlock}>
           {[
             {
-              mode: 'wardrobe' as const,
-              icon: 'shirt-outline',
+              action: 'outfits' as const,
               title: 'Add from wardrobe',
-              sub: 'Pick from your saved clothes',
+              subtitle: 'Pick a saved fit from your closet.',
             },
             {
-              mode: 'create' as const,
-              icon: 'sparkles-outline',
+              action: 'create' as const,
               title: 'Create new outfit',
-              sub: 'Style something from scratch',
+              subtitle: 'Build a fresh look for this day.',
             },
             {
-              mode: 'discover' as const,
-              icon: 'compass-outline',
+              action: 'randomize' as const,
               title: 'Discover new outfits',
-              sub: 'Get inspired by new looks',
+              subtitle: 'Let us suggest a random combo.',
             },
-          ].map(({ mode, icon, title, sub }) => (
+            {
+              action: 'ai-recommended' as const,
+              title: 'AI Recommended outfits',
+              subtitle: 'Get smart picks based on your style.',
+            },
+          ].map(({ action, title, subtitle }) => (
             <TouchableOpacity
-              key={mode}
-              style={[styles.optionBtn, { backgroundColor: theme.card }]}
+              key={action}
+              style={styles.optionBtn}
               onPress={() => {
-                if (mode === 'wardrobe') goToStyling('create');
-                else if (mode === 'discover') goToStyling('randomize');
-                else goToStyling(mode);
+                if (action === 'outfits') goToOutfitsIndex();
+                else if (action === 'create') goToStyling('create');
+                else if (action === 'randomize') goToStyling('randomize');
+                else goToStyling('ai-recommended');
               }}
             >
-              <View style={[styles.optionIconWrap, { backgroundColor: theme.softCard }]}>
-                <Ionicons name={icon as any} size={28} color={COLORS.hotPink} />
-              </View>
-
               <View style={styles.optionTextWrap}>
-                <Text style={[styles.optionTitle, { color: theme.text }]}>{title}</Text>
-                <Text style={[styles.optionSub, { color: theme.subText }]}>{sub}</Text>
+                <View style={styles.optionTextGroup}>
+                  <View style={styles.optionTitleRow}>
+                    <Ionicons name="star" size={14} color="#FFFFFF" style={styles.optionIcon} />
+                    <Text style={styles.optionTitle}>{title}</Text>
+                  </View>
+                  <Text style={styles.optionSubtitle}>{subtitle}</Text>
+                </View>
               </View>
-
-              <Ionicons
-                name="chevron-forward"
-                size={18}
-                color={theme.subText}
-              />
             </TouchableOpacity>
           ))}
         </View>

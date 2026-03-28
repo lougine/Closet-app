@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { buildApiUrl, buildAuthHeaders } from '@/constants/api';
 import { COLORS } from '@/constants/theme';
+import { getAppTheme } from '@/constants/appTheme';
 import { useAppTheme } from '@/context/themeContext';
 import { styles } from '../../Styles/settings/passwords-privacy.styles';
 
@@ -22,24 +23,8 @@ export default function PasswordsPrivacyScreen() {
 
   const [privateProfile, setPrivateProfile] = useState(false); 
   const [allowRecommendations, setAllowRecommendations] = useState(true);
-
-  const theme = isDarkMode
-    ? {
-        screen: '#121212',
-        card: '#1E1E1E',
-        text: '#F2F2F2',
-        subText: '#A8A8A8',
-        border: '#343434',
-        inputBorder: '#444444',
-      }
-    : {
-        screen: COLORS.offWhite,
-        card: COLORS.white,
-        text: COLORS.text,
-        subText: COLORS.subText,
-        border: COLORS.offWhite,
-        inputBorder: COLORS.lightGray,
-      };
+  const baseTheme = getAppTheme(isDarkMode);
+  const theme = { ...baseTheme, inputBorder: isDarkMode ? '#444444' : COLORS.lightGray };
 
   async function handleChangePassword() {
     if (!currentPw || !newPw || !confirmPw) {

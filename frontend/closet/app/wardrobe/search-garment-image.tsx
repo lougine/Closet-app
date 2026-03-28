@@ -21,6 +21,8 @@ import {
   removeBackgroundFromImageUrl,
   searchGarmentImages,
 } from '@/services/garmentSearchService';
+import { getGarmentSearchTheme } from '@/constants/appTheme';
+import { useAppTheme } from '@/context/themeContext';
 
 const SEARCH_HINT = 'e.g. navy blue blazer';
 
@@ -58,6 +60,8 @@ const getFriendlyRemoveBgError = (error: unknown) => {
 export default function SearchGarmentImageScreen() {
   const router = useRouter();
   const { mode, itemJson } = useLocalSearchParams<{ mode?: string; itemJson?: string }>();
+  const { isDarkMode } = useAppTheme();
+  const theme = getGarmentSearchTheme(isDarkMode);
 
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<GarmentSearchImage[]>([]);
@@ -138,26 +142,26 @@ export default function SearchGarmentImageScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.root}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Ionicons name="chevron-back" size={22} color="#1a1a1a" />
+    <SafeAreaView style={[styles.root, { backgroundColor: theme.screen }]}>
+      <View style={[styles.header, { borderBottomColor: theme.border }] }>
+        <TouchableOpacity style={[styles.backBtn, { backgroundColor: theme.card }]} onPress={() => router.back()}>
+          <Ionicons name="chevron-back" size={22} color={theme.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Search by Name</Text>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>Search by Name</Text>
         <View style={styles.headerSpacer} />
       </View>
 
-      <Text style={styles.description}>
+      <Text style={[styles.description, { color: theme.subText }] }>
         Search for a garment image, then we will clean the background automatically.
       </Text>
 
       <View style={styles.searchRow}>
         <TextInput
-          style={styles.searchInput}
+          style={[styles.searchInput, { borderColor: theme.border, color: theme.text, backgroundColor: theme.inputBg }]}
           value={query}
           onChangeText={setQuery}
           placeholder={SEARCH_HINT}
-          placeholderTextColor="#a8a8a8"
+          placeholderTextColor={theme.subText}
           returnKeyType="search"
           onSubmitEditing={handleSearch}
         />
@@ -172,8 +176,8 @@ export default function SearchGarmentImageScreen() {
 
       {searched && results.length === 0 && !searching ? (
         <View style={styles.emptyState}>
-          <Text style={styles.emptyTitle}>No good results found, try rephrasing</Text>
-          <Text style={styles.emptySubtitle}>Try a clearer name like white linen shirt.</Text>
+          <Text style={[styles.emptyTitle, { color: theme.text }]}>No good results found, try rephrasing</Text>
+          <Text style={[styles.emptySubtitle, { color: theme.subText }]}>Try a clearer name like white linen shirt.</Text>
         </View>
       ) : null}
 
@@ -189,14 +193,14 @@ export default function SearchGarmentImageScreen() {
 
           return (
             <TouchableOpacity
-              style={styles.card}
+              style={[styles.card, { borderColor: theme.border, backgroundColor: theme.itemCard }]}
               activeOpacity={0.92}
               onPress={() => handleSelectImage(item)}
               disabled={!!processingImageUrl}
             >
-              <Image source={{ uri: item.imageUrl }} style={styles.cardImage} resizeMode="cover" />
+              <Image source={{ uri: item.imageUrl }} style={[styles.cardImage, { backgroundColor: theme.itemEmpty }]} resizeMode="cover" />
               <View style={styles.cardFooter}>
-                <Text style={styles.cardTitle} numberOfLines={2}>
+                <Text style={[styles.cardTitle, { color: theme.text }]} numberOfLines={2}>
                   {item.title || 'Garment image'}
                 </Text>
               </View>
@@ -227,6 +231,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 6,
     paddingBottom: 10,
+    borderBottomWidth: 1,
   },
   backBtn: {
     width: 34,

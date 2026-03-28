@@ -11,6 +11,7 @@ import { IMAGE_UPLOAD_ASPECT, IMAGE_UPLOAD_QUALITY, validateImageFileSize } from
 import { fetchCurrentUserProfile, uploadBannerImage, uploadProfileImage } from "@/services/userProfileService";
 import { getUploadErrorMessage } from "../../services/uploadRequest";
 import { buildApiUrl, buildAuthHeaders, buildImageUrl } from "../../constants/api";
+import { getAppTheme } from "../../constants/appTheme";
 import { fc, s } from "../../Styles/index.styles";
 import { useAppTheme } from "../../context/themeContext";
 
@@ -327,29 +328,19 @@ export default function WardrobeScreen() {
   const { items, counts, loading, refreshItems } = useWardrobe();
   const { isDarkMode } = useAppTheme();
 
-  const theme = isDarkMode
-    ? {
-        screen: "#121212",
-        card: "#1E1E1E",
-        text: "#F3F3F3",
-        subText: "#A9A9A9",
-        border: "#303030",
-        inputBg: "#2A2A2A",
-        iconInactive: "#8E8E8E",
-        itemCard: "#212121",
-        itemEmpty: "#2B2B2B",
-      }
-    : {
-        screen: "#F7F7F7",
-        card: "#FFFFFF",
-        text: "#161616",
-        subText: "#707070",
-        border: "#E7E7E7",
-        inputBg: "#FFFFFF",
-        iconInactive: "#6F6F6F",
-        itemCard: "#FFFFFF",
-        itemEmpty: "#F5F5F5",
-      };
+  const theme = getAppTheme(isDarkMode, {
+    dark: {
+      text: "#F3F3F3",
+      subText: "#A9A9A9",
+      border: "#303030",
+    },
+    light: {
+      screen: "#F7F7F7",
+      text: "#161616",
+      subText: "#707070",
+      border: "#E7E7E7",
+    },
+  });
 
   const [profilePic, setProfilePic] = useState<string | null>(null);
   const [bgImage, setBgImage] = useState<string | null>(null);
@@ -605,8 +596,8 @@ export default function WardrobeScreen() {
           <RefreshControl
             refreshing={pullRefreshing}
             onRefresh={onPullRefresh}
-            tintColor="#E91E63"
-            colors={["#E91E63"]}
+            tintColor="#F0507B"
+            colors={["#F0507B"]}
           />
         }
       >

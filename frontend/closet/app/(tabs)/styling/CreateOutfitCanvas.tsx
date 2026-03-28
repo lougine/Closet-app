@@ -6,9 +6,10 @@ import { s } from "../../../Styles/styling.styles";
 
 const DRAG_CARD_W = 118;
 const DRAG_CARD_H = 148;
-const DRAG_MARGIN = 10;
+const DRAG_MARGIN = 0;
+const DRAG_EDGE_OVERFLOW = 220;
 const MIN_ITEM_SCALE = 0.45;
-const MAX_ITEM_SCALE = 3.2;
+const MAX_ITEM_SCALE = 5;
 const TAP_SLOP = 6;
 
 type TouchPoint = { pageX: number; pageY: number };
@@ -116,11 +117,11 @@ export function useCreateOutfitLogic({ mode, selected, setSelected, selectedItem
     const scale = getItemScale(itemId);
     const itemW = DRAG_CARD_W * scale;
     const itemH = DRAG_CARD_H * scale;
-    const maxX = Math.max(DRAG_MARGIN, canvasSize.width - itemW - DRAG_MARGIN);
-    const maxY = Math.max(DRAG_MARGIN, canvasSize.height - itemH - DRAG_MARGIN);
+    const maxX = Math.max(-DRAG_EDGE_OVERFLOW, canvasSize.width - itemW + DRAG_EDGE_OVERFLOW);
+    const maxY = Math.max(-DRAG_EDGE_OVERFLOW, canvasSize.height - itemH + DRAG_EDGE_OVERFLOW);
     return {
-      x: Math.min(maxX, Math.max(DRAG_MARGIN, x)),
-      y: Math.min(maxY, Math.max(DRAG_MARGIN, y)),
+      x: Math.min(maxX, Math.max(-DRAG_EDGE_OVERFLOW, x)),
+      y: Math.min(maxY, Math.max(-DRAG_EDGE_OVERFLOW, y)),
     };
   };
 
@@ -349,7 +350,6 @@ export default function CreateOutfitCanvas(props: Props) {
       onTouchStart={onCanvasTouchStart}
       onTouchMove={onCanvasTouchMove}
       onTouchEnd={onCanvasTouchEnd}
-      onTouchCancel={onCanvasTouchEnd}
     >
       <TouchableWithoutFeedback onPress={() => setSelectedCanvasItemId(null)}>
         <View style={s.dragBlankTapArea} />
@@ -397,18 +397,21 @@ export default function CreateOutfitCanvas(props: Props) {
             }));
           },
           onPanResponderRelease: (_, gestureState) => {
-            if (didMove && dragSnapshotRef.current) {
-              pushUndoSnapshot(dragSnapshotRef.current);
-            }
-            dragSnapshotRef.current = null;
-
             const isTap = !didPinch && Math.abs(gestureState.dx) < tapSlop && Math.abs(gestureState.dy) < tapSlop;
+            
             if (isTap) {
+              if (dragSnapshotRef.current) {
+                pushUndoSnapshot(dragSnapshotRef.current);
+              }
               setSelectedCanvasItemId((prev) => (prev === itemId ? null : itemId));
               bringItemToFront(itemId);
+            } else if (didMove && dragSnapshotRef.current) {
+              pushUndoSnapshot(dragSnapshotRef.current);
+              setSelectedCanvasItemId(itemId);
             } else {
               setSelectedCanvasItemId(itemId);
             }
+            dragSnapshotRef.current = null;
             setActiveDragId(null);
           },
           onPanResponderTerminate: () => {
@@ -430,7 +433,7 @@ export default function CreateOutfitCanvas(props: Props) {
                 top: pos.y,
                 width: dragCardW * scale,
                 height: dragCardH * scale,
-                backgroundColor: item.bg,
+                backgroundColor: item.image ? "transparent" : item.bg,
                 zIndex: renderIndex + 1,
               },
               activeDragId === itemId && s.draggableItemActive,

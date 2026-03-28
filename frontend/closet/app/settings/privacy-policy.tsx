@@ -3,28 +3,14 @@ import { View, Text, TouchableOpacity, ScrollView, Linking} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { COLORS } from '@/constants/theme';
+import { getAppTheme } from '@/constants/appTheme';
 import { useAppTheme } from '@/context/themeContext';
 import { styles } from '../../Styles/settings/privacy-policy.styles';
 
 export default function PrivacyPolicyScreen() {
   const router = useRouter();
   const { isDarkMode } = useAppTheme();
-
-  const theme = isDarkMode
-    ? {
-        screen: '#121212',
-        card: '#1E1E1E',
-        text: '#F2F2F2',
-        subText: '#A8A8A8',
-        border: '#343434',
-      }
-    : {
-        screen: COLORS.offWhite,
-        card: COLORS.white,
-        text: COLORS.text,
-        subText: COLORS.subText,
-        border: COLORS.offWhite,
-      };
+  const theme = getAppTheme(isDarkMode);
 
   return (
     <ScrollView style={[styles.scroll, { backgroundColor: theme.screen }]} contentContainerStyle={styles.container}>

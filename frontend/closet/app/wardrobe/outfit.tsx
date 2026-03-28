@@ -2,9 +2,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import * as SecureStore from "expo-secure-store";
-import { Alert, FlatList, SafeAreaView, StatusBar, Text, TouchableOpacity, View } from "react-native";
+import { Alert, FlatList, StatusBar, Text, TouchableOpacity, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import AuthenticatedImage from "../../components/AuthenticatedImage";
 import { buildApiUrl, buildAuthHeaders } from "../../constants/api";
+import { getAppTheme } from "../../constants/appTheme";
 import { useAppTheme } from "../../context/themeContext";
 import { useWardrobe } from "../../context/wardrobeContext";
 import { PINK, s } from "../../Styles/wardrobe/outfit.styles";
@@ -16,23 +18,14 @@ export default function OutfitScreen() {
   const [selected, setSelected] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
 
-  const theme = isDarkMode
-    ? {
-        screen: "#121212",
-        panel: "#1E1E1E",
-        softPanel: "#242424",
-        text: "#F2F2F2",
-        subText: "#A8A8A8",
-        border: "#343434",
-      }
-    : {
-        screen: "#fafafa",
-        panel: "#FFFFFF",
-        softPanel: "#fff8fb",
-        text: "#1a1a1a",
-        subText: "#888888",
-        border: "#f0f0f0",
-      };
+  const baseTheme = getAppTheme(isDarkMode, {
+    light: {
+      screen: "#fafafa",
+      softCard: "#fff8fb",
+      border: "#f0f0f0",
+    },
+  });
+  const theme = { ...baseTheme, panel: baseTheme.card, softPanel: baseTheme.softCard };
 
   const toggle = (id: string) =>
     setSelected((prev) =>

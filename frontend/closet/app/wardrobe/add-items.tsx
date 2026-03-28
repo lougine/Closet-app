@@ -14,6 +14,7 @@ import {
   IMAGE_UPLOAD_QUALITY,
   validateImageFileSize,
 } from "../../constants/imageUpload";
+import { getAppTheme } from "../../constants/appTheme";
 import { buildApiUrl, buildImageUrl } from "../../constants/api";
 import { getUploadErrorMessage, uploadMultipartWithRetry } from "../../services/uploadRequest";
 import { removeBackgroundFromImageUri } from "../../services/removeBackground";
@@ -60,25 +61,15 @@ export default function AddItemsScreen() {
   const { addItem } = useWardrobe();
   const { image: imageParam, source } = useLocalSearchParams<{ image: string; source: string }>();
 
-  const theme = isDarkMode
-    ? {
-        screen: "#121212",
-        panel: "#1E1E1E",
-        softPanel: "#242424",
-        text: "#F2F2F2",
-        subText: "#A8A8A8",
-        border: "#343434",
-        inputBg: "#2A2A2A",
-      }
-    : {
-        screen: "#fafafa",
-        panel: "#FFFFFF",
-        softPanel: "#f0eeea",
-        text: "#1a1a1a",
-        subText: "#888888",
-        border: "#ebebeb",
-        inputBg: "#fafafa",
-      };
+  const baseTheme = getAppTheme(isDarkMode, {
+    light: {
+      screen: "#fafafa",
+      softCard: "#f0eeea",
+      border: "#ebebeb",
+      inputBg: "#fafafa",
+    },
+  });
+  const theme = { ...baseTheme, panel: baseTheme.card, softPanel: baseTheme.softCard };
 
   const [image, setImage] = useState<string | null>(imageParam ?? null);
   const [imageFileSize, setImageFileSize] = useState<number | null>(null);
