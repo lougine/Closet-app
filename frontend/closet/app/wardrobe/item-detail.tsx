@@ -11,6 +11,7 @@ import {
   IMAGE_UPLOAD_QUALITY,
   validateImageFileSize,
 } from "../../constants/imageUpload";
+import { getAppTheme } from "../../constants/appTheme";
 import { buildApiUrl, buildAuthHeaders, buildImageUrl } from "../../constants/api";
 import { getUploadErrorMessage, uploadMultipartWithRetry } from "../../services/uploadRequest";
 import { removeBackgroundFromImageUri } from "../../services/removeBackground";
@@ -537,25 +538,14 @@ export default function ItemDetailScreen() {
     ? ((item.totalCost ?? 0) / item.timesWorn!).toFixed(2)
     : (item.totalCost ?? 0).toFixed(2);
 
-  const theme = isDarkMode
-    ? {
-        screen: "#121212",
-        panel: "#1E1E1E",
-        softPanel: "#242424",
-        text: "#F2F2F2",
-        subText: "#A8A8A8",
-        border: "#343434",
-        inputBg: "#2A2A2A",
-      }
-    : {
-        screen: "#FFFFFF",
-        panel: "#FFFFFF",
-        softPanel: "#f0eeea",
-        text: "#1a1a1a",
-        subText: "#888888",
-        border: "#f0f0f0",
-        inputBg: "#FFFFFF",
-      };
+  const baseTheme = getAppTheme(isDarkMode, {
+    light: {
+      screen: "#FFFFFF",
+      softCard: "#f0eeea",
+      border: "#f0f0f0",
+    },
+  });
+  const theme = { ...baseTheme, panel: baseTheme.card, softPanel: baseTheme.softCard };
 
   return (
     <SafeAreaView style={[s.root, { backgroundColor: theme.screen }]}>

@@ -2,9 +2,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import * as SecureStore from "expo-secure-store";
-import { Alert, Dimensions, FlatList, SafeAreaView, StatusBar, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Alert, Dimensions, FlatList, StatusBar, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import AuthenticatedImage from "../../components/AuthenticatedImage";
 import { buildApiUrl, buildAuthHeaders } from "../../constants/api";
+import { getAppTheme } from "../../constants/appTheme";
 import { useAppTheme } from "../../context/themeContext";
 import { useWardrobe } from "../../context/wardrobeContext";
 import { s, s2 } from "../../Styles/wardrobe/lookbook.styles";
@@ -29,23 +31,16 @@ export default function LookbookScreen() {
   const { isDarkMode } = useAppTheme();
   const { items, refreshItems } = useWardrobe();
 
-  const theme = isDarkMode
-    ? {
-        screen: "#121212",
-        panel: "#1E1E1E",
-        text: "#F2F2F2",
-        subText: "#A8A8A8",
-        border: "#343434",
-        inputBg: "#242424",
-      }
-    : {
-        screen: "#fafafa",
-        panel: "#FFFFFF",
-        text: "#1a1a1a",
-        subText: "#888888",
-        border: "#f0f0f0",
-        inputBg: "#FFFFFF",
-      };
+  const baseTheme = getAppTheme(isDarkMode, {
+    light: {
+      screen: "#fafafa",
+      border: "#f0f0f0",
+    },
+    dark: {
+      inputBg: "#242424",
+    },
+  });
+  const theme = { ...baseTheme, panel: baseTheme.card };
 
   const [name, setName] = useState("");
   const [selected, setSelected] = useState<string[]>([]);

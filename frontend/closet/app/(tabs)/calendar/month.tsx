@@ -1,42 +1,34 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import React, { useMemo, useState } from 'react';
-import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import React, { useMemo, useState, useEffect } from 'react';
+import { Alert, PanResponder, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import OutfitPreviewCollage from '../../../components/OutfitPreviewCollage';
 import { styles, SW } from '../../../Styles/calendar/month.styles';
 import { COLORS, DAYS_SHORT, getMonthGrid, getMostWornThisMonth, getOutfitForDate, getStreak, isSameDay, MONTHS, toDateKey, useCalendar } from '../../../context/calendar-context';
 import { useAppTheme } from '../../../context/themeContext';
+import { getAppTheme } from '../../../constants/appTheme';
 
 export default function MonthScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ garmentIds?: string; outfitName?: string }>();
+  const [savingOutfit, setSavingOutfit] = useState(false);
   const [showOnlyLogged, setShowOnlyLogged] = useState(false);
   const { isDarkMode } = useAppTheme();
-  const theme = isDarkMode
-    ? {
-        screen: '#121212',
-        card: '#1F1F1F',
-        softCard: '#252525',
-        text: '#F2F2F2',
-        subText: '#A7A7A7',
-        border: '#353535',
-      }
-    : {
-        screen: COLORS.white,
-        card: COLORS.offWhite,
-        softCard: '#FFF1F6',
-        text: COLORS.text,
-        subText: COLORS.subText,
-        border: '#FFD7E5',
-      };
+  const theme = getAppTheme(isDarkMode, {
+    dark: {
+      card: '#1F1F1F',
+      subText: '#A7A7A7',
+      border: '#353535',
+    },
+    light: {
+      screen: COLORS.white,
+      card: COLORS.offWhite,
+      softCard: '#FFF1F6',
+      border: '#FFD7E5',
+    },
+  });
 
-  const {
-    currentMonth,
-    setCurrentMonth,
-    selectedDate,
-    setSelectedDate,
-    outfitMap,
-    outfits,
-  } = useCalendar();
+  const { currentMonth, setCurrentMonth, selectedDate, setSelectedDate, outfitMap, outfits, saveOutfitForDate } = useCalendar();
 
   const year = currentMonth.getFullYear();
   const month = currentMonth.getMonth();
@@ -50,39 +42,14 @@ export default function MonthScreen() {
 
   const mostWorn = getMostWornThisMonth(outfits, year, month);
   const streak = getStreak(outfitMap);
-
-  const monthStats = useMemo(() => {
-    const daysWithOutfit = grid
+  const loggedLooks = useMemo(() => {
+    const entries = grid
       .filter((d): d is Date => Boolean(d))
-      .filter((d) => Boolean(getOutfitForDate(outfitMap, d)));
+      .map((d) => ({ date: d, outfit: getOutfitForDate(outfitMap, d) }))
+      .filter((entry) => Boolean(entry.outfit));
 
-    const uniqueDateKeys = new Set(daysWithOutfit.map((d) => toDateKey(d)));
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const loggedDays = uniqueDateKeys.size;
-    const coverage = daysInMonth > 0 ? Math.round((loggedDays / daysInMonth) * 100) : 0;
-
-    let weekendCount = 0;
-    let weekdayCount = 0;
-    const weekdayFrequency = [0, 0, 0, 0, 0, 0, 0];
-
-    daysWithOutfit.forEach((d) => {
-      const weekday = d.getDay();
-      weekdayFrequency[weekday] += 1;
-      if (weekday === 0 || weekday === 6) weekendCount += 1;
-      else weekdayCount += 1;
-    });
-
-    const busiestWeekdayIndex = weekdayFrequency.indexOf(Math.max(...weekdayFrequency));
-    const busiestWeekday = loggedDays > 0 ? DAYS_SHORT[busiestWeekdayIndex] : 'N/A';
-
-    return {
-      loggedDays,
-      coverage,
-      weekendCount,
-      weekdayCount,
-      busiestWeekday,
-    };
-  }, [grid, month, outfitMap, year]);
+    return entries.sort((a, b) => b.date.getTime() - a.date.getTime());
+  }, [grid, outfitMap]);
 
   function prevMonth() {
     setCurrentMonth(new Date(year, month - 1, 1));
@@ -91,6 +58,39 @@ export default function MonthScreen() {
   function nextMonth() {
     setCurrentMonth(new Date(year, month + 1, 1));
   }
+
+  function goToAdjacentMonth(direction: 'next' | 'prev') {
+    const offset = direction === 'next' ? 1 : -1;
+    const target = new Date(year, month + offset, 1);
+    setCurrentMonth(target);
+
+    const currentDay = selectedDate.getDate();
+    const maxDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+    const clampedDay = Math.min(currentDay, maxDay);
+    setSelectedDate(new Date(target.getFullYear(), target.getMonth(), clampedDay));
+  }
+
+  const panResponder = PanResponder.create({
+    onMoveShouldSetPanResponderCapture: (_, gestureState) => {
+      const horizontalDistance = Math.abs(gestureState.dx);
+      const verticalDistance = Math.abs(gestureState.dy);
+      return horizontalDistance > 14 && horizontalDistance > verticalDistance;
+    },
+    onMoveShouldSetPanResponder: (_, gestureState) => {
+      const horizontalDistance = Math.abs(gestureState.dx);
+      const verticalDistance = Math.abs(gestureState.dy);
+      return horizontalDistance > 18 && horizontalDistance > verticalDistance * 1.2;
+    },
+    onPanResponderRelease: (_, gestureState) => {
+      if (gestureState.dx <= -50) {
+        goToAdjacentMonth('next');
+        return;
+      }
+      if (gestureState.dx >= 50) {
+        goToAdjacentMonth('prev');
+      }
+    },
+  });
 
   function jumpToToday() {
     const now = new Date();
@@ -105,8 +105,31 @@ export default function MonthScreen() {
     });
   }
 
+  const handleSaveOutfitToDate = async (date: Date) => {
+    if (!params.garmentIds) return;
+
+    setSavingOutfit(true);
+    try {
+      const garmentIds = JSON.parse(params.garmentIds);
+      await saveOutfitForDate({
+        garmentIds,
+        date,
+        name: params.outfitName || 'Outfit',
+      });
+      router.back();
+    } catch (error: any) {
+      Alert.alert('Error', error?.message || 'Could not save outfit to calendar');
+    } finally {
+      setSavingOutfit(false);
+    }
+  };
+
   return (
-    <ScrollView style={[styles.flex, { backgroundColor: theme.screen }]} contentContainerStyle={styles.container}>
+    <ScrollView
+      style={[styles.flex, { backgroundColor: theme.screen }]}
+      contentContainerStyle={styles.container}
+      {...panResponder.panHandlers}
+    >
       
       <View style={styles.monthHeader}>
         <TouchableOpacity onPress={prevMonth}>
@@ -155,146 +178,151 @@ export default function MonthScreen() {
           <Text style={[styles.filterChipText, { color: theme.subText }, showOnlyLogged && styles.filterChipTextActive]}>Looks only</Text>
         </TouchableOpacity>
       </View>
-
-      <View style={styles.weekHeaderRow}>
-        {DAYS_SHORT.map((d) => (
-          <Text key={d} style={[styles.weekHeaderCell, weekHeaderCellWidth, { color: theme.subText }]}>
-            {d}
-          </Text>
-        ))}
-      </View>
-
-      <View style={styles.gridWrap}>
-        {grid.map((day, i) => {
-          if (!day)
-            return (
-              <View
-                key={`blank-${i}`}
-                style={[styles.blankCell, gridCellSize]}
-              />
-            );
-
-          const key = toDateKey(day);
-          const outfit = getOutfitForDate(outfitMap, day);
-          const isToday = isSameDay(day, today);
-          const isSelected = isSameDay(day, selectedDate);
-          const shouldMute = showOnlyLogged && !outfit;
-
-          return (
+      {showOnlyLogged ? (
+        <View style={styles.loggedListSection}>
+          {loggedLooks.length > 0 ? loggedLooks.map(({ date, outfit }) => (
             <TouchableOpacity
-              key={key}
-              style={[
-                styles.gridCell,
-                gridCellSize,
-                shouldMute && styles.gridCellMuted,
-              ]}
-              onPress={() => {
-                setSelectedDate(day);
-                router.back();
-              }}
-              disabled={shouldMute}
-              onLongPress={() => {
-                if (outfit) openOutfitDetail(outfit);
-              }}
+              key={toDateKey(date)}
+              style={[styles.loggedLookCard, { backgroundColor: theme.card, borderColor: theme.border }]}
+              onPress={() => openOutfitDetail(outfit)}
             >
-              <View
-                style={[
-                  styles.gridDayNum,
-                  isToday && styles.gridDayNumToday,
-                  isSelected && styles.gridDayNumSelected,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.gridDayText,
-                    { color: theme.text },
-                    isToday && styles.gridDayTextToday,
-                    isSelected && styles.gridDayTextSelected,
-                  ]}
-                >
-                  {day.getDate()}
+              <OutfitPreviewCollage outfit={outfit} style={styles.loggedLookThumb} />
+              <View style={styles.loggedLookTextWrap}>
+                <Text style={[styles.loggedLookDay, { color: theme.text }]}>
+                  {DAYS_SHORT[date.getDay()]} look
+                </Text>
+                <Text style={[styles.loggedLookDate, { color: theme.subText }]}>
+                  {date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                 </Text>
               </View>
-
-              {outfit && (
-                <OutfitPreviewCollage
-                  outfit={outfit}
-                  style={[
-                    styles.gridThumb,
-                    thumbSize,
-                  ]}
-                />
-              )}
             </TouchableOpacity>
-          );
-        })}
-      </View>
-
-      <View style={styles.analyticsSection}>
-        <Text style={[styles.analyticsSectionTitle, { color: theme.text }]}>This month</Text>
-
-        <View style={styles.kpiRow}>
-          <View style={[styles.kpiCard, { backgroundColor: theme.softCard, borderColor: theme.border }]}>
-            <Text style={styles.kpiValue}>{monthStats.loggedDays}</Text>
-            <Text style={[styles.kpiLabel, { color: theme.subText }]}>Logged days</Text>
-          </View>
-          <View style={[styles.kpiCard, { backgroundColor: theme.softCard, borderColor: theme.border }]}>
-            <Text style={styles.kpiValue}>{monthStats.coverage}%</Text>
-            <Text style={[styles.kpiLabel, { color: theme.subText }]}>Coverage</Text>
-          </View>
-          <View style={[styles.kpiCard, { backgroundColor: theme.softCard, borderColor: theme.border }]}>
-            <Text style={styles.kpiValue}>{monthStats.busiestWeekday}</Text>
-            <Text style={[styles.kpiLabel, { color: theme.subText }]}>Top day</Text>
-          </View>
-        </View>
-
-        <View style={[styles.analyticsCard, { backgroundColor: theme.card }] }>
-          {mostWorn ? (
-            <OutfitPreviewCollage outfit={mostWorn.outfit} style={styles.analyticsThumb} />
-          ) : (
-            <View style={styles.analyticsThumbEmpty}>
-              <Ionicons name="shirt-outline" size={22} color={COLORS.lightGray} />
+          )) : (
+            <View style={[styles.loggedLookEmpty, { backgroundColor: theme.card, borderColor: theme.border }] }>
+              <Ionicons name="shirt-outline" size={20} color={theme.subText} />
+              <Text style={[styles.loggedLookEmptyText, { color: theme.subText }]}>No logged outfits this month yet.</Text>
             </View>
           )}
-
-          <View style={styles.analyticsTextWrap}>
-            <Text style={[styles.analyticsLabel, { color: theme.text }]}>Most worn this month</Text>
-            <Text style={[styles.analyticsValue, { color: theme.subText }]}>
-              {mostWorn ? `${mostWorn.count} days` : 'No data yet'}
-            </Text>
-          </View>
         </View>
-
-        <View style={[styles.analyticsCard, { backgroundColor: theme.card }] }>
-          <View style={[styles.streakBadge, { backgroundColor: theme.softCard, borderColor: theme.border }]}>
-            <Ionicons name="star" size={22} color={COLORS.hotPink} />
+      ) : (
+        <>
+          <View style={styles.weekHeaderRow}>
+            {DAYS_SHORT.map((d) => (
+              <Text key={d} style={[styles.weekHeaderCell, weekHeaderCellWidth, { color: theme.subText }]}>
+                {d}
+              </Text>
+            ))}
           </View>
 
-          <View style={styles.analyticsTextWrap}>
-            <Text style={[styles.analyticsLabel, { color: theme.text }] }>
-              {streak > 0 ? `${streak} Day streak` : 'No streak yet'}
-            </Text>
-            <Text style={[styles.analyticsValue, { color: theme.subText }] }>
-              {streak > 0
-                ? 'Continuous calendar record'
-                : 'Start logging to build a streak!'}
-            </Text>
-          </View>
-        </View>
+          <View style={styles.gridWrap}>
+            {grid.map((day, i) => {
+              if (!day)
+                return (
+                  <View
+                    key={`blank-${i}`}
+                    style={[styles.blankCell, gridCellSize]}
+                  />
+                );
 
-        <View style={[styles.analyticsCard, { backgroundColor: theme.card }] }>
-          <View style={[styles.streakBadge, { backgroundColor: theme.softCard, borderColor: theme.border }]}>
-            <Ionicons name="partly-sunny-outline" size={22} color={COLORS.hotPink} />
+              const key = toDateKey(day);
+              const outfit = getOutfitForDate(outfitMap, day);
+              const isToday = isSameDay(day, today);
+              const isSelected = isSameDay(day, selectedDate);
+
+              return (
+                <TouchableOpacity
+                  key={key}
+                  style={[
+                    styles.gridCell,
+                    gridCellSize,
+                  ]}
+                  onPress={() => {
+                    setSelectedDate(day);
+                    
+                    // If saving outfit, do that instead
+                    if (params.garmentIds) {
+                      handleSaveOutfitToDate(day);
+                      return;
+                    }
+                    
+                    router.back();
+                  }}
+                  onLongPress={() => {
+                    if (outfit) openOutfitDetail(outfit);
+                  }}
+                >
+                  <View
+                    style={[
+                      styles.gridDayNum,
+                      isToday && styles.gridDayNumToday,
+                      isSelected && styles.gridDayNumSelected,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.gridDayText,
+                        { color: theme.text },
+                        isToday && styles.gridDayTextToday,
+                        isSelected && styles.gridDayTextSelected,
+                      ]}
+                    >
+                      {day.getDate()}
+                    </Text>
+                  </View>
+
+                  {outfit && (
+                    <OutfitPreviewCollage
+                      outfit={outfit}
+                      style={[
+                        styles.gridThumb,
+                        thumbSize,
+                      ]}
+                    />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
           </View>
 
-          <View style={styles.analyticsTextWrap}>
-            <Text style={[styles.analyticsLabel, { color: theme.text }]}>Weekday vs Weekend</Text>
-            <Text style={[styles.analyticsValue, { color: theme.subText }] }>
-              {monthStats.weekdayCount} weekday looks • {monthStats.weekendCount} weekend looks
-            </Text>
+          <View style={styles.analyticsSection}>
+            <Text style={[styles.analyticsSectionTitle, { color: theme.text }]}>This month</Text>
+
+            <View style={[styles.analyticsCard, { backgroundColor: theme.card }] }>
+              {mostWorn ? (
+                <OutfitPreviewCollage outfit={mostWorn.outfit} style={styles.analyticsThumb} />
+              ) : (
+                <View style={styles.analyticsThumbEmpty}>
+                  <Ionicons name="shirt-outline" size={22} color={COLORS.lightGray} />
+                </View>
+              )}
+
+              <View style={styles.analyticsTextWrap}>
+                <Text style={[styles.analyticsLabel, { color: theme.text }]}>Most worn this month</Text>
+                <Text style={[styles.analyticsValue, { color: theme.subText }]}>
+                  {mostWorn ? `${mostWorn.count} days` : 'No data yet'}
+                </Text>
+              </View>
+            </View>
+
+            <View style={[styles.analyticsCard, { backgroundColor: theme.card }] }>
+              <View style={[styles.streakBadge, { backgroundColor: theme.softCard, borderColor: theme.border }]}>
+                <Ionicons name="star" size={22} color={COLORS.hotPink} />
+              </View>
+
+              <View style={styles.analyticsTextWrap}>
+                <Text style={[styles.analyticsLabel, { color: theme.text }] }>
+                  {streak > 0 ? `${streak} Day streak` : 'No streak yet'}
+                </Text>
+                <Text style={[styles.analyticsValue, { color: theme.subText }] }>
+                  {streak > 0
+                    ? 'Continuous calendar record'
+                    : 'Start logging to build a streak!'}
+                </Text>
+              </View>
+            </View>
+
           </View>
-        </View>
-      </View>
+        </>
+      )}
     </ScrollView>
   );
 }

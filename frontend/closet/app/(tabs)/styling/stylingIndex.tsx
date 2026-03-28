@@ -68,6 +68,22 @@ const normalizeCategory = (category?: string) => {
   return /^shoes$/i.test(category) ? "Footwear" : category;
 };
 
+const getObjectIdTimestamp = (value: unknown) => {
+  if (typeof value !== "string" || value.length < 8) return 0;
+  const seconds = Number.parseInt(value.slice(0, 8), 16);
+  return Number.isFinite(seconds) ? seconds * 1000 : 0;
+};
+
+const getItemAddedTimestamp = (item: any) => {
+  const createdAtMs = item?.createdAt ? new Date(item.createdAt).getTime() : 0;
+  if (Number.isFinite(createdAtMs) && createdAtMs > 0) return createdAtMs;
+
+  const dateAddedMs = item?.dateAdded ? new Date(item.dateAdded).getTime() : 0;
+  if (Number.isFinite(dateAddedMs) && dateAddedMs > 0) return dateAddedMs;
+
+  return getObjectIdTimestamp(item?.id);
+};
+
 const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, timeoutMessage: string): Promise<T> => {
   let timer: ReturnType<typeof setTimeout> | null = null;
   try {
@@ -194,6 +210,10 @@ function WardrobePanel({
     return true;
   });
 
+  const filteredSorted = [...filtered].sort(
+    (a, b) => getItemAddedTimestamp(b) - getItemAddedTimestamp(a),
+  );
+
   React.useEffect(() => {
     Animated.spring(slideAnim, {
       toValue: visible ? 0 : PANEL_W,
@@ -218,9 +238,15 @@ function WardrobePanel({
         <View style={s.panelBg} />
       </TouchableWithoutFeedback>
 
-      <Animated.View style={[s.panel, { transform: [{ translateX: slideAnim }] }, { backgroundColor: panelTheme.panelBg }] }>
+      <Animated.View
+        style={[
+          s.panel,
+          { transform: [{ translateX: slideAnim }] },
+          { backgroundColor: isDarkMode ? panelTheme.panelBg : "#F6F6F6" },
+        ]}
+      >
         {/* Header */}
-        <View style={[s.panelHeader, { borderBottomColor: panelTheme.panelBorder, borderBottomWidth: 1 }] }>
+        <View style={s.panelHeader}>
           <Text style={[s.panelTitle, { color: panelTheme.panelText }]}>Wardrobe</Text>
           <TouchableOpacity onPress={onClose}>
             <Ionicons name="close" size={20} color={panelTheme.panelSubText} />
@@ -239,7 +265,7 @@ function WardrobePanel({
             <TouchableOpacity
               style={[
                 s.panelTab,
-                { backgroundColor: isDarkMode ? "#2A2A2A" : "#F5F5F5" },
+                { backgroundColor: isDarkMode ? "#2A2A2A" : "#FFFFFF" },
                 activeTab === tab && s.panelTabActive,
               ]}
               onPress={() => setActiveTab(tab)}
@@ -308,7 +334,7 @@ function WardrobePanel({
 
         {/* Grid */}
         <FlatList
-          data={filtered}
+          data={filteredSorted}
           numColumns={2}
           keyExtractor={i => String(i.id)}
           contentContainerStyle={s.panelGrid}
@@ -532,7 +558,7 @@ function WardrobePanel({
 }
 
 export default function StylingScreen() {
-  const params = useLocalSearchParams<{ mode?: string; date?: string }>();
+  const params = useLocalSearchParams<{ mode?: string; date?: string; outfitJson?: string }>();
   const router = useRouter();
   const { isDarkMode } = useAppTheme();
   const theme = isDarkMode
@@ -560,6 +586,8 @@ export default function StylingScreen() {
   const [mode, setMode]           = useState<Mode>(resolveInitialMode);
   const [panelOpen, setPanelOpen] = useState(false);
   const [selected, setSelected]   = useState<string[]>([]);
+  const [lastSavedOutfitId, setLastSavedOutfitId] = useState<string>("");
+  const [mainOutfitSaved, setMainOutfitSaved] = useState(false);
   const eventText = "Lara's wedding";
   const [inputText, setInputText] = useState("");
   const [temperatureC] = useState(23);
@@ -677,12 +705,33 @@ export default function StylingScreen() {
         throw new Error(errorPayload?.message || "Could not save outfit");
       }
 
+      setMainOutfitSaved(true);
       Alert.alert("Saved", "Outfit has been saved.");
     } catch (error: any) {
       Alert.alert("Save failed", error?.message || "Could not save this outfit.");
     } finally {
       setSavingOutfit(false);
     }
+  };
+
+  const saveOutfitToCalendar = () => {
+    if (selected.length === 0) {
+      Alert.alert("No outfit selected", "Generate or select an outfit first.");
+      return;
+    }
+
+    const selectedRecommendation = recommendations[activeRecommendation];
+    const outfitName = selectedRecommendation?.name || `${mode} Outfit`;
+
+    setLastSavedOutfitId(JSON.stringify(selected));
+
+    router.push({
+      pathname: "/(tabs)/calendar/month",
+      params: {
+        garmentIds: JSON.stringify(selected),
+        outfitName,
+      },
+    });
   };
 
   useEffect(() => {
@@ -695,6 +744,24 @@ export default function StylingScreen() {
       loadAiRecommendations();
     }
   }, [mode]);
+
+  useEffect(() => {
+    setLastSavedOutfitId("");
+    setMainOutfitSaved(false);
+  }, [selected]);
+
+  // Load outfit from day view when editing an existing outfit
+  useEffect(() => {
+    if (params.outfitJson) {
+      try {
+        const outfit = JSON.parse(params.outfitJson);
+        const garmentIds = outfit.garmentIds || outfit.garments || [];
+        setSelected(garmentIds.map(String));
+      } catch (error) {
+        console.error('Failed to parse outfit:', error);
+      }
+    }
+  }, [params.outfitJson]);
 
   const handleSelectedItemPress = (item: (typeof selectedItems)[number]) => {
     if (mode === "Create outfit") {
@@ -842,18 +909,35 @@ export default function StylingScreen() {
         />
       )}
 
-      <TouchableOpacity
-        style={[
-          s.saveOutfitBtn,
-          (selected.length === 0 || savingOutfit || loadingAi || loadingRandomize) && s.saveOutfitBtnDisabled,
-        ]}
-        onPress={persistCurrentOutfit}
-        disabled={selected.length === 0 || savingOutfit || loadingAi || loadingRandomize}
-      >
-        <Text style={s.saveOutfitBtnTxt}>
-          {savingOutfit ? "Saving outfit..." : "Save outfit"}
-        </Text>
-      </TouchableOpacity>
+      <View style={{ flexDirection: "row", gap: 8, marginHorizontal: 16, marginTop: 12 }}>
+        <TouchableOpacity
+          style={[
+            s.saveOutfitBtn,
+            { flex: 1, marginHorizontal: 0, marginTop: 0 },
+            (selected.length === 0 || savingOutfit || loadingAi || loadingRandomize || mainOutfitSaved) && s.saveOutfitBtnDisabled,
+          ]}
+          onPress={persistCurrentOutfit}
+          disabled={selected.length === 0 || savingOutfit || loadingAi || loadingRandomize || mainOutfitSaved}
+        >
+          <Text style={s.saveOutfitBtnTxt}>
+            {savingOutfit ? "Saving outfit..." : mainOutfitSaved ? "Saved" : "Save outfit"}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            s.saveOutfitBtn,
+            { flex: 1, marginHorizontal: 0, marginTop: 0 },
+            (selected.length === 0 || loadingAi || loadingRandomize || lastSavedOutfitId === JSON.stringify(selected)) && s.saveOutfitBtnDisabled,
+          ]}
+          onPress={saveOutfitToCalendar}
+          disabled={selected.length === 0 || loadingAi || loadingRandomize || lastSavedOutfitId === JSON.stringify(selected)}
+        >
+          <Text style={s.saveOutfitBtnTxt}>
+            {lastSavedOutfitId === JSON.stringify(selected) ? "Saved" : "Save to Calendar"}
+          </Text>
+        </TouchableOpacity>
+      </View>
 
       {/* Wardrobe side panel (Create outfit only) */}
       {mode === "Create outfit" && (

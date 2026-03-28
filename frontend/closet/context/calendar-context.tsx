@@ -53,33 +53,28 @@ export function buildOutfitMap(outfits: OutfitEntry[]): OutfitMap {
   outfits.forEach((o) => {
     if (o?.isLookbook) return;
 
-    const parsedDate = new Date(o.date);
-    const rawKey = typeof o.date === 'string' ? o.date.slice(0, 10) : '';
-    const localKey = toDateKey(parsedDate);
-    const utcKey = toUtcDateKey(parsedDate);
+    // Extract date key directly from ISO string to avoid timezone conversion issues
+    const dateString = typeof o.date === 'string' ? o.date.slice(0, 10) : '';
     const hasPreview = Boolean(o.previewImage);
 
-    const upsert = (key: string) => {
-      if (!key) return;
-      const existing = map[key];
-      if (!existing) {
-        map[key] = o;
-        return;
-      }
+    if (!dateString) return;
+    
+    const existing = map[dateString];
+    if (!existing) {
+      map[dateString] = o;
+      return;
+    }
 
-      // Prefer entries with preview image; otherwise keep the first (newest from API sort).
-      if (!existing.previewImage && hasPreview) {
-        map[key] = o;
-      }
-    };
-
-    [rawKey, localKey, utcKey].forEach(upsert);
+    // Prefer entries with preview image; otherwise keep the first (newest from API sort).
+    if (!existing.previewImage && hasPreview) {
+      map[dateString] = o;
+    }
   });
   return map;
 }
 
 export function getOutfitForDate(outfitMap: OutfitMap, date: Date): OutfitEntry | undefined {
-  return outfitMap[toDateKey(date)] || outfitMap[toUtcDateKey(date)];
+  return outfitMap[toDateKey(date)];
 }
 
 export function getWeekDays(date: Date): Date[] {
@@ -208,6 +203,12 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
   async function saveOutfitForDate(payload: { garmentIds: string[]; date: Date; name?: string }) {
     const { garmentIds, date, name } = payload;
     const token = await SecureStore.getItemAsync('userToken');
+    
+    // Create a date at UTC midnight to avoid timezone shifting
+    const dateKey = toDateKey(date);
+    const [year, month, day] = dateKey.split('-').map(Number);
+    const normalizedDate = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0)).toISOString();
+    
     const res = await fetch(buildApiUrl('/api/outfits'), {
       method: 'POST',
       headers: {
@@ -217,7 +218,7 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
       body: JSON.stringify({
         name: name || 'Outfit',
         garments: garmentIds,
-        date: date.toISOString(),
+        date: normalizedDate,
       }),
     });
 

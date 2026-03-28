@@ -674,12 +674,13 @@ export const s = StyleSheet.create({
     paddingBottom: 100,
   },
   panelRow:{ 
-    justifyContent: "flex-start",
+    justifyContent: "center",
+    gap: 8,
   },
   panelItem:{
     width: (W - 36) / 3,
     aspectRatio: 0.75,
-    margin: 3,
+    marginBottom: 8,
     backgroundColor: "#fff",
     borderRadius: 12,
     overflow: "hidden",

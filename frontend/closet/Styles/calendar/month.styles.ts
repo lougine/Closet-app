@@ -248,4 +248,59 @@ export const styles = StyleSheet.create({
     color: COLORS.subText,
     marginTop: 2,
   },
+
+  loggedListSection: {
+    marginTop: 8,
+    gap: 10,
+  },
+
+  loggedLookCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 10,
+    gap: 10,
+  },
+
+  loggedLookThumb: {
+    width: 64,
+    height: 64,
+    borderRadius: 10,
+    backgroundColor: COLORS.offWhite,
+  },
+
+  loggedLookTextWrap: {
+    flex: 1,
+  },
+
+  loggedLookDay: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.text,
+  },
+
+  loggedLookDate: {
+    marginTop: 2,
+    fontSize: 12,
+    fontWeight: '500',
+    color: COLORS.subText,
+  },
+
+  loggedLookEmpty: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingVertical: 18,
+    paddingHorizontal: 12,
+    gap: 8,
+  },
+
+  loggedLookEmptyText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: COLORS.subText,
+  },
 });

@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { buildApiUrl, buildAuthHeaders } from '@/constants/api';
 import { COLORS } from '@/constants/theme';
+import { getAppTheme } from '@/constants/appTheme';
 import { useAppTheme } from '@/context/themeContext';
 import { styles } from '../../Styles/settings/notifications.styles';
 
@@ -28,22 +29,7 @@ export default function NotificationsScreen() {
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-
-  const theme = isDarkMode
-    ? {
-        screen: '#121212',
-        card: '#1E1E1E',
-        text: '#F2F2F2',
-        subText: '#A8A8A8',
-        border: '#343434',
-      }
-    : {
-        screen: COLORS.offWhite,
-        card: COLORS.white,
-        text: COLORS.text,
-        subText: COLORS.subText,
-        border: COLORS.offWhite,
-      };
+  const theme = getAppTheme(isDarkMode);
 
   useEffect(() => {
     fetchSettings();
