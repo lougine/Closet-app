@@ -1,16 +1,49 @@
 import { StyleSheet } from "react-native";
 
-const styles = StyleSheet.create({
+const createCommunityStyles = (isDarkMode = false) => {
+  const palette = isDarkMode
+    ? {
+        container: "#111111",
+        header: "#1C1C1C",
+        input: "#F3F3F3",
+        card: "#1E1E1E",
+        border: "#2B2B2B",
+        chip: "#2A2A2A",
+        text: "#F3F3F3",
+        subText: "#A8A8A8",
+        comment: "#262626",
+        commentInput: "#2A2A2A",
+        pollCard: "#2A1E22",
+        pollBorder: "#4A3139",
+        pollOption: "#242424",
+      }
+    : {
+        container: "#f2f2f2",
+        header: "#ffffff",
+        input: "#111111",
+        card: "#ffffff",
+        border: "#ececec",
+        chip: "#e5e5e5",
+        text: "#222222",
+        subText: "#777777",
+        comment: "#f7f7f7",
+        commentInput: "#f2f2f2",
+        pollCard: "#fff6f9",
+        pollBorder: "#ffd0de",
+        pollOption: "#ffffff",
+      };
+
+  return StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f2f2f2",
+    backgroundColor: palette.container,
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 15,
     paddingVertical: 12,
-    backgroundColor: "white",
+    backgroundColor: palette.header,
     borderRadius: 20,
     margin: 10,
   },
@@ -18,6 +51,7 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 8,
     fontSize: 14,
+    color: palette.input,
   },
   headerIcons: {
     flexDirection: "row",
@@ -55,7 +89,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   chip: {
-    backgroundColor: "#e5e5e5",
+    backgroundColor: palette.chip,
     paddingVertical: 6,
     paddingHorizontal: 14,
     borderRadius: 20,
@@ -66,6 +100,7 @@ const styles = StyleSheet.create({
   },
   chipText: {
     fontSize: 13,
+    color: palette.text,
   },
   activeChipText: {
     color: "white",
@@ -91,11 +126,11 @@ const styles = StyleSheet.create({
     height: 12,
   },
   feedCard: {
-    backgroundColor: "#fff",
+    backgroundColor: palette.card,
     borderRadius: 16,
     padding: 12,
     borderWidth: 1,
-    borderColor: "#ececec",
+    borderColor: palette.border,
   },
   feedHeader: {
     flexDirection: "row",
@@ -117,7 +152,7 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
     borderRadius: 16,
-    backgroundColor: "#efefef",
+    backgroundColor: isDarkMode ? "#2C2C2C" : "#efefef",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -127,16 +162,16 @@ const styles = StyleSheet.create({
   authorName: {
     fontSize: 13,
     fontWeight: "700",
-    color: "#222",
+    color: palette.text,
   },
   postMeta: {
     fontSize: 11,
-    color: "#8a8a8a",
+    color: palette.subText,
     marginTop: 1,
   },
   postCaption: {
     fontSize: 14,
-    color: "#222",
+    color: palette.text,
     marginBottom: 8,
     lineHeight: 20,
   },
@@ -144,7 +179,7 @@ const styles = StyleSheet.create({
     width: "100%",
     height: 220,
     borderRadius: 12,
-    backgroundColor: "#f4f4f4",
+    backgroundColor: isDarkMode ? "#232323" : "#f4f4f4",
     marginBottom: 10,
   },
   feedActions: {
@@ -160,31 +195,31 @@ const styles = StyleSheet.create({
   },
   actionText: {
     fontSize: 12,
-    color: "#444",
+    color: palette.subText,
     fontWeight: "600",
   },
   commentsSection: {
     marginTop: 8,
     borderTopWidth: 1,
-    borderTopColor: "#f0f0f0",
+    borderTopColor: palette.border,
     paddingTop: 8,
     gap: 6,
   },
   commentRow: {
-    backgroundColor: "#f7f7f7",
+    backgroundColor: palette.comment,
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 7,
   },
   commentAuthor: {
     fontSize: 11,
-    color: "#555",
+    color: palette.subText,
     fontWeight: "700",
     marginBottom: 2,
   },
   commentText: {
     fontSize: 13,
-    color: "#222",
+    color: palette.text,
   },
   commentComposer: {
     flexDirection: "row",
@@ -194,11 +229,12 @@ const styles = StyleSheet.create({
   },
   commentInput: {
     flex: 1,
-    backgroundColor: "#f2f2f2",
+    backgroundColor: palette.commentInput,
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 8,
     fontSize: 13,
+    color: palette.text,
   },
   commentSend: {
     color: "#ff4d73",
@@ -208,25 +244,25 @@ const styles = StyleSheet.create({
   },
   pollCard: {
     marginBottom: 8,
-    backgroundColor: "#fff6f9",
+    backgroundColor: palette.pollCard,
     borderRadius: 12,
     padding: 10,
     borderWidth: 1,
-    borderColor: "#ffd0de",
+    borderColor: palette.pollBorder,
     gap: 8,
   },
   pollQuestion: {
     fontSize: 13,
     fontWeight: "700",
-    color: "#222",
+    color: palette.text,
   },
   pollOption: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "#fff",
+    backgroundColor: palette.pollOption,
     borderWidth: 1,
-    borderColor: "#f1d6df",
+    borderColor: palette.pollBorder,
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 8,
@@ -236,7 +272,7 @@ const styles = StyleSheet.create({
     borderColor: "#ff4d73",
   },
   pollOptionText: {
-    color: "#333",
+    color: palette.text,
     fontSize: 13,
     fontWeight: "600",
   },
@@ -244,17 +280,17 @@ const styles = StyleSheet.create({
     color: "#fff",
   },
   pollVotes: {
-    color: "#555",
+    color: palette.subText,
     fontSize: 12,
     fontWeight: "700",
   },
   emptyStateCard: {
     marginHorizontal: 10,
     marginTop: 10,
-    backgroundColor: "#fff",
+    backgroundColor: palette.card,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#ececec",
+    borderColor: palette.border,
     alignItems: "center",
     paddingVertical: 28,
     paddingHorizontal: 14,
@@ -263,11 +299,11 @@ const styles = StyleSheet.create({
   emptyStateTitle: {
     fontSize: 15,
     fontWeight: "700",
-    color: "#222",
+    color: palette.text,
   },
   emptyStateText: {
     fontSize: 13,
-    color: "#777",
+    color: palette.subText,
     textAlign: "center",
   },
   loadMoreWrap: {
@@ -278,13 +314,13 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   loadMoreText: {
-    color: "#666",
+    color: palette.subText,
     fontSize: 12,
     fontWeight: "600",
   },
   endOfFeedText: {
     textAlign: "center",
-    color: "#8a8a8a",
+    color: palette.subText,
     fontSize: 12,
     paddingVertical: 12,
   },
@@ -326,4 +362,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
 });
-export default styles;
+};
+
+export default createCommunityStyles;

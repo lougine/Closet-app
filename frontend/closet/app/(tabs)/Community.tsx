@@ -5,7 +5,8 @@ import React, { useCallback, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, FlatList, Image, RefreshControl, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
 import AuthenticatedImage from "../../components/AuthenticatedImage";
 import { buildApiUrl, buildAuthHeaders, buildImageUrl } from "../../constants/api";
-import styles from "../../Styles/communityStyles";
+import createCommunityStyles from "../../Styles/communityStyles";
+import { useAppTheme } from "../../context/themeContext";
 
 type CommunityFilter = "for-you" | "friends" | "polls" | "recent";
 
@@ -53,6 +54,10 @@ const COMMUNITY_BASE = '/api/community';
 const LEGACY_COMMUNITY_BASE = '/community';
 
 const CommunityScreen: React.FC = () => {
+  const { isDarkMode } = useAppTheme();
+  const styles = useMemo(() => createCommunityStyles(isDarkMode), [isDarkMode]);
+  const iconColor = isDarkMode ? "#D8D8D8" : "#333";
+
   const closetItems = [
     require("../../assets/images/favicon.png"),
     require("../../assets/images/favicon.png"),
@@ -288,7 +293,7 @@ const CommunityScreen: React.FC = () => {
             />
           ) : (
             <View style={styles.avatarPlaceholder}>
-              <Ionicons name="person" size={14} color="#666" />
+              <Ionicons name="person" size={14} color={isDarkMode ? "#A8A8A8" : "#666"} />
             </View>
           )}
         </View>
@@ -333,13 +338,13 @@ const CommunityScreen: React.FC = () => {
           <Ionicons
             name={post.likedByMe ? "heart" : "heart-outline"}
             size={18}
-            color={post.likedByMe ? "#ff4d73" : "#333"}
+            color={post.likedByMe ? "#ff4d73" : iconColor}
           />
           <Text style={styles.actionText}>{post.likeCount}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.actionButton} onPress={() => toggleComments(post._id)}>
-          <Ionicons name="chatbubble-outline" size={17} color="#333" />
+          <Ionicons name="chatbubble-outline" size={17} color={iconColor} />
           <Text style={styles.actionText}>{post.commentsCount}</Text>
         </TouchableOpacity>
       </View>
@@ -361,6 +366,7 @@ const CommunityScreen: React.FC = () => {
                 <TextInput
                   style={styles.commentInput}
                   placeholder="Add a comment"
+                  placeholderTextColor={isDarkMode ? "#888" : "#999"}
                   value={commentDraftByPost[post._id] || ""}
                   onChangeText={(text) => {
                     setCommentDraftByPost((prev) => ({ ...prev, [post._id]: text }));
@@ -459,11 +465,12 @@ const CommunityScreen: React.FC = () => {
     <View style={styles.container}>
       {/* HEADER */}
       <View style={styles.header}>
-        <Ionicons name="search-outline" size={22} />
+        <Ionicons name="search-outline" size={22} color={iconColor} />
 
         <TextInput
           placeholder="What will today's fit be?"
           style={styles.searchInput}
+          placeholderTextColor={isDarkMode ? "#8F8F8F" : "#888"}
           value={searchQuery}
           onChangeText={setSearchQuery}
           onSubmitEditing={onSubmitSearch}
@@ -471,8 +478,8 @@ const CommunityScreen: React.FC = () => {
         />
 
         <View style={styles.headerIcons}>
-          <Ionicons name="notifications-outline" size={22} />
-          <Ionicons name="person-circle-outline" size={24} />
+          <Ionicons name="notifications-outline" size={22} color={iconColor} />
+          <Ionicons name="person-circle-outline" size={24} color={iconColor} />
         </View>
       </View>
 
@@ -483,7 +490,7 @@ const CommunityScreen: React.FC = () => {
         ListHeaderComponent={listHeader}
         ListEmptyComponent={listEmpty}
         ListFooterComponent={listFooter}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#ff4d73" />}
         onEndReached={loadMore}
         onEndReachedThreshold={0.35}
         showsVerticalScrollIndicator={false}

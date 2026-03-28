@@ -1,6 +1,3 @@
-// styles/shared.ts
-// ─── Global design tokens shared across the whole app ────────────────────────
-
 export const PINK    = "#FF4F81";
 export const BODY_BG = "#f2f2f2";
 
@@ -45,7 +42,6 @@ export const SHADOW = {
   },
 };
 
-// ─── Color swatches ───────────────────────────────────────────────────────────
 export const COLOR_HEX: Record<string, string> = {
   Black:  "#111111",
   White:  "#FFFFFF",

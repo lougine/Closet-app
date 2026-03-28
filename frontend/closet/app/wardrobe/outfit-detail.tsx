@@ -79,7 +79,8 @@ export default function OutfitDetailScreen() {
       .map((garment) => ({
         id: garment._id,
         label: garment.name || "Unnamed item",
-        category: garment.category,
+        bg: "#f1f1f1",
+        category: garment.category ? [garment.category] : [],
         image: garment.imageUrl ? buildImageUrl(garment.imageUrl) : null,
       }));
   }, [outfit]);

@@ -1,30 +1,24 @@
 import React, { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  Switch,
-  Alert,
-  ActivityIndicator,
-} from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Switch, Alert, ActivityIndicator} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { buildApiUrl, buildAuthHeaders } from '@/constants/api';
 import { COLORS } from '@/constants/theme';
+import { useAppTheme } from '@/context/themeContext';
+import { styles } from '../../Styles/settings/notifications.styles';
 
 type NotifSettings = {
-  dailyOutfitReminder: boolean;  // "Don't forget to log today's outfit!"
-  outfitPlanning: boolean;       // reminder the night before to plan tomorrow
-  weeklyRecap: boolean;          // weekly summary of your logged outfits
-  streakAlerts: boolean;         // alert when streak is about to break
-  newFeatures: boolean;          // app updates and new feature announcements
+  dailyOutfitReminder: boolean; 
+  outfitPlanning: boolean;       
+  weeklyRecap: boolean;        
+  streakAlerts: boolean;       
+  newFeatures: boolean;        
 };
 
 export default function NotificationsScreen() {
   const router = useRouter();
+  const { isDarkMode } = useAppTheme();
   const [settings, setSettings] = useState<NotifSettings>({
     dailyOutfitReminder: true,
     outfitPlanning: false,
@@ -34,6 +28,22 @@ export default function NotificationsScreen() {
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  const theme = isDarkMode
+    ? {
+        screen: '#121212',
+        card: '#1E1E1E',
+        text: '#F2F2F2',
+        subText: '#A8A8A8',
+        border: '#343434',
+      }
+    : {
+        screen: COLORS.offWhite,
+        card: COLORS.white,
+        text: COLORS.text,
+        subText: COLORS.subText,
+        border: COLORS.offWhite,
+      };
 
   useEffect(() => {
     fetchSettings();
@@ -48,14 +58,12 @@ export default function NotificationsScreen() {
       const data = await res.json();
       setSettings(data);
     } catch (e) {
-      // If fetch fails just use the defaults above — not critical
       console.warn('Could not load notification settings, using defaults');
     } finally {
       setLoading(false);
     }
   }
 
-  // Toggle one setting and auto-save immediately (no save button needed)
   async function toggleSetting(key: keyof NotifSettings) {
     const updated = { ...settings, [key]: !settings[key] };
     setSettings(updated);
@@ -71,7 +79,6 @@ export default function NotificationsScreen() {
         body: JSON.stringify(updated),
       });
     } catch (e) {
-      // Revert the toggle if save fails
       setSettings(settings);
       Alert.alert('Error', 'Could not update notification setting.');
     }
@@ -79,77 +86,78 @@ export default function NotificationsScreen() {
 
   if (loading) {
     return (
-      <View style={styles.loadingWrap}>
+      <View style={[styles.loadingWrap, { backgroundColor: theme.screen }]}>
         <ActivityIndicator size="large" color={COLORS.hotPink} />
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
+    <ScrollView style={[styles.scroll, { backgroundColor: theme.screen }]} contentContainerStyle={styles.container}>
 
-      {/* ── Header ── */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+        <TouchableOpacity onPress={() => router.back()} style={[styles.backBtn, { backgroundColor: theme.card }] }>
           <Ionicons name="chevron-back" size={22} color={COLORS.hotPink} />
         </TouchableOpacity>
-        <Text style={styles.pageTitle}>Notifications</Text>
+        <Text style={[styles.pageTitle, { color: theme.text }]}>Notifications</Text>
         <View style={styles.headerSpacer} />
       </View>
 
-      <Text style={styles.pageSubtitle}>
-        Choose what you want to be reminded about 🔔
+      <Text style={[styles.pageSubtitle, { color: theme.subText }]}>
+        Choose what you want to be reminded about 
       </Text>
 
-      {/* ── Daily reminders section ── */}
-      <Text style={styles.sectionLabel}>Daily</Text>
-      <View style={styles.card}>
+      <Text style={[styles.sectionLabel, { color: theme.subText }]}>Daily</Text>
+      <View style={[styles.card, { backgroundColor: theme.card }] }>
         <NotifRow
-          icon="shirt-outline"
           title="Daily outfit reminder"
           subtitle="Get reminded to log today's look"
           value={settings.dailyOutfitReminder}
           onToggle={() => toggleSetting('dailyOutfitReminder')}
+          theme={theme}
+          isDarkMode={isDarkMode}
         />
-        <Divider />
+        <Divider border={theme.border} />
         <NotifRow
-          icon="moon-outline"
           title="Outfit planning"
           subtitle="Plan tomorrow's outfit the night before"
           value={settings.outfitPlanning}
           onToggle={() => toggleSetting('outfitPlanning')}
+          theme={theme}
+          isDarkMode={isDarkMode}
         />
       </View>
 
-      {/* ── Weekly section ── */}
-      <Text style={styles.sectionLabel}>Weekly</Text>
-      <View style={styles.card}>
+      <Text style={[styles.sectionLabel, { color: theme.subText }]}>Weekly</Text>
+      <View style={[styles.card, { backgroundColor: theme.card }] }>
         <NotifRow
-          icon="bar-chart-outline"
           title="Weekly recap"
           subtitle="See your outfit highlights every Sunday"
           value={settings.weeklyRecap}
           onToggle={() => toggleSetting('weeklyRecap')}
+          theme={theme}
+          isDarkMode={isDarkMode}
         />
       </View>
 
-      {/* ── Streaks & activity ── */}
-      <Text style={styles.sectionLabel}>Activity</Text>
-      <View style={styles.card}>
+      <Text style={[styles.sectionLabel, { color: theme.subText }]}>Activity</Text>
+      <View style={[styles.card, { backgroundColor: theme.card }] }>
         <NotifRow
-          icon="flame-outline"
           title="Streak alerts"
           subtitle="Don't let your streak break!"
           value={settings.streakAlerts}
           onToggle={() => toggleSetting('streakAlerts')}
+          theme={theme}
+          isDarkMode={isDarkMode}
         />
-        <Divider />
+        <Divider border={theme.border} />
         <NotifRow
-          icon="sparkles-outline"
           title="New features"
           subtitle="Be the first to know about updates"
           value={settings.newFeatures}
           onToggle={() => toggleSetting('newFeatures')}
+          theme={theme}
+          isDarkMode={isDarkMode}
         />
       </View>
 
@@ -157,72 +165,34 @@ export default function NotificationsScreen() {
   );
 }
 
-// ─── Reusable notification toggle row ─────────────────────────────────────────
 function NotifRow({
-  icon, title, subtitle, value, onToggle,
+  title, subtitle, value, onToggle, theme, isDarkMode,
 }: {
-  icon: string;
   title: string;
   subtitle: string;
   value: boolean;
   onToggle: () => void;
+  theme: { text: string; subText: string };
+  isDarkMode: boolean;
 }) {
   return (
     <View style={styles.notifRow}>
-      <View style={styles.notifIconWrap}>
-        <Ionicons name={icon as any} size={20} color={COLORS.hotPink} />
-      </View>
       <View style={styles.notifText}>
-        <Text style={styles.notifTitle}>{title}</Text>
-        <Text style={styles.notifSub}>{subtitle}</Text>
+        <Text style={[styles.notifTitle, { color: theme.text }]}>{title}</Text>
+        <Text style={[styles.notifSub, { color: theme.subText }]}>{subtitle}</Text>
       </View>
-      {/* The pink toggle switch */}
+      
       <Switch
         value={value}
         onValueChange={onToggle}
         trackColor={{ false: COLORS.lightGray, true: COLORS.lightPink }}
-        thumbColor={value ? COLORS.hotPink : COLORS.white}
+        thumbColor={isDarkMode ? COLORS.hotPink : COLORS.white}
         ios_backgroundColor={COLORS.lightGray}
       />
     </View>
   );
 }
 
-function Divider() {
-  return <View style={styles.divider} />;
+function Divider({ border }: { border: string }) {
+  return <View style={[styles.divider, { backgroundColor: border }]} />;
 }
-
-const styles = StyleSheet.create({
-  scroll: { flex: 1, backgroundColor: COLORS.offWhite },
-  container: { paddingTop: 60, paddingBottom: 60, paddingHorizontal: 20, gap: 10 },
-  loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.offWhite },
-
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
-  backBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: COLORS.white, justifyContent: 'center', alignItems: 'center' },
-  headerSpacer: { width: 36 },
-  pageTitle: { fontSize: 18, fontWeight: '700', color: COLORS.text },
-  pageSubtitle: { fontSize: 13, color: COLORS.subText, marginBottom: 8 },
-
-  sectionLabel: {
-    fontSize: 12, fontWeight: '600', color: COLORS.subText,
-    textTransform: 'uppercase', letterSpacing: 1, marginLeft: 4, marginTop: 8,
-  },
-  card: {
-    backgroundColor: COLORS.white, borderRadius: 20, overflow: 'hidden',
-    shadowColor: COLORS.hotPink, shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06, shadowRadius: 8, elevation: 2,
-  },
-  notifRow: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 16, paddingVertical: 14, gap: 12,
-  },
-  notifIconWrap: {
-    width: 38, height: 38, borderRadius: 10,
-    backgroundColor: COLORS.offWhite,
-    justifyContent: 'center', alignItems: 'center',
-  },
-  notifText: { flex: 1 },
-  notifTitle: { fontSize: 14, fontWeight: '600', color: COLORS.text },
-  notifSub: { fontSize: 12, color: COLORS.subText, marginTop: 1 },
-  divider: { height: 1, backgroundColor: COLORS.offWhite, marginHorizontal: 16 },
-});

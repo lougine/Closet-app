@@ -9,6 +9,7 @@ import CreateOutfitCanvas, { useCreateOutfitLogic } from "./CreateOutfitCanvas";
 import RandomizeCanvas, { RANDOMIZE_PRESETS, RandomizeControls, useRandomizeModeLogic } from "./RandomizeCanvas";
 import { buildApiUrl, buildAuthHeaders } from "../../../constants/api";
 import { useWardrobe } from "../../../context/wardrobeContext";
+import { useAppTheme } from "../../../context/themeContext";
 import { PANEL_W, PINK, s } from "../../../Styles/styling.styles";
 
 const { width: W } = Dimensions.get("window");
@@ -90,6 +91,22 @@ function WardrobePanel({
   selected: string[];
 }) {
   const { items } = useWardrobe();
+  const { isDarkMode } = useAppTheme();
+  const panelTheme = isDarkMode
+    ? {
+        panelBg: "#121212",
+        panelCard: "#1E1E1E",
+        panelText: "#F2F2F2",
+        panelSubText: "#A7A7A7",
+        panelBorder: "#343434",
+      }
+    : {
+        panelBg: "#FFFFFF",
+        panelCard: "#FFFFFF",
+        panelText: "#1A1A1A",
+        panelSubText: "#777777",
+        panelBorder: "#EAEAEA",
+      };
   const slideAnim = useRef(new Animated.Value(PANEL_W)).current;
   const [activeTab, setActiveTab] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
@@ -201,12 +218,12 @@ function WardrobePanel({
         <View style={s.panelBg} />
       </TouchableWithoutFeedback>
 
-      <Animated.View style={[s.panel, { transform: [{ translateX: slideAnim }] }]}>
+      <Animated.View style={[s.panel, { transform: [{ translateX: slideAnim }] }, { backgroundColor: panelTheme.panelBg }] }>
         {/* Header */}
-        <View style={s.panelHeader}>
-          <Text style={s.panelTitle}>Wardrobe</Text>
+        <View style={[s.panelHeader, { borderBottomColor: panelTheme.panelBorder, borderBottomWidth: 1 }] }>
+          <Text style={[s.panelTitle, { color: panelTheme.panelText }]}>Wardrobe</Text>
           <TouchableOpacity onPress={onClose}>
-            <Ionicons name="close" size={20} color="#555" />
+            <Ionicons name="close" size={20} color={panelTheme.panelSubText} />
           </TouchableOpacity>
         </View>
 
@@ -220,12 +237,16 @@ function WardrobePanel({
           contentContainerStyle={s.panelTabsRow}
           renderItem={({ item: tab }) => (
             <TouchableOpacity
-              style={[s.panelTab, activeTab === tab && s.panelTabActive]}
+              style={[
+                s.panelTab,
+                { backgroundColor: isDarkMode ? "#2A2A2A" : "#F5F5F5" },
+                activeTab === tab && s.panelTabActive,
+              ]}
               onPress={() => setActiveTab(tab)}
             >
               <Text
                 numberOfLines={1}
-                style={[s.panelTabTxt, activeTab === tab && s.panelTabTxtActive]}
+                style={[s.panelTabTxt, { color: panelTheme.panelSubText }, activeTab === tab && s.panelTabTxtActive]}
               >
                 {tab}
               </Text>
@@ -235,12 +256,12 @@ function WardrobePanel({
 
         {/* Search + filter row */}
         <View style={s.panelSearchRow}>
-          <View style={s.panelSearchBar}>
-            <Ionicons name="search" size={12} color="#aaa" />
+          <View style={[s.panelSearchBar, { backgroundColor: panelTheme.panelCard, borderColor: panelTheme.panelBorder, borderWidth: 1 }] }>
+            <Ionicons name="search" size={12} color={panelTheme.panelSubText} />
             <TextInput
-              style={s.panelSearchTxt}
+              style={[s.panelSearchTxt, { color: panelTheme.panelText }]}
               placeholder="Search"
-              placeholderTextColor="#aaa"
+              placeholderTextColor={panelTheme.panelSubText}
               value={searchQuery}
               onChangeText={setSearchQuery}
             />
@@ -252,7 +273,7 @@ function WardrobePanel({
             <Ionicons
               name={quickFilter === "hidden" ? "eye-off" : "eye-off-outline"}
               size={15}
-              color={quickFilter === "hidden" ? "#fff" : "#333"}
+              color={quickFilter === "hidden" ? "#fff" : panelTheme.panelSubText}
             />
           </TouchableOpacity>
           <TouchableOpacity
@@ -262,7 +283,7 @@ function WardrobePanel({
             <Ionicons
               name={quickFilter === "favorites" ? "star" : "star-outline"}
               size={15}
-              color={quickFilter === "favorites" ? "#fff" : "#333"}
+              color={quickFilter === "favorites" ? "#fff" : panelTheme.panelSubText}
             />
           </TouchableOpacity>
           <TouchableOpacity
@@ -275,7 +296,7 @@ function WardrobePanel({
             <Feather
               name="sliders"
               size={15}
-              color={activeFilterCount > 0 ? "#fff" : "#333"}
+              color={activeFilterCount > 0 ? "#fff" : panelTheme.panelSubText}
             />
             {activeFilterCount > 0 && (
               <View style={s.panelBadge}>
@@ -301,13 +322,17 @@ function WardrobePanel({
 
             return (
               <TouchableOpacity
-                style={[s.panelItem, isSelected && s.panelItemSelected]}
+                style={[
+                  s.panelItem,
+                  { backgroundColor: isDarkMode ? "#252525" : "#FFFFFF" },
+                  isSelected && s.panelItemSelected,
+                ]}
                 onPress={() => onSelect(itemId)}
                 activeOpacity={0.8}
               >
                 {item.image
                   ? <AuthenticatedImage source={{ uri: item.image }} style={s.panelImg} resizeMode="contain" />
-                  : <View style={s.panelEmpty} />
+                  : <View style={[s.panelEmpty, { backgroundColor: isDarkMode ? "#2D2D2D" : "#F5F5F5" }]} />
                 }
                 {isHidden && <View style={s.panelItemHiddenOverlay} />}
 
@@ -353,14 +378,14 @@ function WardrobePanel({
               activeOpacity={1}
               onPress={() => setShowFilter(false)}
             />
-            <View style={s.panelFilterSheet}>
+            <View style={[s.panelFilterSheet, { backgroundColor: panelTheme.panelBg }] }>
               <View style={s.panelFilterHeader}>
                 <TouchableOpacity onPress={clearFilters}>
                   <Text style={s.panelFilterClearTxt}>Clear all</Text>
                 </TouchableOpacity>
-                <Text style={s.panelFilterTitle}>Filter</Text>
+                <Text style={[s.panelFilterTitle, { color: panelTheme.panelText }]}>Filter</Text>
                 <TouchableOpacity onPress={() => setShowFilter(false)}>
-                  <Ionicons name="close" size={20} color="#1a1a1a" />
+                  <Ionicons name="close" size={20} color={panelTheme.panelText} />
                 </TouchableOpacity>
               </View>
 
@@ -368,37 +393,45 @@ function WardrobePanel({
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={s.panelFilterScrollContent}
               >
-                <Text style={s.panelFilterSection}>CATEGORY</Text>
+                <Text style={[s.panelFilterSection, { color: panelTheme.panelSubText }]}>CATEGORY</Text>
                 <View style={s.panelChipRow}>
                   {Object.keys(CATEGORY_TREE).map((category) => (
                     <TouchableOpacity
                       key={category}
-                      style={[s.panelChip, filters.category === category && s.panelChipActive]}
+                      style={[
+                        s.panelChip,
+                        { backgroundColor: isDarkMode ? "#2A2A2A" : "#FAFAFA", borderColor: panelTheme.panelBorder },
+                        filters.category === category && s.panelChipActive,
+                      ]}
                       onPress={() => setCategory(category)}
                     >
-                      <Text style={[s.panelChipTxt, filters.category === category && s.panelChipTxtActive]}>{category}</Text>
+                      <Text style={[s.panelChipTxt, { color: panelTheme.panelSubText }, filters.category === category && s.panelChipTxtActive]}>{category}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
 
                 {filters.category !== "" && (
                   <>
-                    <Text style={s.panelFilterSection}>{filters.category.toUpperCase()} TYPE</Text>
+                    <Text style={[s.panelFilterSection, { color: panelTheme.panelSubText }]}>{filters.category.toUpperCase()} TYPE</Text>
                     <View style={s.panelChipRow}>
                       {CATEGORY_TREE[filters.category].map((subcategory) => (
                         <TouchableOpacity
                           key={subcategory}
-                          style={[s.panelChip, filters.subcategories.includes(subcategory) && s.panelChipActive]}
+                          style={[
+                            s.panelChip,
+                            { backgroundColor: isDarkMode ? "#2A2A2A" : "#FAFAFA", borderColor: panelTheme.panelBorder },
+                            filters.subcategories.includes(subcategory) && s.panelChipActive,
+                          ]}
                           onPress={() => toggleMulti("subcategories", subcategory)}
                         >
-                          <Text style={[s.panelChipTxt, filters.subcategories.includes(subcategory) && s.panelChipTxtActive]}>{subcategory}</Text>
+                          <Text style={[s.panelChipTxt, { color: panelTheme.panelSubText }, filters.subcategories.includes(subcategory) && s.panelChipTxtActive]}>{subcategory}</Text>
                         </TouchableOpacity>
                       ))}
                     </View>
                   </>
                 )}
 
-                <Text style={s.panelFilterSection}>COLOR</Text>
+                <Text style={[s.panelFilterSection, { color: panelTheme.panelSubText }]}>COLOR</Text>
                 <View style={s.panelColorRow}>
                   {FILTER_COLORS.map((colorName) => {
                     const hex = COLOR_HEX[colorName];
@@ -427,34 +460,42 @@ function WardrobePanel({
                             />
                           )}
                         </View>
-                        <Text style={s.panelSwatchLabel}>{colorName}</Text>
+                        <Text style={[s.panelSwatchLabel, { color: panelTheme.panelSubText }]}>{colorName}</Text>
                       </TouchableOpacity>
                     );
                   })}
                 </View>
 
-                <Text style={s.panelFilterSection}>SEASON</Text>
+                <Text style={[s.panelFilterSection, { color: panelTheme.panelSubText }]}>SEASON</Text>
                 <View style={s.panelChipRow}>
                   {FILTER_SEASONS.map((season) => (
                     <TouchableOpacity
                       key={season}
-                      style={[s.panelChip, filters.seasons.includes(season) && s.panelChipActive]}
+                      style={[
+                        s.panelChip,
+                        { backgroundColor: isDarkMode ? "#2A2A2A" : "#FAFAFA", borderColor: panelTheme.panelBorder },
+                        filters.seasons.includes(season) && s.panelChipActive,
+                      ]}
                       onPress={() => toggleMulti("seasons", season)}
                     >
-                      <Text style={[s.panelChipTxt, filters.seasons.includes(season) && s.panelChipTxtActive]}>{season}</Text>
+                      <Text style={[s.panelChipTxt, { color: panelTheme.panelSubText }, filters.seasons.includes(season) && s.panelChipTxtActive]}>{season}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
 
-                <Text style={s.panelFilterSection}>SIZE</Text>
+                <Text style={[s.panelFilterSection, { color: panelTheme.panelSubText }]}>SIZE</Text>
                 <View style={s.panelChipRow}>
                   {FILTER_SIZES.map((sizeLabel) => (
                     <TouchableOpacity
                       key={sizeLabel}
-                      style={[s.panelChip, filters.sizes.includes(sizeLabel) && s.panelChipActive]}
+                      style={[
+                        s.panelChip,
+                        { backgroundColor: isDarkMode ? "#2A2A2A" : "#FAFAFA", borderColor: panelTheme.panelBorder },
+                        filters.sizes.includes(sizeLabel) && s.panelChipActive,
+                      ]}
                       onPress={() => toggleMulti("sizes", sizeLabel)}
                     >
-                      <Text style={[s.panelChipTxt, filters.sizes.includes(sizeLabel) && s.panelChipTxtActive]}>{sizeLabel}</Text>
+                      <Text style={[s.panelChipTxt, { color: panelTheme.panelSubText }, filters.sizes.includes(sizeLabel) && s.panelChipTxtActive]}>{sizeLabel}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -493,6 +534,22 @@ function WardrobePanel({
 export default function StylingScreen() {
   const params = useLocalSearchParams<{ mode?: string; date?: string }>();
   const router = useRouter();
+  const { isDarkMode } = useAppTheme();
+  const theme = isDarkMode
+    ? {
+        screen: "#121212",
+        card: "#1E1E1E",
+        text: "#F2F2F2",
+        subText: "#A7A7A7",
+        border: "#353535",
+      }
+    : {
+        screen: "#F6F6F6",
+        card: "#FFFFFF",
+        text: "#1A1A1A",
+        subText: "#888888",
+        border: "#ECECEC",
+      };
 
   const resolveInitialMode = (): Mode => {
     if (params.mode === "randomize" || params.mode === "discover") return "Randomize";
@@ -652,8 +709,8 @@ export default function StylingScreen() {
   };
 
   return (
-    <View style={s.root}>
-      <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
+    <View style={[s.root, { backgroundColor: theme.screen }]}>
+      <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} translucent backgroundColor="transparent" />
 
       {/* Header image */}
       <Image
@@ -664,18 +721,18 @@ export default function StylingScreen() {
 
       {/* Title */}
       <View style={s.titleRow}>
-        <Text style={s.title}>Styling</Text>
+        <Text style={[s.title, { color: theme.text }]}>Styling</Text>
       </View>
 
       {/* Mode tabs */}
-      <View style={s.modeTabs}>
+      <View style={[s.modeTabs, { backgroundColor: theme.card, borderColor: theme.border, borderWidth: 1 }] }>
         {MODES.map(m => (
           <TouchableOpacity
             key={m}
             style={[s.modeTab, mode === m && s.modeTabActive]}
             onPress={() => handleModeChange(m)}
           >
-            <Text style={[s.modeTabTxt, mode === m && s.modeTabTxtActive]} numberOfLines={1}>
+            <Text style={[s.modeTabTxt, { color: theme.subText }, mode === m && s.modeTabTxtActive]} numberOfLines={1}>
               {m}
             </Text>
           </TouchableOpacity>
@@ -686,6 +743,7 @@ export default function StylingScreen() {
       <View
         style={[
           s.canvasWrap,
+          { backgroundColor: theme.card },
           mode === "Create outfit" && s.createCanvasWrap,
           mode === "Randomize" && s.randomizeCanvasWrap,
           mode === "Randomize" && s.randomizeCanvasFlat,
@@ -731,8 +789,8 @@ export default function StylingScreen() {
           />
         ) : selectedItems.length === 0 ? (
           <View style={s.canvasEmpty}>
-            <Ionicons name="shirt-outline" size={48} color="#e0e0e0" />
-            <Text style={s.canvasEmptyTxt}>Tap › to pick items</Text>
+            <Ionicons name="shirt-outline" size={48} color={isDarkMode ? "#6A6A6A" : "#e0e0e0"} />
+            <Text style={[s.canvasEmptyTxt, { color: theme.subText }]}>Tap › to pick items</Text>
           </View>
         ) : (
           <CreateOutfitCanvas

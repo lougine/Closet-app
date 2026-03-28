@@ -44,9 +44,16 @@ const userSchema = new mongoose.Schema({
   bannerImageMetadata: { type: imageMetadataSchema, default: null },
   bannerPreset: { type: String, default: 'pink' },
   age: { type: Number, min: 1, max: 99, default: null },
+  gender: { type: String, default: null },
+  clothingSize: { type: String, default: null },
+  shoesSize: { type: String, default: null },
   heightCm: { type: Number, min: 1, max: 272, default: null },
   weightKg: { type: Number, min: 1, max: 300, default: null },
   bodyType: { type: String, default: null },
+  outfitFormula: { type: String, default: null },
+  styleWords: { type: [String], default: [] },
+  closetGoal: { type: String, default: null },
+  shoppingFrequency: { type: String, default: null },
   stylePreferences: { type: [String], default: [] },
 
   preferences: {

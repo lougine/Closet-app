@@ -1,13 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import {
-  View, Text, StyleSheet, TouchableOpacity,
-  TextInput, ScrollView, Alert, ActivityIndicator,
-} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { buildApiUrl, buildAuthHeaders } from '@/constants/api';
 import { COLORS } from '@/constants/theme';
+import { useAppTheme } from '@/context/themeContext';
 
 const STYLE_OPTIONS = [
   'Casual', 'Streetwear', 'Minimalist', 'Feminine', 'Preppy',
@@ -15,27 +13,28 @@ const STYLE_OPTIONS = [
 ];
 
 const BODY_TYPES = ['Pear', 'Apple', 'Hourglass', 'Rectangle', 'Inverted Triangle'];
+const GENDER_OPTIONS = ['Male', 'Female'];
+const CLOTHING_SIZE_OPTIONS = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
+const SHOES_SIZE_OPTIONS = ['36', '37', '38', '39', '40', '41', '42', '43', '44', '45'];
+const OUTFIT_FORMULA_OPTIONS = ['Casual & comfortable', 'Smart casual', 'Formal & professional', 'Sporty & active', 'Trendy & bold'];
+const STYLE_WORD_OPTIONS = ['Minimalist', 'Classic', 'Bohemian', 'Streetwear', 'Elegant', 'Edgy'];
+const CLOSET_GOAL_OPTIONS = ['Build a capsule wardrobe', 'Stay on trend', 'Shop more sustainably', 'Organize my outfits', 'Save money'];
+const SHOPPING_FREQUENCY_OPTIONS = ['Weekly', 'Monthly', 'Every few months', 'Rarely', 'Only on sale'];
 
 type PersonalInfo = {
-  age: string;
+  gender: string;
+  clothingSize: string;
+  shoesSize: string;
   heightCm: string;
   weightKg: string;
   bodyType: string;
+  outfitFormula: string;
+  styleWords: string[];
+  closetGoal: string;
+  shoppingFrequency: string;
   stylePreferences: string[];
 };
 
-// ─── INPUT VALIDATION ─────────────────────────────────────────────────────────
-
-// Age: max 2 digits, between 1–99
-function filterAge(val: string): string {
-  const digits = val.replace(/[^0-9]/g, '').slice(0, 2);
-  const num = parseInt(digits);
-  if (!digits) return '';
-  if (num > 99) return '99';
-  return digits;
-}
-
-// Height: max 3 digits, between 1–272 cm (tallest human ever was 272cm)
 function filterHeight(val: string): string {
   const digits = val.replace(/[^0-9]/g, '').slice(0, 3);
   const num = parseInt(digits);
@@ -44,7 +43,6 @@ function filterHeight(val: string): string {
   return digits;
 }
 
-// Weight: max 3 digits, between 1–300 kg
 function filterWeight(val: string): string {
   const digits = val.replace(/[^0-9]/g, '').slice(0, 3);
   const num = parseInt(digits);
@@ -53,14 +51,44 @@ function filterWeight(val: string): string {
   return digits;
 }
 
-// ─── COMPONENT ────────────────────────────────────────────────────────────────
 export default function PersonalInfoScreen() {
   const router = useRouter();
+  const { isDarkMode } = useAppTheme();
   const [info, setInfo] = useState<PersonalInfo>({
-    age: '', heightCm: '', weightKg: '', bodyType: '', stylePreferences: [],
+    gender: '',
+    clothingSize: '',
+    shoesSize: '',
+    heightCm: '',
+    weightKg: '',
+    bodyType: '',
+    outfitFormula: '',
+    styleWords: [],
+    closetGoal: '',
+    shoppingFrequency: '',
+    stylePreferences: [],
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  const theme = isDarkMode
+    ? {
+        screen: '#121212',
+        card: '#1E1E1E',
+        text: '#F2F2F2',
+        subText: '#A8A8A8',
+        border: '#343434',
+        chipBg: '#171717',
+        chipBorder: '#3D3D3D',
+      }
+    : {
+        screen: COLORS.offWhite,
+        card: COLORS.white,
+        text: COLORS.text,
+        subText: COLORS.subText,
+        border: COLORS.offWhite,
+        chipBg: COLORS.offWhite,
+        chipBorder: COLORS.lightGray,
+      };
 
   useEffect(() => { fetchInfo(); }, []);
 
@@ -73,18 +101,23 @@ export default function PersonalInfoScreen() {
         headers: buildAuthHeaders(token),
       });
 
-      if (!res.ok) { setLoading(false); return; } // silently show empty form
+      if (!res.ok) { setLoading(false); return; } 
 
       const data = await res.json();
       setInfo({
-        age: data.age?.toString() ?? '',
+        gender: data.gender ?? '',
+        clothingSize: data.clothingSize ?? '',
+        shoesSize: data.shoesSize ?? '',
         heightCm: data.heightCm?.toString() ?? '',
         weightKg: data.weightKg?.toString() ?? '',
         bodyType: data.bodyType ?? '',
+        outfitFormula: data.outfitFormula ?? '',
+        styleWords: data.styleWords ?? [],
+        closetGoal: data.closetGoal ?? '',
+        shoppingFrequency: data.shoppingFrequency ?? '',
         stylePreferences: data.stylePreferences ?? [],
       });
     } catch (e) {
-      // Network error — silently show empty form, no toast
       console.warn('PersonalInfo: could not load (offline?)');
     } finally {
       setLoading(false);
@@ -100,6 +133,15 @@ export default function PersonalInfoScreen() {
     }));
   }
 
+  function toggleStyleWord(styleWord: string) {
+    setInfo((prev) => ({
+      ...prev,
+      styleWords: prev.styleWords.includes(styleWord)
+        ? prev.styleWords.filter((s) => s !== styleWord)
+        : [...prev.styleWords, styleWord],
+    }));
+  }
+
   async function handleSave() {
     setSaving(true);
     try {
@@ -111,10 +153,16 @@ export default function PersonalInfoScreen() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          age: info.age ? parseInt(info.age) : null,
+          gender: info.gender || null,
+          clothingSize: info.clothingSize || null,
+          shoesSize: info.shoesSize || null,
           heightCm: info.heightCm ? parseInt(info.heightCm) : null,
           weightKg: info.weightKg ? parseInt(info.weightKg) : null,
           bodyType: info.bodyType || null,
+          outfitFormula: info.outfitFormula || null,
+          styleWords: info.styleWords,
+          closetGoal: info.closetGoal || null,
+          shoppingFrequency: info.shoppingFrequency || null,
           stylePreferences: info.stylePreferences,
         }),
       });
@@ -131,7 +179,7 @@ export default function PersonalInfoScreen() {
 
   if (loading) {
     return (
-      <View style={styles.loadingWrap}>
+      <View style={[styles.loadingWrap, { backgroundColor: theme.screen }]}>
         <ActivityIndicator size="large" color={COLORS.hotPink} />
       </View>
     );
@@ -139,40 +187,80 @@ export default function PersonalInfoScreen() {
 
   return (
     <ScrollView
-      style={styles.scroll}
+      style={[styles.scroll, { backgroundColor: theme.screen }]}
       contentContainerStyle={styles.container}
       keyboardShouldPersistTaps="handled"
     >
-      {/* ── Header ── */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+        <TouchableOpacity onPress={() => router.back()} style={[styles.backBtn, { backgroundColor: theme.card }] }>
           <Ionicons name="chevron-back" size={22} color={COLORS.hotPink} />
         </TouchableOpacity>
-        <Text style={styles.pageTitle}>Personal Information</Text>
+        <Text style={[styles.pageTitle, { color: theme.text }]}>Personal Information</Text>
         <View style={styles.headerSpacer} />
       </View>
 
-      <Text style={styles.pageSubtitle}>
-        This helps us give you better outfit recommendations. 🎀
+      <Text style={[styles.pageSubtitle, { color: theme.subText }]}>
+        This helps us give you better outfit recommendations. 
       </Text>
 
-      {/* ── Basics ── */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Basics</Text>
+      <View style={[styles.card, { backgroundColor: theme.card }] }>
+        <Text style={[styles.inputLabel, { color: theme.text }]}>Gender</Text>
+        <View style={styles.chipsWrap}>
+          {GENDER_OPTIONS.map((value) => (
+            <TouchableOpacity
+              key={value}
+              style={[
+                styles.chip,
+                { backgroundColor: theme.chipBg, borderColor: theme.chipBorder },
+                info.gender === value && styles.chipSelected,
+              ]}
+              onPress={() => setInfo((p) => ({ ...p, gender: p.gender === value ? '' : value }))}
+            >
+              <Text style={[styles.chipText, { color: theme.subText }, info.gender === value && styles.chipTextSelected]}>{value}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
 
-        {/* Age — max 3 digits, 1–120 */}
-        <InputField
-          label="Age"
-          value={info.age}
-          onChangeText={(v) => setInfo((p) => ({ ...p, age: filterAge(v) }))}
-          placeholder="e.g. 22"
-          unit="yrs"
-          hint="Max 99"
-          maxLen={2}
-        />
-        <Divider />
+        <Divider border={theme.border} />
 
-        {/* Height — max 3 digits, 1–272 cm */}
+        <Text style={[styles.inputLabel, { color: theme.text }]}>Clothing Size</Text>
+        <View style={styles.chipsWrap}>
+          {CLOTHING_SIZE_OPTIONS.map((value) => (
+            <TouchableOpacity
+              key={value}
+              style={[
+                styles.chip,
+                { backgroundColor: theme.chipBg, borderColor: theme.chipBorder },
+                info.clothingSize === value && styles.chipSelected,
+              ]}
+              onPress={() => setInfo((p) => ({ ...p, clothingSize: p.clothingSize === value ? '' : value }))}
+            >
+              <Text style={[styles.chipText, { color: theme.subText }, info.clothingSize === value && styles.chipTextSelected]}>{value}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <Divider border={theme.border} />
+
+        <Text style={[styles.inputLabel, { color: theme.text }]}>Shoes Size</Text>
+        <View style={styles.chipsWrap}>
+          {SHOES_SIZE_OPTIONS.map((value) => (
+            <TouchableOpacity
+              key={value}
+              style={[
+                styles.chip,
+                { backgroundColor: theme.chipBg, borderColor: theme.chipBorder },
+                info.shoesSize === value && styles.chipSelected,
+              ]}
+              onPress={() => setInfo((p) => ({ ...p, shoesSize: p.shoesSize === value ? '' : value }))}
+            >
+              <Text style={[styles.chipText, { color: theme.subText }, info.shoesSize === value && styles.chipTextSelected]}>{value}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <Divider border={theme.border} />
+
         <InputField
           label="Height"
           value={info.heightCm}
@@ -180,10 +268,10 @@ export default function PersonalInfoScreen() {
           placeholder="e.g. 165"
           unit="cm"
           hint="Max 272"
+          theme={theme}
         />
-        <Divider />
+        <Divider border={theme.border} />
 
-        {/* Weight — max 3 digits, 1–300 kg */}
         <InputField
           label="Weight"
           value={info.weightKg}
@@ -191,21 +279,25 @@ export default function PersonalInfoScreen() {
           placeholder="e.g. 58"
           unit="kg"
           hint="Max 300"
+          theme={theme}
         />
       </View>
 
-      {/* ── Body type ── */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Body Type</Text>
-        <Text style={styles.cardSub}>Select the one that fits you best</Text>
+      <View style={[styles.card, { backgroundColor: theme.card }] }>
+        <Text style={[styles.cardTitle, { color: theme.text }]}>Body Type</Text>
+        <Text style={[styles.cardSub, { color: theme.subText }]}>Select the one that fits you best</Text>
         <View style={styles.chipsWrap}>
           {BODY_TYPES.map((type) => (
             <TouchableOpacity
               key={type}
-              style={[styles.chip, info.bodyType === type && styles.chipSelected]}
+              style={[
+                styles.chip,
+                { backgroundColor: theme.chipBg, borderColor: theme.chipBorder },
+                info.bodyType === type && styles.chipSelected,
+              ]}
               onPress={() => setInfo((p) => ({ ...p, bodyType: type }))}
             >
-              <Text style={[styles.chipText, info.bodyType === type && styles.chipTextSelected]}>
+              <Text style={[styles.chipText, { color: theme.subText }, info.bodyType === type && styles.chipTextSelected]}>
                 {type}
               </Text>
             </TouchableOpacity>
@@ -213,19 +305,23 @@ export default function PersonalInfoScreen() {
         </View>
       </View>
 
-      {/* ── Style preferences ── */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Style Preferences</Text>
-        <Text style={styles.cardSub}>Pick all that describe you</Text>
+      <View style={[styles.card, { backgroundColor: theme.card }] }>
+        <Text style={[styles.cardTitle, { color: theme.text }]}>Style Preferences</Text>
+        <Text style={[styles.cardSub, { color: theme.subText }]}>Pick all that describe you and your shopping habits</Text>
         <View style={styles.chipsWrap}>
           {STYLE_OPTIONS.map((style) => (
             <TouchableOpacity
               key={style}
-              style={[styles.chip, info.stylePreferences.includes(style) && styles.chipSelected]}
+              style={[
+                styles.chip,
+                { backgroundColor: theme.chipBg, borderColor: theme.chipBorder },
+                info.stylePreferences.includes(style) && styles.chipSelected,
+              ]}
               onPress={() => toggleStyle(style)}
             >
               <Text style={[
                 styles.chipText,
+                { color: theme.subText },
                 info.stylePreferences.includes(style) && styles.chipTextSelected,
               ]}>
                 {style}
@@ -233,9 +329,84 @@ export default function PersonalInfoScreen() {
             </TouchableOpacity>
           ))}
         </View>
+
+        <Divider border={theme.border} />
+
+        <Text style={[styles.inputLabel, { color: theme.text }]}>Go-to Outfit Formula</Text>
+        <View style={styles.chipsWrap}>
+          {OUTFIT_FORMULA_OPTIONS.map((value) => (
+            <TouchableOpacity
+              key={value}
+              style={[
+                styles.chip,
+                { backgroundColor: theme.chipBg, borderColor: theme.chipBorder },
+                info.outfitFormula === value && styles.chipSelected,
+              ]}
+              onPress={() => setInfo((p) => ({ ...p, outfitFormula: p.outfitFormula === value ? '' : value }))}
+            >
+              <Text style={[styles.chipText, { color: theme.subText }, info.outfitFormula === value && styles.chipTextSelected]}>{value}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <Divider border={theme.border} />
+
+        <Text style={[styles.inputLabel, { color: theme.text }]}>Style Words</Text>
+        <View style={styles.chipsWrap}>
+          {STYLE_WORD_OPTIONS.map((value) => (
+            <TouchableOpacity
+              key={value}
+              style={[
+                styles.chip,
+                { backgroundColor: theme.chipBg, borderColor: theme.chipBorder },
+                info.styleWords.includes(value) && styles.chipSelected,
+              ]}
+              onPress={() => toggleStyleWord(value)}
+            >
+              <Text style={[styles.chipText, { color: theme.subText }, info.styleWords.includes(value) && styles.chipTextSelected]}>{value}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <Divider border={theme.border} />
+
+        <Text style={[styles.inputLabel, { color: theme.text }]}>Primary Closet Goal</Text>
+        <View style={styles.chipsWrap}>
+          {CLOSET_GOAL_OPTIONS.map((value) => (
+            <TouchableOpacity
+              key={value}
+              style={[
+                styles.chip,
+                { backgroundColor: theme.chipBg, borderColor: theme.chipBorder },
+                info.closetGoal === value && styles.chipSelected,
+              ]}
+              onPress={() => setInfo((p) => ({ ...p, closetGoal: p.closetGoal === value ? '' : value }))}
+            >
+              <Text style={[styles.chipText, { color: theme.subText }, info.closetGoal === value && styles.chipTextSelected]}>{value}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <Divider border={theme.border} />
+
+        <Text style={[styles.inputLabel, { color: theme.text }]}>Shopping Frequency</Text>
+        <View style={styles.chipsWrap}>
+          {SHOPPING_FREQUENCY_OPTIONS.map((value) => (
+            <TouchableOpacity
+              key={value}
+              style={[
+                styles.chip,
+                { backgroundColor: theme.chipBg, borderColor: theme.chipBorder },
+                info.shoppingFrequency === value && styles.chipSelected,
+              ]}
+              onPress={() => setInfo((p) => ({ ...p, shoppingFrequency: p.shoppingFrequency === value ? '' : value }))}
+            >
+              <Text style={[styles.chipText, { color: theme.subText }, info.shoppingFrequency === value && styles.chipTextSelected]}>{value}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
       </View>
 
-      {/* ── Save button ── */}
       <TouchableOpacity
         style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
         onPress={handleSave}
@@ -250,37 +421,37 @@ export default function PersonalInfoScreen() {
   );
 }
 
-// ─── Reusable inline input row ─────────────────────────────────────────────────
 function InputField({
-  label, value, onChangeText, placeholder, unit, hint, maxLen = 3,
+  label, value, onChangeText, placeholder, unit, hint, maxLen = 3, theme,
 }: {
   label: string; value: string; onChangeText: (v: string) => void;
   placeholder?: string; unit?: string; hint?: string; maxLen?: number;
+  theme: { text: string; subText: string };
 }) {
   return (
     <View style={styles.inputRow}>
       <View>
-        <Text style={styles.inputLabel}>{label}</Text>
-        {hint && <Text style={styles.inputHint}>{hint}</Text>}
+        <Text style={[styles.inputLabel, { color: theme.text }]}>{label}</Text>
+        {hint && <Text style={[styles.inputHint, { color: theme.subText }]}>{hint}</Text>}
       </View>
       <View style={styles.inputRight}>
         <TextInput
-          style={styles.inlineInput}
+          style={[styles.inlineInput, { color: theme.text }]}
           value={value}
           onChangeText={onChangeText}
           keyboardType="number-pad"
           placeholder={placeholder}
-          placeholderTextColor={COLORS.lightGray}
+          placeholderTextColor={theme.subText}
           textAlign="right"
           maxLength={maxLen}
         />
-        {unit && <Text style={styles.unit}>{unit}</Text>}
+        {unit && <Text style={[styles.unit, { color: theme.subText }]}>{unit}</Text>}
       </View>
     </View>
   );
 }
 
-function Divider() { return <View style={styles.divider} />; }
+function Divider({ border }: { border: string }) { return <View style={[styles.divider, { backgroundColor: border }]} />; }
 
 const styles = StyleSheet.create({
   scroll: { flex: 1, backgroundColor: COLORS.offWhite },

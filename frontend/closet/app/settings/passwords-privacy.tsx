@@ -1,18 +1,17 @@
 import React, { useState } from 'react';
-import {
-  View, Text, StyleSheet, TouchableOpacity,
-  ScrollView, TextInput, Alert, ActivityIndicator, Switch,
-} from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, TextInput, Alert, ActivityIndicator, Switch} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { buildApiUrl, buildAuthHeaders } from '@/constants/api';
 import { COLORS } from '@/constants/theme';
+import { useAppTheme } from '@/context/themeContext';
+import { styles } from '../../Styles/settings/passwords-privacy.styles';
 
 export default function PasswordsPrivacyScreen() {
   const router = useRouter();
+  const { isDarkMode } = useAppTheme();
 
-  // ── Change password state ──────────────────────────────────────────────────
   const [currentPw, setCurrentPw] = useState('');
   const [newPw, setNewPw] = useState('');
   const [confirmPw, setConfirmPw] = useState('');
@@ -21,9 +20,26 @@ export default function PasswordsPrivacyScreen() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [savingPw, setSavingPw] = useState(false);
 
-  // ── Privacy toggles state ─────────────────────────────────────────────────
-  const [privateProfile, setPrivateProfile] = useState(false); // false = public
+  const [privateProfile, setPrivateProfile] = useState(false); 
   const [allowRecommendations, setAllowRecommendations] = useState(true);
+
+  const theme = isDarkMode
+    ? {
+        screen: '#121212',
+        card: '#1E1E1E',
+        text: '#F2F2F2',
+        subText: '#A8A8A8',
+        border: '#343434',
+        inputBorder: '#444444',
+      }
+    : {
+        screen: COLORS.offWhite,
+        card: COLORS.white,
+        text: COLORS.text,
+        subText: COLORS.subText,
+        border: COLORS.offWhite,
+        inputBorder: COLORS.lightGray,
+      };
 
   async function handleChangePassword() {
     if (!currentPw || !newPw || !confirmPw) {
@@ -65,7 +81,6 @@ export default function PasswordsPrivacyScreen() {
   }
 
   async function togglePrivacy(key: 'privateProfile' | 'allowRecommendations', value: boolean) {
-    // Update locally immediately for snappy UI
     if (key === 'privateProfile') setPrivateProfile(value);
     if (key === 'allowRecommendations') setAllowRecommendations(value);
 
@@ -80,7 +95,6 @@ export default function PasswordsPrivacyScreen() {
         }),
       });
     } catch {
-      // Revert on failure
       if (key === 'privateProfile') setPrivateProfile(!value);
       if (key === 'allowRecommendations') setAllowRecommendations(!value);
       Alert.alert('Error', 'Could not save privacy setting.');
@@ -88,46 +102,47 @@ export default function PasswordsPrivacyScreen() {
   }
 
   return (
-    <ScrollView style={styles.scroll} contentContainerStyle={styles.container}
+    <ScrollView style={[styles.scroll, { backgroundColor: theme.screen }]} contentContainerStyle={styles.container}
       keyboardShouldPersistTaps="handled">
 
-      {/* ── Header ── */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+        <TouchableOpacity onPress={() => router.back()} style={[styles.backBtn, { backgroundColor: theme.card }] }>
           <Ionicons name="chevron-back" size={22} color={COLORS.hotPink} />
         </TouchableOpacity>
-        <Text style={styles.pageTitle}>Passwords & Privacy</Text>
+        <Text style={[styles.pageTitle, { color: theme.text }]}>Passwords & Privacy</Text>
         <View style={styles.headerSpacer} />
       </View>
 
-      {/* ── Change password card ── */}
-      <Text style={styles.sectionLabel}>Change Password</Text>
-      <View style={styles.card}>
+      <Text style={[styles.sectionLabel, { color: theme.subText }]}>Change Password</Text>
+      <View style={[styles.card, { backgroundColor: theme.card }] }>
         <PasswordField
           label="Current password"
           value={currentPw}
           onChangeText={setCurrentPw}
           show={showCurrent}
           onToggleShow={() => setShowCurrent(!showCurrent)}
+          theme={theme}
         />
-        <Divider />
+        <Divider border={theme.border} />
         <PasswordField
           label="New password"
           value={newPw}
           onChangeText={setNewPw}
           show={showNew}
           onToggleShow={() => setShowNew(!showNew)}
+          theme={theme}
         />
-        <Divider />
+        <Divider border={theme.border} />
         <PasswordField
           label="Confirm new password"
           value={confirmPw}
           onChangeText={setConfirmPw}
           show={showConfirm}
           onToggleShow={() => setShowConfirm(!showConfirm)}
+          theme={theme}
         />
 
-        <Text style={styles.pwHint}>Minimum 8 characters</Text>
+        <Text style={[styles.pwHint, { color: theme.subText }]}>Minimum 8 characters</Text>
 
         <TouchableOpacity
           style={[styles.saveBtn, savingPw && styles.saveBtnDisabled]}
@@ -140,15 +155,13 @@ export default function PasswordsPrivacyScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* ── Privacy settings card ── */}
-      <Text style={styles.sectionLabel}>Privacy</Text>
-      <View style={styles.card}>
+      <Text style={[styles.sectionLabel, { color: theme.subText }]}>Privacy</Text>
+      <View style={[styles.card, { backgroundColor: theme.card }] }>
 
-        {/* Private profile toggle */}
         <View style={styles.toggleRow}>
           <View style={styles.toggleText}>
-            <Text style={styles.toggleTitle}>Private profile</Text>
-            <Text style={styles.toggleSub}>
+            <Text style={[styles.toggleTitle, { color: theme.text }]}>Private profile</Text>
+            <Text style={[styles.toggleSub, { color: theme.subText }]}>
               Only approved followers can see your outfits
             </Text>
           </View>
@@ -161,13 +174,12 @@ export default function PasswordsPrivacyScreen() {
           />
         </View>
 
-        <Divider />
+        <Divider border={theme.border} />
 
-        {/* Outfit recommendations toggle */}
         <View style={styles.toggleRow}>
           <View style={styles.toggleText}>
-            <Text style={styles.toggleTitle}>Personalised recommendations</Text>
-            <Text style={styles.toggleSub}>
+            <Text style={[styles.toggleTitle, { color: theme.text }]}>Personalised recommendations</Text>
+            <Text style={[styles.toggleSub, { color: theme.subText }]}>
               Allow us to use your outfit data to suggest looks
             </Text>
           </View>
@@ -182,9 +194,8 @@ export default function PasswordsPrivacyScreen() {
 
       </View>
 
-      {/* ── Delete account — destructive action at the bottom ── */}
-      <Text style={styles.sectionLabel}>Danger Zone</Text>
-      <View style={styles.card}>
+      <Text style={[styles.sectionLabel, { color: theme.subText }]}>Danger Zone</Text>
+      <View style={[styles.card, { backgroundColor: theme.card }] }>
         <TouchableOpacity
           style={styles.deleteRow}
           onPress={() =>
@@ -197,7 +208,6 @@ export default function PasswordsPrivacyScreen() {
                   text: 'Delete my account',
                   style: 'destructive',
                   onPress: async () => {
-                    // TODO: call DELETE /users/me then clear token and redirect to auth
                     Alert.alert('Contact support', 'To delete your account email us at support@closetdripp.com');
                   },
                 },
@@ -214,30 +224,33 @@ export default function PasswordsPrivacyScreen() {
   );
 }
 
-// ─── Reusable password input row with show/hide toggle ────────────────────────
-function PasswordField({ label, value, onChangeText, show, onToggleShow }: {
+function PasswordField({ label, value, onChangeText, show, onToggleShow, theme }: {
   label: string; value: string; onChangeText: (v: string) => void;
   show: boolean; onToggleShow: () => void;
+  theme: {
+    text: string;
+    subText: string;
+    inputBorder: string;
+  };
 }) {
   return (
     <View style={styles.pwRow}>
-      <Text style={styles.fieldLabel}>{label}</Text>
-      <View style={styles.pwInputWrap}>
+      <Text style={[styles.fieldLabel, { color: theme.subText }]}>{label}</Text>
+      <View style={[styles.pwInputWrap, { borderBottomColor: theme.inputBorder }] }>
         <TextInput
-          style={styles.pwInput}
+          style={[styles.pwInput, { color: theme.text }]}
           value={value}
           onChangeText={onChangeText}
           secureTextEntry={!show}
           autoCapitalize="none"
           autoCorrect={false}
           placeholder="••••••••"
-          placeholderTextColor={COLORS.lightGray}
+          placeholderTextColor={theme.subText}
         />
-        {/* Eye icon to reveal/hide password */}
         <TouchableOpacity onPress={onToggleShow} style={styles.eyeBtn}>
           <Ionicons
             name={show ? 'eye-off-outline' : 'eye-outline'}
-            size={18} color={COLORS.subText}
+            size={18} color={theme.subText}
           />
         </TouchableOpacity>
       </View>
@@ -245,52 +258,4 @@ function PasswordField({ label, value, onChangeText, show, onToggleShow }: {
   );
 }
 
-function Divider() { return <View style={styles.divider} />; }
-
-const styles = StyleSheet.create({
-  scroll: { flex: 1, backgroundColor: COLORS.offWhite },
-  container: { paddingTop: 60, paddingBottom: 60, paddingHorizontal: 20, gap: 10 },
-
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
-  backBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: COLORS.white, justifyContent: 'center', alignItems: 'center' },
-  headerSpacer: { width: 36 },
-  pageTitle: { fontSize: 18, fontWeight: '700', color: COLORS.text },
-
-  sectionLabel: {
-    fontSize: 12, fontWeight: '600', color: COLORS.subText,
-    textTransform: 'uppercase', letterSpacing: 1, marginLeft: 4, marginTop: 10, marginBottom: 8,
-  },
-  card: {
-    backgroundColor: COLORS.white, borderRadius: 20, padding: 18, gap: 14,
-    shadowColor: COLORS.hotPink, shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06, shadowRadius: 8, elevation: 2,
-  },
-
-  // Password field
-  pwRow: { gap: 6 },
-  fieldLabel: { fontSize: 12, fontWeight: '600', color: COLORS.subText, textTransform: 'uppercase', letterSpacing: 0.8 },
-  pwInputWrap: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1.5, borderBottomColor: COLORS.lightGray },
-  pwInput: { flex: 1, fontSize: 16, color: COLORS.text, paddingVertical: 6 },
-  eyeBtn: { padding: 6 },
-  pwHint: { fontSize: 12, color: COLORS.subText },
-
-  saveBtn: {
-    backgroundColor: COLORS.hotPink, borderRadius: 14, paddingVertical: 14,
-    alignItems: 'center', shadowColor: COLORS.hotPink,
-    shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 4,
-  },
-  saveBtnDisabled: { opacity: 0.6 },
-  saveBtnText: { fontSize: 15, fontWeight: '700', color: COLORS.white },
-
-  // Privacy toggles
-  toggleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  toggleText: { flex: 1 },
-  toggleTitle: { fontSize: 14, fontWeight: '600', color: COLORS.text },
-  toggleSub: { fontSize: 12, color: COLORS.subText, marginTop: 2 },
-
-  divider: { height: 1, backgroundColor: COLORS.offWhite },
-
-  // Delete account
-  deleteRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  deleteText: { fontSize: 15, fontWeight: '600', color: COLORS.hotPink },
-});
+function Divider({ border }: { border: string }) { return <View style={[styles.divider, { backgroundColor: border }]} />; }

@@ -1,23 +1,15 @@
 
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  TextInput,
-  Linking,
-  Alert,
-} from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, TextInput, Linking, Alert} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { COLORS } from '@/constants/theme';
+import { useAppTheme } from '@/context/themeContext';
+import { styles } from '../../Styles/settings/help.styles';
 
-// TODO: replace with your actual support email
+
 const SUPPORT_EMAIL = 'support@closetdripp.com';
 
-// ── FAQ items ─────────────────────────────────────────────────────────────────
 const FAQS = [
   {
     q: 'How do I add an outfit to my calendar?',
@@ -43,10 +35,28 @@ const FAQS = [
 
 export default function HelpScreen() {
   const router = useRouter();
+  const { isDarkMode } = useAppTheme();
   const [message, setMessage] = useState('');
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
 
-  // Opens the native mail app with pre-filled support email
+  const theme = isDarkMode
+    ? {
+        screen: '#121212',
+        card: '#1E1E1E',
+        text: '#F2F2F2',
+        subText: '#A8A8A8',
+        border: '#343434',
+        inputBg: '#171717',
+      }
+    : {
+        screen: COLORS.offWhite,
+        card: COLORS.white,
+        text: COLORS.text,
+        subText: COLORS.subText,
+        border: COLORS.offWhite,
+        inputBg: COLORS.offWhite,
+      };
+
   function handleSendEmail() {
     if (!message.trim()) {
       Alert.alert('Empty message', 'Please describe your issue before sending.');
@@ -61,7 +71,6 @@ export default function HelpScreen() {
       if (supported) {
         Linking.openURL(mailto);
       } else {
-        // Fallback if no mail app is set up
         Alert.alert(
           'No mail app found',
           `Please email us directly at ${SUPPORT_EMAIL}`,
@@ -73,32 +82,29 @@ export default function HelpScreen() {
 
   return (
     <ScrollView
-      style={styles.scroll}
+      style={[styles.scroll, { backgroundColor: theme.screen }]}
       contentContainerStyle={styles.container}
       keyboardShouldPersistTaps="handled"
     >
-      {/* ── Header ── */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+        <TouchableOpacity onPress={() => router.back()} style={[styles.backBtn, { backgroundColor: theme.card }] }>
           <Ionicons name="chevron-back" size={22} color={COLORS.hotPink} />
         </TouchableOpacity>
-        <Text style={styles.pageTitle}>Help</Text>
+        <Text style={[styles.pageTitle, { color: theme.text }]}>Help</Text>
         <View style={styles.headerSpacer} />
       </View>
 
-      {/* ── Contact section ── */}
-      <View style={styles.card}>
+      <View style={[styles.card, { backgroundColor: theme.card }] }>
         <View style={styles.cardHeader}>
           <Ionicons name="mail-outline" size={22} color={COLORS.hotPink} />
-          <Text style={styles.cardTitle}>Contact Us</Text>
+          <Text style={[styles.cardTitle, { color: theme.text }]}>Contact Us</Text>
         </View>
-        <Text style={styles.cardSub}>
-          Having an issue? Tell us what's going on and we'll get back to you as soon as possible. 💌
+        <Text style={[styles.cardSub, { color: theme.subText }] }>
+          Having an issue? Tell us what's going on and we'll get back to you as soon as possible. 
         </Text>
 
-        {/* Message input */}
         <TextInput
-          style={styles.messageInput}
+          style={[styles.messageInput, { backgroundColor: theme.inputBg, color: theme.text, borderColor: theme.border }]}
           value={message}
           onChangeText={setMessage}
           placeholder="Describe your issue here..."
@@ -108,16 +114,14 @@ export default function HelpScreen() {
           textAlignVertical="top"
           maxLength={1000}
         />
-        <Text style={styles.charCount}>{message.length}/1000</Text>
+        <Text style={[styles.charCount, { color: theme.subText }]}>{message.length}/1000</Text>
 
-        {/* Send button */}
         <TouchableOpacity style={styles.sendBtn} onPress={handleSendEmail}>
           <Ionicons name="send" size={16} color={COLORS.white} />
           <Text style={styles.sendBtnText}>Send to support</Text>
         </TouchableOpacity>
 
-        {/* Direct email link as fallback */}
-        <Text style={styles.emailNote}>
+        <Text style={[styles.emailNote, { color: theme.subText }] }>
           Or email us directly at{' '}
           <Text
             style={styles.emailLink}
@@ -128,34 +132,30 @@ export default function HelpScreen() {
         </Text>
       </View>
 
-      {/* ── FAQ section ── */}
-      <Text style={styles.sectionLabel}>Frequently Asked Questions</Text>
-      <View style={styles.card}>
+      <Text style={[styles.sectionLabel, { color: theme.subText }]}>Frequently Asked Questions</Text>
+      <View style={[styles.card, { backgroundColor: theme.card }] }>
         {FAQS.map((faq, i) => (
           <View key={i}>
-            {/* Question row — tapping expands/collapses the answer */}
             <TouchableOpacity
               style={styles.faqRow}
               onPress={() => setExpandedFaq(expandedFaq === i ? null : i)}
               activeOpacity={0.7}
             >
-              <Text style={styles.faqQ}>{faq.q}</Text>
+              <Text style={[styles.faqQ, { color: theme.text }]}>{faq.q}</Text>
               <Ionicons
                 name={expandedFaq === i ? 'chevron-up' : 'chevron-down'}
                 size={16}
-                color={COLORS.lightPink}
+                color={COLORS.hotPink}
               />
             </TouchableOpacity>
 
-            {/* Answer — only shown when expanded */}
             {expandedFaq === i && (
               <View style={styles.faqAnswer}>
-                <Text style={styles.faqA}>{faq.a}</Text>
+                <Text style={[styles.faqA, { color: theme.subText }]}>{faq.a}</Text>
               </View>
             )}
 
-            {/* Divider between questions (not after last one) */}
-            {i < FAQS.length - 1 && <View style={styles.divider} />}
+            {i < FAQS.length - 1 && <View style={[styles.divider, { backgroundColor: theme.border }]} />}
           </View>
         ))}
       </View>
@@ -164,62 +164,3 @@ export default function HelpScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  scroll: { flex: 1, backgroundColor: COLORS.offWhite },
-  container: { paddingTop: 60, paddingBottom: 60, paddingHorizontal: 20, gap: 14 },
-
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
-  backBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: COLORS.white, justifyContent: 'center', alignItems: 'center' },
-  headerSpacer: { width: 36 },
-  pageTitle: { fontSize: 18, fontWeight: '700', color: COLORS.text },
-
-  sectionLabel: {
-    fontSize: 12, fontWeight: '600', color: COLORS.subText,
-    textTransform: 'uppercase', letterSpacing: 1, marginLeft: 4, marginTop: 4,
-  },
-  card: {
-    backgroundColor: COLORS.white, borderRadius: 20, padding: 18, gap: 12,
-    shadowColor: COLORS.hotPink, shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06, shadowRadius: 8, elevation: 2,
-  },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  cardTitle: { fontSize: 16, fontWeight: '700', color: COLORS.text },
-  cardSub: { fontSize: 13, color: COLORS.subText, lineHeight: 20 },
-
-  messageInput: {
-    backgroundColor: COLORS.offWhite,
-    borderRadius: 12,
-    padding: 12,
-    fontSize: 14,
-    color: COLORS.text,
-    minHeight: 120,
-    borderWidth: 1.5,
-    borderColor: COLORS.lightGray,
-  },
-  charCount: { fontSize: 11, color: COLORS.lightGray, textAlign: 'right', marginTop: -6 },
-
-  sendBtn: {
-    backgroundColor: COLORS.hotPink,
-    borderRadius: 14, paddingVertical: 14,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    shadowColor: COLORS.hotPink, shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3, shadowRadius: 10, elevation: 4,
-  },
-  sendBtnText: { fontSize: 15, fontWeight: '700', color: COLORS.white },
-
-  emailNote: { fontSize: 12, color: COLORS.subText, textAlign: 'center' },
-  emailLink: { color: COLORS.hotPink, fontWeight: '600' },
-
-  // FAQ
-  faqRow: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingVertical: 14,
-  },
-  faqQ: { flex: 1, fontSize: 14, fontWeight: '600', color: COLORS.text, paddingRight: 8 },
-  faqAnswer: {
-    paddingBottom: 12,
-    paddingTop: 2,
-  },
-  faqA: { fontSize: 13, color: COLORS.subText, lineHeight: 20 },
-  divider: { height: 1, backgroundColor: COLORS.offWhite },
-});

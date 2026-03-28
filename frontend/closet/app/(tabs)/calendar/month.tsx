@@ -5,10 +5,29 @@ import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import OutfitPreviewCollage from '../../../components/OutfitPreviewCollage';
 import { styles, SW } from '../../../Styles/calendar/month.styles';
 import { COLORS, DAYS_SHORT, getMonthGrid, getMostWornThisMonth, getOutfitForDate, getStreak, isSameDay, MONTHS, toDateKey, useCalendar } from '../../../context/calendar-context';
+import { useAppTheme } from '../../../context/themeContext';
 
 export default function MonthScreen() {
   const router = useRouter();
   const [showOnlyLogged, setShowOnlyLogged] = useState(false);
+  const { isDarkMode } = useAppTheme();
+  const theme = isDarkMode
+    ? {
+        screen: '#121212',
+        card: '#1F1F1F',
+        softCard: '#252525',
+        text: '#F2F2F2',
+        subText: '#A7A7A7',
+        border: '#353535',
+      }
+    : {
+        screen: COLORS.white,
+        card: COLORS.offWhite,
+        softCard: '#FFF1F6',
+        text: COLORS.text,
+        subText: COLORS.subText,
+        border: '#FFD7E5',
+      };
 
   const {
     currentMonth,
@@ -87,14 +106,14 @@ export default function MonthScreen() {
   }
 
   return (
-    <ScrollView style={styles.flex} contentContainerStyle={styles.container}>
+    <ScrollView style={[styles.flex, { backgroundColor: theme.screen }]} contentContainerStyle={styles.container}>
       
       <View style={styles.monthHeader}>
         <TouchableOpacity onPress={prevMonth}>
           <Ionicons name="chevron-back" size={22} color={COLORS.hotPink} />
         </TouchableOpacity>
 
-        <Text style={styles.monthTitle}>
+        <Text style={[styles.monthTitle, { color: theme.text }] }>
           {MONTHS[month]} {year}
         </Text>
 
@@ -115,23 +134,31 @@ export default function MonthScreen() {
 
       <View style={styles.filterRow}>
         <TouchableOpacity
-          style={[styles.filterChip, !showOnlyLogged && styles.filterChipActive]}
+          style={[
+            styles.filterChip,
+            { backgroundColor: isDarkMode ? '#262626' : COLORS.offWhite },
+            !showOnlyLogged && styles.filterChipActive,
+          ]}
           onPress={() => setShowOnlyLogged(false)}
         >
-          <Text style={[styles.filterChipText, !showOnlyLogged && styles.filterChipTextActive]}>All days</Text>
+          <Text style={[styles.filterChipText, { color: theme.subText }, !showOnlyLogged && styles.filterChipTextActive]}>All days</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.filterChip, showOnlyLogged && styles.filterChipActive]}
+          style={[
+            styles.filterChip,
+            { backgroundColor: isDarkMode ? '#262626' : COLORS.offWhite },
+            showOnlyLogged && styles.filterChipActive,
+          ]}
           onPress={() => setShowOnlyLogged(true)}
         >
-          <Text style={[styles.filterChipText, showOnlyLogged && styles.filterChipTextActive]}>Looks only</Text>
+          <Text style={[styles.filterChipText, { color: theme.subText }, showOnlyLogged && styles.filterChipTextActive]}>Looks only</Text>
         </TouchableOpacity>
       </View>
 
       <View style={styles.weekHeaderRow}>
         {DAYS_SHORT.map((d) => (
-          <Text key={d} style={[styles.weekHeaderCell, weekHeaderCellWidth]}>
+          <Text key={d} style={[styles.weekHeaderCell, weekHeaderCellWidth, { color: theme.subText }]}>
             {d}
           </Text>
         ))}
@@ -180,6 +207,7 @@ export default function MonthScreen() {
                 <Text
                   style={[
                     styles.gridDayText,
+                    { color: theme.text },
                     isToday && styles.gridDayTextToday,
                     isSelected && styles.gridDayTextSelected,
                   ]}
@@ -203,24 +231,24 @@ export default function MonthScreen() {
       </View>
 
       <View style={styles.analyticsSection}>
-        <Text style={styles.analyticsSectionTitle}>This month</Text>
+        <Text style={[styles.analyticsSectionTitle, { color: theme.text }]}>This month</Text>
 
         <View style={styles.kpiRow}>
-          <View style={styles.kpiCard}>
+          <View style={[styles.kpiCard, { backgroundColor: theme.softCard, borderColor: theme.border }]}>
             <Text style={styles.kpiValue}>{monthStats.loggedDays}</Text>
-            <Text style={styles.kpiLabel}>Logged days</Text>
+            <Text style={[styles.kpiLabel, { color: theme.subText }]}>Logged days</Text>
           </View>
-          <View style={styles.kpiCard}>
+          <View style={[styles.kpiCard, { backgroundColor: theme.softCard, borderColor: theme.border }]}>
             <Text style={styles.kpiValue}>{monthStats.coverage}%</Text>
-            <Text style={styles.kpiLabel}>Coverage</Text>
+            <Text style={[styles.kpiLabel, { color: theme.subText }]}>Coverage</Text>
           </View>
-          <View style={styles.kpiCard}>
+          <View style={[styles.kpiCard, { backgroundColor: theme.softCard, borderColor: theme.border }]}>
             <Text style={styles.kpiValue}>{monthStats.busiestWeekday}</Text>
-            <Text style={styles.kpiLabel}>Top day</Text>
+            <Text style={[styles.kpiLabel, { color: theme.subText }]}>Top day</Text>
           </View>
         </View>
 
-        <View style={styles.analyticsCard}>
+        <View style={[styles.analyticsCard, { backgroundColor: theme.card }] }>
           {mostWorn ? (
             <OutfitPreviewCollage outfit={mostWorn.outfit} style={styles.analyticsThumb} />
           ) : (
@@ -230,23 +258,23 @@ export default function MonthScreen() {
           )}
 
           <View style={styles.analyticsTextWrap}>
-            <Text style={styles.analyticsLabel}>Most worn this month</Text>
-            <Text style={styles.analyticsValue}>
+            <Text style={[styles.analyticsLabel, { color: theme.text }]}>Most worn this month</Text>
+            <Text style={[styles.analyticsValue, { color: theme.subText }]}>
               {mostWorn ? `${mostWorn.count} days` : 'No data yet'}
             </Text>
           </View>
         </View>
 
-        <View style={styles.analyticsCard}>
-          <View style={styles.streakBadge}>
+        <View style={[styles.analyticsCard, { backgroundColor: theme.card }] }>
+          <View style={[styles.streakBadge, { backgroundColor: theme.softCard, borderColor: theme.border }]}>
             <Ionicons name="star" size={22} color={COLORS.hotPink} />
           </View>
 
           <View style={styles.analyticsTextWrap}>
-            <Text style={styles.analyticsLabel}>
+            <Text style={[styles.analyticsLabel, { color: theme.text }] }>
               {streak > 0 ? `${streak} Day streak` : 'No streak yet'}
             </Text>
-            <Text style={styles.analyticsValue}>
+            <Text style={[styles.analyticsValue, { color: theme.subText }] }>
               {streak > 0
                 ? 'Continuous calendar record'
                 : 'Start logging to build a streak!'}
@@ -254,14 +282,14 @@ export default function MonthScreen() {
           </View>
         </View>
 
-        <View style={styles.analyticsCard}>
-          <View style={styles.streakBadge}>
+        <View style={[styles.analyticsCard, { backgroundColor: theme.card }] }>
+          <View style={[styles.streakBadge, { backgroundColor: theme.softCard, borderColor: theme.border }]}>
             <Ionicons name="partly-sunny-outline" size={22} color={COLORS.hotPink} />
           </View>
 
           <View style={styles.analyticsTextWrap}>
-            <Text style={styles.analyticsLabel}>Weekday vs Weekend</Text>
-            <Text style={styles.analyticsValue}>
+            <Text style={[styles.analyticsLabel, { color: theme.text }]}>Weekday vs Weekend</Text>
+            <Text style={[styles.analyticsValue, { color: theme.subText }] }>
               {monthStats.weekdayCount} weekday looks • {monthStats.weekendCount} weekend looks
             </Text>
           </View>

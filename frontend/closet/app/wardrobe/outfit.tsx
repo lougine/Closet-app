@@ -5,14 +5,34 @@ import * as SecureStore from "expo-secure-store";
 import { Alert, FlatList, SafeAreaView, StatusBar, Text, TouchableOpacity, View } from "react-native";
 import AuthenticatedImage from "../../components/AuthenticatedImage";
 import { buildApiUrl, buildAuthHeaders } from "../../constants/api";
+import { useAppTheme } from "../../context/themeContext";
 import { useWardrobe } from "../../context/wardrobeContext";
 import { PINK, s } from "../../Styles/wardrobe/outfit.styles";
 
 export default function OutfitScreen() {
   const router = useRouter();
+  const { isDarkMode } = useAppTheme();
   const { items, refreshItems } = useWardrobe();
   const [selected, setSelected] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+
+  const theme = isDarkMode
+    ? {
+        screen: "#121212",
+        panel: "#1E1E1E",
+        softPanel: "#242424",
+        text: "#F2F2F2",
+        subText: "#A8A8A8",
+        border: "#343434",
+      }
+    : {
+        screen: "#fafafa",
+        panel: "#FFFFFF",
+        softPanel: "#fff8fb",
+        text: "#1a1a1a",
+        subText: "#888888",
+        border: "#f0f0f0",
+      };
 
   const toggle = (id: string) =>
     setSelected((prev) =>
@@ -63,15 +83,15 @@ export default function OutfitScreen() {
   };
 
   return (
-    <SafeAreaView style={s.root}>
-      <StatusBar barStyle="dark-content" />
+    <SafeAreaView style={[s.root, { backgroundColor: theme.screen }] }>
+      <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} />
 
-      <View style={s.header}>
+      <View style={[s.header, { backgroundColor: theme.panel, borderBottomColor: theme.border }] }>
         <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
-          <Ionicons name="chevron-back" size={22} color="#1a1a1a" />
+          <Ionicons name="chevron-back" size={22} color={theme.text} />
         </TouchableOpacity>
 
-        <Text style={s.headerTitle}>Create Outfit</Text>
+        <Text style={[s.headerTitle, { color: theme.text }]}>Create Outfit</Text>
 
         <TouchableOpacity
           style={[s.saveBtn, (selected.length < 2 || saving) && s.saveBtnDisabled]}
@@ -83,8 +103,8 @@ export default function OutfitScreen() {
       </View>
 
       {selectedItems.length > 0 && (
-        <View style={s.previewStrip}>
-          <Text style={s.previewLabel}>
+        <View style={[s.previewStrip, { backgroundColor: theme.panel, borderBottomColor: theme.border }] }>
+          <Text style={[s.previewLabel, { color: theme.subText }] }>
             Your outfit ({selected.length} pieces)
           </Text>
 
@@ -124,8 +144,8 @@ export default function OutfitScreen() {
         </View>
       )}
 
-      <View style={s.instruction}>
-        <Text style={s.instructionText}>
+      <View style={[s.instruction, { backgroundColor: theme.softPanel }] }>
+        <Text style={[s.instructionText, { color: theme.subText }]}>
           {selected.length === 0
             ? "Tap items to add them to your outfit"
             : selected.length === 1
@@ -136,9 +156,9 @@ export default function OutfitScreen() {
 
       {items.length === 0 ? (
         <View style={s.emptyState}>
-          <Text style={s.emptyTitle}>No items in your wardrobe</Text>
+          <Text style={[s.emptyTitle, { color: theme.text }]}>No items in your wardrobe</Text>
 
-          <Text style={s.emptySubtitle}>
+          <Text style={[s.emptySubtitle, { color: theme.subText }]}>
             Add some items first to create outfits
           </Text>
 
@@ -181,7 +201,7 @@ export default function OutfitScreen() {
                   </View>
                 )}
 
-                <Text style={s.gridLabel} numberOfLines={1}>
+                <Text style={[s.gridLabel, { color: isDarkMode ? "#B8B8B8" : "#999" }]} numberOfLines={1}>
                   {item.label}
                 </Text>
               </TouchableOpacity>

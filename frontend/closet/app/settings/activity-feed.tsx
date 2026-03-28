@@ -1,31 +1,20 @@
 import React, { useEffect, useState } from 'react';
-import {
-  View, Text, StyleSheet, TouchableOpacity,
-  ScrollView, ActivityIndicator,
-} from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { buildApiUrl, buildAuthHeaders } from '@/constants/api';
 import { COLORS } from '@/constants/theme';
+import { useAppTheme } from '@/context/themeContext';
+import { styles } from '../../Styles/settings/activity-feed.styles';
 
-// The shape of one activity item from your backend
 type ActivityItem = {
   _id: string;
   type: 'outfit_logged' | 'streak_reached' | 'item_added' | 'outfit_deleted';
-  description: string;  // e.g. "You logged an outfit for March 3rd"
-  date: string;         // ISO date string
+  description: string; 
+  date: string;        
 };
 
-// Maps each activity type to an icon + color
-const ACTIVITY_ICONS: Record<ActivityItem['type'], { icon: string; color: string; bg: string }> = {
-  outfit_logged:  { icon: 'shirt-outline',       color: COLORS.hotPink,  bg: '#FFE8EF' },
-  streak_reached: { icon: 'flame-outline',        color: '#FF6B35',       bg: '#FFF0EA' },
-  item_added:     { icon: 'add-circle-outline',   color: '#7C5CBF',       bg: '#F0EAFF' },
-  outfit_deleted: { icon: 'trash-outline',        color: COLORS.subText,  bg: COLORS.offWhite },
-};
-
-// Groups activity items by date label (Today, Yesterday, or "March 3")
 function groupByDate(items: ActivityItem[]): { label: string; items: ActivityItem[] }[] {
   const groups: Record<string, ActivityItem[]> = {};
   const today = new Date();
@@ -48,15 +37,31 @@ function groupByDate(items: ActivityItem[]): { label: string; items: ActivityIte
 
 export default function ActivityFeedScreen() {
   const router = useRouter();
+  const { isDarkMode } = useAppTheme();
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const theme = isDarkMode
+    ? {
+        screen: '#121212',
+        card: '#1E1E1E',
+        text: '#F2F2F2',
+        subText: '#A8A8A8',
+        border: '#343434',
+      }
+    : {
+        screen: COLORS.offWhite,
+        card: COLORS.white,
+        text: COLORS.text,
+        subText: COLORS.subText,
+        border: COLORS.offWhite,
+      };
 
   useEffect(() => { fetchActivity(); }, []);
 
   async function fetchActivity() {
     try {
       const token = await SecureStore.getItemAsync('userToken');
-      // This endpoint should return the user's activity sorted newest first
       const res = await fetch(buildApiUrl('/api/users/me/activity'), {
         headers: buildAuthHeaders(token),
       });
@@ -72,40 +77,35 @@ export default function ActivityFeedScreen() {
   const grouped = groupByDate(activities);
 
   return (
-    <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
+    <ScrollView style={[styles.scroll, { backgroundColor: theme.screen }]} contentContainerStyle={styles.container}>
 
-      {/* ── Header ── */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+        <TouchableOpacity onPress={() => router.back()} style={[styles.backBtn, { backgroundColor: theme.card }] }>
           <Ionicons name="chevron-back" size={22} color={COLORS.hotPink} />
         </TouchableOpacity>
-        <Text style={styles.pageTitle}>Activity Feed</Text>
+        <Text style={[styles.pageTitle, { color: theme.text }]}>Activity Feed</Text>
         <View style={styles.headerSpacer} />
       </View>
 
-      <Text style={styles.pageSubtitle}>Everything you've been up to 👀</Text>
+      <Text style={[styles.pageSubtitle, { color: theme.subText }]}>Everything you've been up to </Text>
 
       {loading ? (
         <ActivityIndicator size="large" color={COLORS.hotPink} style={styles.loadingIndicator} />
       ) : activities.length === 0 ? (
-        // ── Empty state ──
         <View style={styles.emptyState}>
           <Ionicons name="sparkles-outline" size={48} color={COLORS.lightPink} />
-          <Text style={styles.emptyTitle}>No activity yet</Text>
-          <Text style={styles.emptySub}>
+          <Text style={[styles.emptyTitle, { color: theme.text }]}>No activity yet</Text>
+          <Text style={[styles.emptySub, { color: theme.subText }] }>
             Start logging outfits and your activity will show up here!
           </Text>
         </View>
       ) : (
-        // ── Activity groups ──
         grouped.map(({ label, items }) => (
           <View key={label}>
-            {/* Date group label e.g. "Today" */}
-            <Text style={styles.groupLabel}>{label}</Text>
+            <Text style={[styles.groupLabel, { color: theme.subText }]}>{label}</Text>
 
-            <View style={styles.card}>
+            <View style={[styles.card, { backgroundColor: theme.card }] }>
               {items.map((item, i) => {
-                const iconInfo = ACTIVITY_ICONS[item.type] ?? ACTIVITY_ICONS.outfit_logged;
                 const time = new Date(item.date).toLocaleTimeString('en-GB', {
                   hour: '2-digit', minute: '2-digit',
                 });
@@ -113,19 +113,12 @@ export default function ActivityFeedScreen() {
                 return (
                   <View key={item._id}>
                     <View style={styles.activityRow}>
-                      {/* Colored icon bubble */}
-                      <View style={[styles.iconBubble, { backgroundColor: iconInfo.bg }]}>
-                        <Ionicons name={iconInfo.icon as any} size={20} color={iconInfo.color} />
-                      </View>
-
-                      {/* Description + time */}
                       <View style={styles.activityText}>
-                        <Text style={styles.activityDesc}>{item.description}</Text>
-                        <Text style={styles.activityTime}>{time}</Text>
+                        <Text style={[styles.activityDesc, { color: theme.text }]}>{item.description}</Text>
+                        <Text style={[styles.activityTime, { color: theme.subText }]}>{time}</Text>
                       </View>
                     </View>
-                    {/* Divider between items (not after last) */}
-                    {i < items.length - 1 && <View style={styles.divider} />}
+                    {i < items.length - 1 && <View style={[styles.divider, { backgroundColor: theme.border }]} />}
                   </View>
                 );
               })}
@@ -137,46 +130,3 @@ export default function ActivityFeedScreen() {
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  scroll: { flex: 1, backgroundColor: COLORS.offWhite },
-  container: { paddingTop: 60, paddingBottom: 60, paddingHorizontal: 20, gap: 8 },
-
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
-  backBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: COLORS.white, justifyContent: 'center', alignItems: 'center' },
-  headerSpacer: { width: 36 },
-  loadingIndicator: { marginTop: 40 },
-  pageTitle: { fontSize: 18, fontWeight: '700', color: COLORS.text },
-  pageSubtitle: { fontSize: 13, color: COLORS.subText, marginBottom: 8 },
-
-  groupLabel: {
-    fontSize: 12, fontWeight: '700', color: COLORS.subText,
-    textTransform: 'uppercase', letterSpacing: 1,
-    marginTop: 12, marginBottom: 6, marginLeft: 4,
-  },
-  card: {
-    backgroundColor: COLORS.white, borderRadius: 20, overflow: 'hidden',
-    shadowColor: COLORS.hotPink, shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06, shadowRadius: 8, elevation: 2,
-  },
-  activityRow: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 16, paddingVertical: 14, gap: 14,
-  },
-  iconBubble: {
-    width: 42, height: 42, borderRadius: 12,
-    justifyContent: 'center', alignItems: 'center',
-  },
-  activityText: { flex: 1 },
-  activityDesc: { fontSize: 14, fontWeight: '500', color: COLORS.text, lineHeight: 20 },
-  activityTime: { fontSize: 12, color: COLORS.subText, marginTop: 2 },
-  divider: { height: 1, backgroundColor: COLORS.offWhite, marginHorizontal: 16 },
-
-  // Empty state
-  emptyState: {
-    alignItems: 'center', justifyContent: 'center',
-    paddingTop: 60, gap: 12,
-  },
-  emptyTitle: { fontSize: 18, fontWeight: '700', color: COLORS.text },
-  emptySub: { fontSize: 14, color: COLORS.subText, textAlign: 'center', lineHeight: 22 },
-});

@@ -3,6 +3,7 @@ import React, { useMemo, useState } from "react";
 import { FlatList, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from "react-native";
 import AuthenticatedImage from "../../../components/AuthenticatedImage";
 import { s } from "../../../Styles/styling.styles";
+import { useAppTheme } from "../../../context/themeContext";
 import { inferRandomizeCategory, type RandomizeCategory } from "./RandomizeCanvas";
 
 export type RecommendationGarment = {
@@ -224,6 +225,23 @@ type Props = {
 };
 
 export default function AiRecommendedCanvas(props: Props) {
+  const { isDarkMode } = useAppTheme();
+  const theme = isDarkMode
+    ? {
+        card: "#202020",
+        text: "#F2F2F2",
+        subText: "#A7A7A7",
+        border: "#343434",
+        inputBg: "#262626",
+      }
+    : {
+        card: "#FFFFFF",
+        text: "#1A1A1A",
+        subText: "#999999",
+        border: "#F0F0F0",
+        inputBg: "transparent",
+      };
+
   const {
     selectedItems,
     selectedGridColumns,
@@ -278,28 +296,28 @@ export default function AiRecommendedCanvas(props: Props) {
         </TouchableOpacity>
       </View>
 
-      <View style={s.contextCard}>
+      <View style={[s.contextCard, { backgroundColor: theme.card }] }>
         <View style={s.tempRow}>
-          <Text style={s.tempTxt}>{temperatureC}°C</Text>
+          <Text style={[s.tempTxt, { color: theme.subText }]}>{temperatureC}°C</Text>
         </View>
-        <Text style={s.eventTxt}>Event: {inputText.trim() || eventText}</Text>
-        <View style={s.inputRow}>
+        <Text style={[s.eventTxt, { color: theme.text }]}>Event: {inputText.trim() || eventText}</Text>
+        <View style={[s.inputRow, { borderColor: theme.border, backgroundColor: theme.inputBg }] }>
           <TextInput
-            style={s.input}
+            style={[s.input, { color: theme.text }]}
             placeholder="Type here or speak"
-            placeholderTextColor="#bbb"
+            placeholderTextColor={theme.subText}
             value={inputText}
             onChangeText={setInputText}
           />
-          <Ionicons name="mic-outline" size={20} color="#bbb" />
+          <Ionicons name="mic-outline" size={20} color={theme.subText} />
         </View>
         {recommendations[activeRecommendation]?.reason ? (
-          <Text style={s.recommendationReason}>
+          <Text style={[s.recommendationReason, { color: theme.subText }]}>
             {recommendations[activeRecommendation].reason}
           </Text>
         ) : null}
         {(loadingAi || loadingRandomize || savingOutfit) ? (
-          <Text style={s.recommendationLoading}>
+          <Text style={[s.recommendationLoading, { color: theme.subText }]}>
             {savingOutfit ? "Saving outfit..." : loadingAi ? "Generating recommendations..." : "Randomizing..."}
           </Text>
         ) : null}

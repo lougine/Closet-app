@@ -5,7 +5,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator, Alert, Image, KeyboardAvoidingView,
-  Platform, ScrollView, Text, TextInput, TouchableOpacity, View,
+  Platform, ScrollView, StatusBar, Text, TextInput, TouchableOpacity, View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as SecureStore from "expo-secure-store";
@@ -17,6 +17,7 @@ import {
 import { buildApiUrl, buildImageUrl } from "../../constants/api";
 import { getUploadErrorMessage, uploadMultipartWithRetry } from "../../services/uploadRequest";
 import { removeBackgroundFromImageUri } from "../../services/removeBackground";
+import { useAppTheme } from "../../context/themeContext";
 import { useWardrobe } from "../../context/wardrobeContext";
 import { s } from "../../Styles/wardrobe/add-items.styles";
 
@@ -55,8 +56,29 @@ const getAutoItemName = (category: string) => {
 
 export default function AddItemsScreen() {
   const router = useRouter();
+  const { isDarkMode } = useAppTheme();
   const { addItem } = useWardrobe();
   const { image: imageParam, source } = useLocalSearchParams<{ image: string; source: string }>();
+
+  const theme = isDarkMode
+    ? {
+        screen: "#121212",
+        panel: "#1E1E1E",
+        softPanel: "#242424",
+        text: "#F2F2F2",
+        subText: "#A8A8A8",
+        border: "#343434",
+        inputBg: "#2A2A2A",
+      }
+    : {
+        screen: "#fafafa",
+        panel: "#FFFFFF",
+        softPanel: "#f0eeea",
+        text: "#1a1a1a",
+        subText: "#888888",
+        border: "#ebebeb",
+        inputBg: "#fafafa",
+      };
 
   const [image, setImage] = useState<string | null>(imageParam ?? null);
   const [imageFileSize, setImageFileSize] = useState<number | null>(null);
@@ -269,30 +291,32 @@ export default function AddItemsScreen() {
   };
 
   return (
-    <SafeAreaView style={s.root}>
-      <View style={s.header}>
+    <SafeAreaView style={[s.root, { backgroundColor: theme.screen }]}>
+      <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} />
+
+      <View style={[s.header, { backgroundColor: theme.panel, borderBottomColor: theme.border }]}>
         <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
-          <Ionicons name="chevron-back" size={22} color="#1a1a1a" />
+          <Ionicons name="chevron-back" size={22} color={theme.text} />
         </TouchableOpacity>
-        <Text style={s.headerTitle}>Add Item</Text>
+        <Text style={[s.headerTitle, { color: theme.text }]}>Add Item</Text>
         <TouchableOpacity style={[s.saveBtn, saving && s.saveBtnDisabled]} onPress={handleSave} disabled={saving}>
           {saving ? <ActivityIndicator size="small" color="#fff" /> : <Text style={s.saveBtnText}>Save</Text>}
         </TouchableOpacity>
       </View>
 
-      {uploadStatus ? <Text style={s.uploadStatusText}>{uploadStatus}</Text> : null}
+      {uploadStatus ? <Text style={[s.uploadStatusText, { color: theme.subText }]}>{uploadStatus}</Text> : null}
 
       <KeyboardAvoidingView style={s.flexOne} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <ScrollView style={s.scroll} contentContainerStyle={s.scrollContent}
           showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
-          <View style={s.photoCard}>
+          <View style={[s.photoCard, { backgroundColor: theme.softPanel }]}>
             {image ? (
               <Image source={{ uri: image }} style={s.photo} resizeMode="contain" />
             ) : (
               <View style={s.photoPlaceholder}>
-                <Ionicons name="image-outline" size={48} color="#ccc" />
-                <Text style={s.photoPlaceholderText}>No photo</Text>
+                <Ionicons name="image-outline" size={48} color={theme.subText} />
+                <Text style={[s.photoPlaceholderText, { color: theme.subText }]}>No photo</Text>
               </View>
             )}
           </View>
@@ -310,18 +334,18 @@ export default function AddItemsScreen() {
             </TouchableOpacity>
           ) : null}
 
-          <Section title="Category" required>
+          <Section title="Category" required isDarkMode={isDarkMode}>
             <View style={s.chipRow}>
               {CATEGORIES.map((cat) => (
-                <TouchableOpacity key={cat} style={[s.chip, form.category === cat && s.chipActive]}
+                <TouchableOpacity key={cat} style={[s.chip, { backgroundColor: isDarkMode ? "#2A2A2A" : "#fafafa", borderColor: theme.border }, form.category === cat && s.chipActive]}
                   onPress={() => update("category", cat)}>
-                  <Text style={[s.chipText, form.category === cat && s.chipTextActive]}>{cat}</Text>
+                  <Text style={[s.chipText, { color: isDarkMode ? "#C8C8C8" : "#555" }, form.category === cat && s.chipTextActive]}>{cat}</Text>
                 </TouchableOpacity>
               ))}
             </View>
           </Section>
 
-          <Section title="Colors">
+          <Section title="Colors" isDarkMode={isDarkMode}>
             <View style={s.colorGrid}>
               {COLOR_OPTIONS.map(({ label, hex }) => {
                 const selected = form.colors.includes(label);
@@ -333,42 +357,42 @@ export default function AddItemsScreen() {
                       selected && s.swatchSelected]}>
                       {selected && <Ionicons name="checkmark" size={14} color={isLight ? "#333" : "#fff"} />}
                     </View>
-                    <Text style={s.colorLabel}>{label}</Text>
+                    <Text style={[s.colorLabel, { color: theme.subText }]}>{label}</Text>
                   </TouchableOpacity>
                 );
               })}
             </View>
           </Section>
 
-          <Section title="Brand">
-            <TextInput style={s.textInput} value={form.brand} onChangeText={(v) => update("brand", v)}
-              placeholder="e.g. Zara, H&M, Vintage" placeholderTextColor="#bbb" returnKeyType="done" />
+          <Section title="Brand" isDarkMode={isDarkMode}>
+            <TextInput style={[s.textInput, { borderColor: theme.border, backgroundColor: theme.inputBg, color: theme.text }]} value={form.brand} onChangeText={(v) => update("brand", v)}
+              placeholder="e.g. Zara, H&M, Vintage" placeholderTextColor={theme.subText} returnKeyType="done" />
           </Section>
 
-          <Section title="Size">
-            <TextInput style={s.textInput} value={form.size} onChangeText={(v) => update("size", v)}
-              placeholder="e.g. XS, S, M, 36, 8" placeholderTextColor="#bbb" returnKeyType="done" />
+          <Section title="Size" isDarkMode={isDarkMode}>
+            <TextInput style={[s.textInput, { borderColor: theme.border, backgroundColor: theme.inputBg, color: theme.text }]} value={form.size} onChangeText={(v) => update("size", v)}
+              placeholder="e.g. XS, S, M, 36, 8" placeholderTextColor={theme.subText} returnKeyType="done" />
           </Section>
 
-          <Section title="Cost">
+          <Section title="Cost" isDarkMode={isDarkMode}>
             <View style={s.inputRow}>
-              <Text style={s.currencySymbol}>$</Text>
-              <TextInput style={[s.textInput, s.inputRowText]}
+              <Text style={[s.currencySymbol, { backgroundColor: theme.inputBg, borderColor: theme.border, color: theme.subText }]}>$</Text>
+              <TextInput style={[s.textInput, s.inputRowText, { borderColor: theme.border, backgroundColor: theme.inputBg, color: theme.text }]}
                 value={form.cost} onChangeText={(v) => update("cost", v.replace(/[^0-9.]/g, ""))}
-                placeholder="0.00" placeholderTextColor="#bbb" keyboardType="decimal-pad" />
+                placeholder="0.00" placeholderTextColor={theme.subText} keyboardType="decimal-pad" />
             </View>
           </Section>
 
-          <Section title="Date Purchased">
-            <TextInput style={s.textInput} value={form.datePurchased} onChangeText={(v) => update("datePurchased", v)}
-              placeholder="e.g. Jan 2024" placeholderTextColor="#bbb" returnKeyType="done" />
+          <Section title="Date Purchased" isDarkMode={isDarkMode}>
+            <TextInput style={[s.textInput, { borderColor: theme.border, backgroundColor: theme.inputBg, color: theme.text }]} value={form.datePurchased} onChangeText={(v) => update("datePurchased", v)}
+              placeholder="e.g. Jan 2024" placeholderTextColor={theme.subText} returnKeyType="done" />
           </Section>
 
-          <Section title="Tags">
+          <Section title="Tags" isDarkMode={isDarkMode}>
             <View style={s.tagInputRow}>
-              <TextInput style={[s.textInput, s.flexInput]} value={tagInput} onChangeText={setTagInput}
+              <TextInput style={[s.textInput, s.flexInput, { borderColor: theme.border, backgroundColor: theme.inputBg, color: theme.text }]} value={tagInput} onChangeText={setTagInput}
                 onSubmitEditing={addTag} placeholder="e.g. y2k, casual, summer"
-                placeholderTextColor="#bbb" returnKeyType="done" />
+                placeholderTextColor={theme.subText} returnKeyType="done" />
               <TouchableOpacity style={s.tagAddBtn} onPress={addTag}>
                 <Ionicons name="add" size={20} color="#fff" />
               </TouchableOpacity>
@@ -394,11 +418,15 @@ export default function AddItemsScreen() {
   );
 }
 
-function Section({ title, required = false, children }: { title: string; required?: boolean; children: React.ReactNode }) {
+function Section({ title, required = false, children, isDarkMode = false }: { title: string; required?: boolean; children: React.ReactNode; isDarkMode?: boolean }) {
+  const sectionTheme = isDarkMode
+    ? { card: "#1E1E1E", text: "#A8A8A8" }
+    : { card: "#FFFFFF", text: "#888888" };
+
   return (
-    <View style={s.section}>
+    <View style={[s.section, { backgroundColor: sectionTheme.card }] }>
       <View style={s.sectionTitleRow}>
-        <Text style={s.sectionTitle}>{title}</Text>
+        <Text style={[s.sectionTitle, { color: sectionTheme.text }]}>{title}</Text>
         {required && <Text style={s.requiredDot}>*</Text>}
       </View>
       {children}

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Dimensions, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -6,8 +6,9 @@ import * as SecureStore from 'expo-secure-store';
 import AuthenticatedImage from '@/components/AuthenticatedImage';
 import { buildApiUrl, buildAuthHeaders, buildImageUrl } from '@/constants/api';
 import { COLORS } from '@/constants/theme';
+import { useAppTheme } from '@/context/themeContext';
 import Svg, { Circle, G, Path, Text as SvgText,} from 'react-native-svg';
-import { styles } from '../../Styles/features/analystics.styles';
+import { createAnalyticsStyles } from '@/Styles/features/analystics.styles';
 
 const CHART_COLORS = [
   '#0051ff', '#ff62a4', '#00ff91', '#FFB3C6',
@@ -95,6 +96,13 @@ function buildPieSlices(data: { count: number; colour: string }[], radius: numbe
 }
 
 export default function AnalyticsScreen() {
+  const { isDarkMode } = useAppTheme();
+  const styles = useMemo(() => createAnalyticsStyles(isDarkMode), [isDarkMode]);
+
+  const analyticsTheme = isDarkMode
+    ? { panel: '#1E1E1E', text: '#F2F2F2', subText: '#A8A8A8', wave: '#1E1E1E', track: '#2D2D2D' }
+    : { panel: COLORS.white, text: COLORS.text, subText: COLORS.subText, wave: COLORS.white, track: COLORS.lightGray };
+
   const [overview, setOverview] = useState<OverviewStats | null>(null);
   const [categories, setCategories] = useState<CategoryStat[]>([]);
   const [colours, setColours] = useState<ColourStat[]>([]);
@@ -275,7 +283,7 @@ export default function AnalyticsScreen() {
           preserveAspectRatio="none"
         >
           <Path
-            fill={COLORS.white}
+            fill={analyticsTheme.wave}
             d="M0,160 C400,320 1000,0 1440,220 L1440,320 L0,320 Z"
           />
         </Svg>
@@ -295,7 +303,7 @@ export default function AnalyticsScreen() {
           <Svg width={140} height={140} viewBox="0 0 140 140">
             <Circle
               cx={70} cy={70} r={DONUT_R}
-              stroke={COLORS.lightGray}
+              stroke={analyticsTheme.track}
               strokeWidth={12}
               fill="none"
             />
@@ -310,11 +318,11 @@ export default function AnalyticsScreen() {
               transform="rotate(-90 70 70)"
             />
             <SvgText x={70} y={66} textAnchor="middle"
-              fontSize={22} fontWeight="800" fill={COLORS.text}>
+              fontSize={22} fontWeight="800" fill={analyticsTheme.text}>
               {outfitPercent}%
             </SvgText>
             <SvgText x={70} y={84} textAnchor="middle"
-              fontSize={10} fill={COLORS.subText}>
+              fontSize={10} fill={analyticsTheme.subText}>
               {outfitsWorn}/{totalOutfits}
             </SvgText>
           </Svg>
@@ -384,7 +392,7 @@ export default function AnalyticsScreen() {
                 {pieSlices.map((slice, i) => (
                   <Path key={i} d={slice.path} fill={slice.colour} />
                 ))}
-                <Circle cx={100} cy={100} r={50} fill={COLORS.white} />
+                <Circle cx={100} cy={100} r={50} fill={analyticsTheme.panel} />
               </Svg>
               <View style={styles.colourLegend}>
                 {normalizedColours.slice(0, 6).map((c, i) => (
@@ -436,18 +444,21 @@ export default function AnalyticsScreen() {
             subtitle="Your go-to pieces"
             items={mostWorn}
             accentColor={COLORS.hotPink}
+            styles={styles}
           />
           <UsageSection
             title="Least worn"
             subtitle="Give these some love"
             items={leastWorn}
             accentColor={COLORS.lightPink}
+            styles={styles}
           />
           <UsageSection
             title="Never worn"
             subtitle="Still has the tags on?"
             items={neverWorn}
             accentColor={COLORS.lightGray}
+            styles={styles}
           />
           <View style={styles.insightCard}>
             <Ionicons name="bulb-outline" size={22} color={COLORS.hotPink} />
@@ -539,9 +550,10 @@ export default function AnalyticsScreen() {
 }
 
 function UsageSection({
-  title, subtitle, items, accentColor,
+  title, subtitle, items, accentColor, styles,
 }: {
   title: string; subtitle: string; items: WornItem[]; accentColor: string;
+  styles: ReturnType<typeof createAnalyticsStyles>;
 }) {
   return (
     <View style={styles.usageSection}>
