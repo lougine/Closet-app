@@ -1,6 +1,6 @@
 import { Feather, Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
-import { useFocusEffect, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Dimensions, Modal, ScrollView, StatusBar, Text, TextInput, TouchableOpacity, View, ActivityIndicator, RefreshControl } from "react-native";
@@ -13,6 +13,7 @@ import { getUploadErrorMessage } from "../../services/uploadRequest";
 import { buildApiUrl, buildAuthHeaders, buildImageUrl } from "../../constants/api";
 import { getAppTheme } from "../../constants/appTheme";
 import { fc, s } from "../../Styles/index.styles";
+import { useCalendar } from "../../context/calendar-context";
 import { useAppTheme } from "../../context/themeContext";
 
 const { width: W } = Dimensions.get("window");
@@ -326,7 +327,9 @@ const Chip = ({ label, active, onPress, }: { label: string; active: boolean;onPr
 
 export default function WardrobeScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ tab?: string; pickForCalendar?: string }>();
   const { items, counts, loading, refreshItems } = useWardrobe();
+  const { selectedDate, saveOutfitForDate } = useCalendar();
   const { isDarkMode } = useAppTheme();
 
   const theme = getAppTheme(isDarkMode, {
@@ -361,7 +364,54 @@ export default function WardrobeScreen() {
   const [uploadingHeaderImage, setUploadingHeaderImage] = useState(false);
   const [outfits, setOutfits] = useState<OutfitSummary[]>([]);
   const [loadingOutfits, setLoadingOutfits] = useState(false);
+  const [savingCalendarOutfitId, setSavingCalendarOutfitId] = useState<string | null>(null);
   const [pullRefreshing, setPullRefreshing] = useState(false);
+
+  const selectingForCalendar = params.pickForCalendar === "1";
+
+  const getCalendarGarmentIds = useCallback((outfit: OutfitSummary) => {
+    const fromGarmentIds = Array.isArray(outfit.garmentIds)
+      ? outfit.garmentIds.map((id) => String(id)).filter(Boolean)
+      : [];
+
+    if (fromGarmentIds.length > 0) {
+      return fromGarmentIds;
+    }
+
+    const fromGarments = Array.isArray(outfit.garments)
+      ? outfit.garments
+          .map((garment) => toIdString(garment?._id))
+          .filter(Boolean)
+      : [];
+
+    return fromGarments;
+  }, []);
+
+  const handleSelectOutfitForCalendar = useCallback(async (outfit: OutfitSummary) => {
+    if (savingCalendarOutfitId) return;
+
+    const garmentIds = getCalendarGarmentIds(outfit);
+    if (!garmentIds.length) {
+      Alert.alert("Unavailable", "This outfit has no items to add to calendar.");
+      return;
+    }
+
+    try {
+      setSavingCalendarOutfitId(outfit._id);
+      await saveOutfitForDate({
+        garmentIds,
+        date: selectedDate,
+        name: outfit.name || "Outfit",
+      });
+      Alert.alert("Added", "Outfit added to your selected day.", [
+        { text: "OK", onPress: () => router.back() },
+      ]);
+    } catch (error: any) {
+      Alert.alert("Error", error?.message || "Could not add outfit to calendar.");
+    } finally {
+      setSavingCalendarOutfitId(null);
+    }
+  }, [getCalendarGarmentIds, router, saveOutfitForDate, savingCalendarOutfitId, selectedDate]);
 
   useEffect(() => {
     setFavoriteItemIds(
@@ -424,6 +474,12 @@ export default function WardrobeScreen() {
     fetchUserHeaderImages();
     fetchOutfits();
   }, [fetchOutfits, fetchUserHeaderImages, refreshItems]);
+
+  useEffect(() => {
+    if (params.tab === "outfits") {
+      setActiveTopTab(1);
+    }
+  }, [params.tab]);
 
   useFocusEffect(
     useCallback(() => {
@@ -1017,12 +1073,18 @@ export default function WardrobeScreen() {
                     <TouchableOpacity
                       key={outfit._id}
                       style={[s.gridItem, { backgroundColor: theme.itemCard }]}
-                      onPress={() =>
+                      onPress={() => {
+                        if (selectingForCalendar) {
+                          handleSelectOutfitForCalendar(outfit);
+                          return;
+                        }
+
                         router.push({
                           pathname: "/wardrobe/outfit-detail" as any,
                           params: { outfitJson: JSON.stringify(outfit) },
-                        })
-                      }
+                        });
+                      }}
+                      disabled={savingCalendarOutfitId === outfit._id}
                     >
                       <OutfitPreviewTile tiles={previewTiles} />
                       <Text style={[s.gridLabel, { color: theme.text }]} numberOfLines={1}>
