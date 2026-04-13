@@ -179,6 +179,43 @@ describe('Analytics endpoints', () => {
     expect(response.status).toBe(200);
     expect(response.body.totalOutfits).toBe(2);
     expect(response.body.outfitsWorn).toBe(1);
+    expect(response.body.wardrobeUsagePercent).toBe(50);
+    expect(response.body.totalWearEvents).toBe(1);
+  });
+
+  test('GET /api/analytics/overview ignores undated outfits for worn calculations', async () => {
+    const user = await createUser();
+    const garment = await Garment.create({
+      owner: user._id,
+      name: 'Grey Tee',
+      category: 'Tops',
+      color: 'Grey',
+      purchasePrice: 25,
+    });
+
+    const undatedOutfit = await Outfit.create({
+      owner: user._id,
+      name: 'Undated Plan',
+      garments: [garment._id],
+      isLookbook: false,
+    });
+
+    await Usage.create({
+      user: user._id,
+      garment: garment._id,
+      outfit: undatedOutfit._id,
+      wornDate: new Date('2026-03-05T00:00:00.000Z'),
+    });
+
+    const response = await request(app)
+      .get('/api/analytics/overview')
+      .set(authHeader(user._id.toString()));
+
+    expect(response.status).toBe(200);
+    expect(response.body.totalOutfits).toBe(0);
+    expect(response.body.outfitsWorn).toBe(0);
+    expect(response.body.wardrobeUsagePercent).toBe(0);
+    expect(response.body.totalWearEvents).toBe(0);
   });
 
   test('GET /api/analytics/cost-per-wear returns computed data', async () => {
@@ -227,11 +264,39 @@ describe('Analytics endpoints', () => {
     const thisMonthDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 10));
     const previousMonthDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 12));
     const twoMonthsAgoDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 2, 18));
+    const thisMonthOutfit = await Outfit.create({
+      owner: user._id,
+      name: 'This month look',
+      garments: [garment._id],
+      date: thisMonthDate,
+      isLookbook: false,
+    });
+    const previousMonthOutfit = await Outfit.create({
+      owner: user._id,
+      name: 'Previous month look',
+      garments: [garment._id],
+      date: previousMonthDate,
+      isLookbook: false,
+    });
+    const twoMonthsAgoOutfit = await Outfit.create({
+      owner: user._id,
+      name: 'Two months ago look',
+      garments: [garment._id],
+      date: twoMonthsAgoDate,
+      isLookbook: false,
+    });
+    const undatedOutfit = await Outfit.create({
+      owner: user._id,
+      name: 'Planned look',
+      garments: [garment._id],
+      isLookbook: false,
+    });
 
     await Usage.insertMany([
-      { user: user._id, garment: garment._id, wornDate: twoMonthsAgoDate },
-      { user: user._id, garment: garment._id, wornDate: previousMonthDate },
-      { user: user._id, garment: garment._id, wornDate: thisMonthDate },
+      { user: user._id, garment: garment._id, outfit: twoMonthsAgoOutfit._id, wornDate: twoMonthsAgoDate },
+      { user: user._id, garment: garment._id, outfit: previousMonthOutfit._id, wornDate: previousMonthDate },
+      { user: user._id, garment: garment._id, outfit: thisMonthOutfit._id, wornDate: thisMonthDate },
+      { user: user._id, garment: garment._id, outfit: undatedOutfit._id, wornDate: thisMonthDate },
     ]);
 
     const response = await request(app)
@@ -246,6 +311,67 @@ describe('Analytics endpoints', () => {
     expect(response.body.dayOfWeek).toHaveLength(7);
     expect(response.body.summary.totalWearEventsInRange).toBe(3);
     expect(response.body.byCategory[0].category).toBe('Tops');
+  });
+
+  test('GET /api/analytics most/least/never worn only count past calendar outfit usage', async () => {
+    const user = await createUser();
+    const datedGarment = await Garment.create({
+      owner: user._id,
+      name: 'Dated Shirt',
+      category: 'Tops',
+      color: 'Blue',
+    });
+    const undatedGarment = await Garment.create({
+      owner: user._id,
+      name: 'Planned Pants',
+      category: 'Bottoms',
+      color: 'Black',
+    });
+
+    const datedOutfit = await Outfit.create({
+      owner: user._id,
+      name: 'Worn Outfit',
+      garments: [datedGarment._id],
+      date: new Date('2026-03-15T00:00:00.000Z'),
+      isLookbook: false,
+    });
+    const undatedOutfit = await Outfit.create({
+      owner: user._id,
+      name: 'Planned Outfit',
+      garments: [undatedGarment._id],
+      isLookbook: false,
+    });
+
+    await Usage.insertMany([
+      {
+        user: user._id,
+        garment: datedGarment._id,
+        outfit: datedOutfit._id,
+        wornDate: new Date('2026-03-15T00:00:00.000Z'),
+      },
+      {
+        user: user._id,
+        garment: undatedGarment._id,
+        outfit: undatedOutfit._id,
+        wornDate: new Date('2026-03-16T00:00:00.000Z'),
+      },
+    ]);
+
+    const headers = authHeader(user._id.toString());
+
+    const [mostWornRes, leastWornRes, neverWornRes] = await Promise.all([
+      request(app).get('/api/analytics/most-worn?limit=10').set(headers),
+      request(app).get('/api/analytics/least-worn?limit=10').set(headers),
+      request(app).get('/api/analytics/never-worn?limit=10').set(headers),
+    ]);
+
+    expect(mostWornRes.status).toBe(200);
+    expect(leastWornRes.status).toBe(200);
+    expect(neverWornRes.status).toBe(200);
+
+    expect(mostWornRes.body.some((item) => item.name === 'Planned Pants')).toBe(false);
+    expect(leastWornRes.body.some((item) => item.name === 'Planned Pants')).toBe(false);
+    expect(neverWornRes.body.some((item) => item.name === 'Planned Pants')).toBe(true);
   });
 
   test('GET /api/analytics/usage-trends returns 400 for invalid months', async () => {
