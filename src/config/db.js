@@ -33,6 +33,11 @@ const getMongoDeploymentType = (uri) => {
   return 'local';
 };
 
+const isSrvDnsRefusedError = (error) => {
+  const message = String(error?.message || '');
+  return error?.code === 'ECONNREFUSED' && message.includes('querySrv');
+};
+
 const connectDB = async () => {
   try {
     const mongoUri = process.env.MONGO_URI;
@@ -46,7 +51,18 @@ const connectDB = async () => {
       throw new Error('Refusing Atlas connection during tests. Set ALLOW_TEST_ATLAS=true to override intentionally.');
     }
 
-    await mongoose.connect(mongoUri, getMongoConnectOptions());
+    try {
+      await mongoose.connect(mongoUri, getMongoConnectOptions());
+    } catch (primaryConnectError) {
+      const fallbackUri = process.env.MONGO_URI_FALLBACK;
+      if (!fallbackUri || !isSrvDnsRefusedError(primaryConnectError)) {
+        throw primaryConnectError;
+      }
+
+      console.warn('MongoDB SRV DNS lookup failed with ECONNREFUSED. Retrying with MONGO_URI_FALLBACK.');
+      await mongoose.connect(fallbackUri, getMongoConnectOptions());
+    }
+
     console.log('MongoDB connected');
     console.log(`MongoDB startup: db=${mongoose.connection.name} deployment=${deployment}`);
 
