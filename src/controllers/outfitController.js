@@ -191,17 +191,6 @@ exports.createOutfit = async (req, res) => {
 
     await outfit.save();
 
-    if (garments.length > 0) {
-      const wornDate = outfit.date || new Date();
-      const usageDocs = garments.map((garmentId) => ({
-        user: owner,
-        garment: garmentId,
-        outfit: outfit._id,
-        wornDate,
-      }));
-      await Usage.insertMany(usageDocs);
-    }
-
     res.status(201).json(outfit);
 
   } catch (error) {
@@ -296,24 +285,6 @@ exports.updateOutfit = async (req, res) => {
 
     if (req.file) {
       await cleanupReplacedPreviewImage(owner, oldPreviewImage, outfit.previewImage, { excludeOutfitId: outfit._id });
-    }
-
-    if (hasGarmentsUpdate) {
-      await Usage.deleteMany({
-        user: owner,
-        outfit: outfit._id,
-      });
-
-      if (nextGarments.length > 0) {
-        const wornDate = outfit.date || new Date();
-        const usageDocs = nextGarments.map((garmentId) => ({
-          user: owner,
-          garment: garmentId,
-          outfit: outfit._id,
-          wornDate,
-        }));
-        await Usage.insertMany(usageDocs);
-      }
     }
 
     const populated = await Outfit.findById(outfit._id)

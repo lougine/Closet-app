@@ -99,6 +99,20 @@ const outfitIncludesItem = (outfit: ItemOutfitSummary, itemId: string) => {
     : false;
 };
 
+const getUploadImageMeta = (uri: string) => {
+  const cleaned = uri.split("?")[0]?.toLowerCase() ?? "";
+  const ext = cleaned.split(".").pop();
+
+  if (ext === "png") {
+    return { extension: "png", mimeType: "image/png" };
+  }
+  if (ext === "webp") {
+    return { extension: "webp", mimeType: "image/webp" };
+  }
+
+  return { extension: "jpg", mimeType: "image/jpeg" };
+};
+
 export default function ItemDetailScreen() {
   const router = useRouter();
   const { isDarkMode } = useAppTheme();
@@ -408,10 +422,11 @@ export default function ItemDetailScreen() {
       setUploadingImage(true);
 
       const formData = new FormData();
+      const imageMeta = getUploadImageMeta(localUri);
       formData.append("image", {
         uri: localUri,
-        name: `item-${Date.now()}.jpg`,
-        type: "image/jpeg",
+        name: `item-${Date.now()}.${imageMeta.extension}`,
+        type: imageMeta.mimeType,
       } as any);
 
       const updatedGarment = await uploadMultipartWithRetry<any>({

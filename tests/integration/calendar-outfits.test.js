@@ -59,6 +59,34 @@ afterAll(async () => {
 });
 
 describe('Calendar outfit endpoints', () => {
+  test('POST /api/outfits does not mark garments as worn automatically', async () => {
+    const user = await createUser();
+    const garment = await Garment.create({
+      owner: user._id,
+      name: 'Planning Tee',
+      category: 'Tops',
+      color: 'White',
+      imageUrl: '/uploads/planning-tee.jpg',
+    });
+
+    const response = await request(app)
+      .post('/api/outfits')
+      .set(authHeader(user._id.toString()))
+      .send({
+        name: 'Planned Outfit',
+        garments: [garment._id.toString()],
+        date: '2026-03-22T00:00:00.000Z',
+      });
+
+    expect(response.status).toBe(201);
+
+    const usageCount = await Usage.countDocuments({
+      user: user._id,
+      outfit: response.body._id,
+    });
+    expect(usageCount).toBe(0);
+  });
+
   test('GET /api/outfits returns calendar-friendly fields', async () => {
     const user = await createUser();
     const garment = await Garment.create({

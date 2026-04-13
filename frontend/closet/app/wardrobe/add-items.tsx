@@ -55,6 +55,20 @@ const getAutoItemName = (category: string) => {
   return `${base} ${stamp}`;
 };
 
+const getUploadImageMeta = (uri: string) => {
+  const cleaned = uri.split("?")[0]?.toLowerCase() ?? "";
+  const ext = cleaned.split(".").pop();
+
+  if (ext === "png") {
+    return { extension: "png", mimeType: "image/png" };
+  }
+  if (ext === "webp") {
+    return { extension: "webp", mimeType: "image/webp" };
+  }
+
+  return { extension: "jpg", mimeType: "image/jpeg" };
+};
+
 export default function AddItemsScreen() {
   const router = useRouter();
   const { isDarkMode } = useAppTheme();
@@ -193,12 +207,13 @@ export default function AddItemsScreen() {
         setUploadStatus("Uploading image...");
         // If there's an image, send as FormData
         const formData = new FormData();
+        const imageMeta = getUploadImageMeta(image);
 
         // For React Native/Expo, append the image URI directly
         formData.append('image', {
           uri: image,
-          name: `image-${Date.now()}.jpg`,
-          type: 'image/jpeg',
+          name: `image-${Date.now()}.${imageMeta.extension}`,
+          type: imageMeta.mimeType,
         } as any);
 
         // Add form data

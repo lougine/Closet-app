@@ -52,57 +52,89 @@ const buildDayOfWeekSeries = (dayRows) => {
   }));
 };
 
-const buildGarmentWearAggregation = (userObjectId) => ([
-  { $match: { owner: userObjectId } },
-  {
-    $lookup: {
-      from: 'usages',
-      let: { garmentId: '$_id' },
-      pipeline: [
-        {
-          $match: {
-            $expr: {
-              $and: [
-                { $eq: ['$garment', '$$garmentId'] },
-                { $eq: ['$user', userObjectId] },
-              ],
-            },
-          },
+const buildGarmentWearAggregation = (userObjectId, options = {}) => {
+  const { scopedToPastCalendarOutfits = false, now = new Date() } = options;
+
+  const usagePipeline = [
+    {
+      $match: {
+        $expr: {
+          $and: [
+            { $eq: ['$garment', '$$garmentId'] },
+            { $eq: ['$user', userObjectId] },
+          ],
         },
-        { $count: 'wearCount' },
-      ],
-      as: 'wearMeta',
-    },
-  },
-  {
-    $addFields: {
-      wearCount: { $ifNull: [{ $first: '$wearMeta.wearCount' }, 0] },
-    },
-  },
-  {
-    $project: {
-      _id: 1,
-      name: 1,
-      imageUrl: 1,
-      category: 1,
-      color: 1,
-      purchasePrice: 1,
-      wearCount: 1,
-      costPerWear: {
-        $cond: [
-          {
-            $and: [
-              { $gt: ['$wearCount', 0] },
-              { $ne: ['$purchasePrice', null] },
-            ],
-          },
-          { $round: [{ $divide: ['$purchasePrice', '$wearCount'] }, 2] },
-          null,
-        ],
       },
     },
-  },
-]);
+  ];
+
+  if (scopedToPastCalendarOutfits) {
+    usagePipeline.push(
+      { $match: { outfit: { $ne: null } } },
+      {
+        $lookup: {
+          from: 'outfits',
+          localField: 'outfit',
+          foreignField: '_id',
+          as: 'outfitDoc',
+        },
+      },
+      { $unwind: '$outfitDoc' },
+      {
+        $match: {
+          'outfitDoc.owner': userObjectId,
+          'outfitDoc.isLookbook': { $ne: true },
+          'outfitDoc.date': {
+            $type: 'date',
+            $lte: now,
+          },
+        },
+      },
+    );
+  }
+
+  usagePipeline.push({ $count: 'wearCount' });
+
+  return [
+    { $match: { owner: userObjectId } },
+    {
+      $lookup: {
+        from: 'usages',
+        let: { garmentId: '$_id' },
+        pipeline: usagePipeline,
+        as: 'wearMeta',
+      },
+    },
+    {
+      $addFields: {
+        wearCount: { $ifNull: [{ $first: '$wearMeta.wearCount' }, 0] },
+      },
+    },
+    {
+      $project: {
+        _id: 1,
+        name: 1,
+        imageUrl: 1,
+        category: 1,
+        color: 1,
+        purchasePrice: 1,
+        wearCount: 1,
+        costPerWear: {
+          $cond: [
+            {
+              $and: [
+                { $gt: ['$wearCount', 0] },
+                { $ne: ['$purchasePrice', null] },
+              ],
+            },
+            { $round: [{ $divide: ['$purchasePrice', '$wearCount'] }, 2] },
+            null,
+          ],
+        },
+      },
+    },
+  ];
+};
 
 exports.getOverview = async (req, res) => {
   try {
@@ -113,17 +145,49 @@ exports.getOverview = async (req, res) => {
       owner: ownerObjectId,
       isLookbook: { $ne: true },
     };
+    const pastCalendarOutfitFilter = {
+      ...nonLookbookOutfitFilter,
+      date: {
+        $type: 'date',
+        $lte: now,
+      },
+    };
 
-    const [totalItems, outfits, usageStats, wornCurrentGarmentsStats] = await Promise.all([
+    const [totalItems, totalOutfits, usageScopedStats] = await Promise.all([
       Garment.countDocuments({ owner: ownerObjectId }),
-      Outfit.find(nonLookbookOutfitFilter).select('date').lean(),
+      Outfit.countDocuments(pastCalendarOutfitFilter),
       Usage.aggregate([
-        { $match: { user: ownerObjectId } },
+        {
+          $match: {
+            user: ownerObjectId,
+            outfit: { $ne: null },
+          },
+        },
+        {
+          $lookup: {
+            from: 'outfits',
+            localField: 'outfit',
+            foreignField: '_id',
+            as: 'outfitDoc',
+          },
+        },
+        { $unwind: '$outfitDoc' },
+        {
+          $match: {
+            'outfitDoc.owner': ownerObjectId,
+            'outfitDoc.isLookbook': { $ne: true },
+            'outfitDoc.date': {
+              $type: 'date',
+              $lte: now,
+            },
+          },
+        },
         {
           $group: {
             _id: null,
             totalWearEvents: { $sum: 1 },
             uniqueGarments: { $addToSet: '$garment' },
+            uniqueOutfits: { $addToSet: '$outfit' },
           },
         },
         {
@@ -131,75 +195,19 @@ exports.getOverview = async (req, res) => {
             _id: 0,
             totalWearEvents: 1,
             wornGarmentCount: { $size: '$uniqueGarments' },
-          },
-        },
-      ]),
-      Garment.aggregate([
-        { $match: { owner: ownerObjectId } },
-        {
-          $lookup: {
-            from: 'usages',
-            let: { garmentId: '$_id' },
-            pipeline: [
-              {
-                $match: {
-                  $expr: {
-                    $and: [
-                      { $eq: ['$garment', '$$garmentId'] },
-                      { $eq: ['$user', ownerObjectId] },
-                    ],
-                  },
-                },
-              },
-              { $limit: 1 },
-            ],
-            as: 'usageHit',
-          },
-        },
-        {
-          $project: {
-            isWorn: { $gt: [{ $size: '$usageHit' }, 0] },
-          },
-        },
-        {
-          $group: {
-            _id: null,
-            wornGarmentCount: {
-              $sum: { $cond: ['$isWorn', 1, 0] },
-            },
-          },
-        },
-        {
-          $project: {
-            _id: 0,
-            wornGarmentCount: 1,
+            outfitsWornCount: { $size: '$uniqueOutfits' },
           },
         },
       ]),
     ]);
 
-    const wornDateKeys = new Set();
-    outfits.forEach((outfit) => {
-      const parsedDate = outfit?.date ? new Date(outfit.date) : null;
-      if (!parsedDate || Number.isNaN(parsedDate.getTime())) return;
-      if (parsedDate > now) return;
-
-      const dayKey = parsedDate.toISOString().slice(0, 10);
-      wornDateKeys.add(dayKey);
-    });
-
-    const outfitTotals = {
-      totalOutfits: outfits.length,
-      outfitsWornCount: wornDateKeys.size,
-    };
-
-    const stats = usageStats[0] || {
+    const stats = usageScopedStats[0] || {
       totalWearEvents: 0,
       wornGarmentCount: 0,
+      outfitsWornCount: 0,
     };
 
-    const wornCurrentGarments = wornCurrentGarmentsStats[0]?.wornGarmentCount || 0;
-    const safeWornCount = Math.max(0, Math.min(totalItems, wornCurrentGarments));
+    const safeWornCount = Math.max(0, Math.min(totalItems, stats.wornGarmentCount));
 
     const wardrobeUsagePercent = totalItems === 0
       ? 0
@@ -210,8 +218,8 @@ exports.getOverview = async (req, res) => {
     res.json({
       totalItems,
       wardrobeUsagePercent,
-      outfitsWorn: outfitTotals.outfitsWornCount,
-      totalOutfits: outfitTotals.totalOutfits,
+      outfitsWorn: stats.outfitsWornCount,
+      totalOutfits,
       totalWearEvents: stats.totalWearEvents,
       averageWearPerItem: totalItems === 0
         ? 0
@@ -296,9 +304,10 @@ exports.getMostWorn = async (req, res) => {
   try {
     const limit = parseLimit(req.query.limit);
     const ownerObjectId = new mongoose.Types.ObjectId(req.user.userId);
+    const now = new Date();
 
     const items = await Garment.aggregate([
-      ...buildGarmentWearAggregation(ownerObjectId),
+      ...buildGarmentWearAggregation(ownerObjectId, { scopedToPastCalendarOutfits: true, now }),
       { $match: { wearCount: { $gt: 0 } } },
       { $sort: { wearCount: -1, name: 1 } },
       { $limit: limit },
@@ -314,9 +323,10 @@ exports.getLeastWorn = async (req, res) => {
   try {
     const limit = parseLimit(req.query.limit);
     const ownerObjectId = new mongoose.Types.ObjectId(req.user.userId);
+    const now = new Date();
 
     const items = await Garment.aggregate([
-      ...buildGarmentWearAggregation(ownerObjectId),
+      ...buildGarmentWearAggregation(ownerObjectId, { scopedToPastCalendarOutfits: true, now }),
       { $match: { wearCount: { $gt: 0 } } },
       { $sort: { wearCount: 1, name: 1 } },
       { $limit: limit },
@@ -332,9 +342,10 @@ exports.getNeverWorn = async (req, res) => {
   try {
     const limit = parseLimit(req.query.limit);
     const ownerObjectId = new mongoose.Types.ObjectId(req.user.userId);
+    const now = new Date();
 
     const items = await Garment.aggregate([
-      ...buildGarmentWearAggregation(ownerObjectId),
+      ...buildGarmentWearAggregation(ownerObjectId, { scopedToPastCalendarOutfits: true, now }),
       { $match: { wearCount: 0 } },
       { $sort: { name: 1 } },
       { $limit: limit },
@@ -411,6 +422,7 @@ exports.getUsageTrends = async (req, res) => {
   try {
     const ownerObjectId = new mongoose.Types.ObjectId(req.user.userId);
     const months = parseLimit(req.query.months, 6, 24);
+    const now = new Date();
     const fromDate = new Date();
     fromDate.setUTCDate(1);
     fromDate.setUTCHours(0, 0, 0, 0);
@@ -420,7 +432,27 @@ exports.getUsageTrends = async (req, res) => {
       {
         $match: {
           user: ownerObjectId,
-          wornDate: { $gte: fromDate },
+          outfit: { $ne: null },
+        },
+      },
+      {
+        $lookup: {
+          from: 'outfits',
+          localField: 'outfit',
+          foreignField: '_id',
+          as: 'outfitDoc',
+        },
+      },
+      { $unwind: '$outfitDoc' },
+      {
+        $match: {
+          'outfitDoc.owner': ownerObjectId,
+          'outfitDoc.isLookbook': { $ne: true },
+          'outfitDoc.date': {
+            $type: 'date',
+            $gte: fromDate,
+            $lte: now,
+          },
         },
       },
       {
@@ -428,7 +460,7 @@ exports.getUsageTrends = async (req, res) => {
           monthly: [
             {
               $group: {
-                _id: { $dateToString: { format: '%Y-%m', date: '$wornDate' } },
+                _id: { $dateToString: { format: '%Y-%m', date: '$outfitDoc.date' } },
                 wearCount: { $sum: 1 },
               },
             },
@@ -444,7 +476,7 @@ exports.getUsageTrends = async (req, res) => {
           dayOfWeek: [
             {
               $group: {
-                _id: { $isoDayOfWeek: '$wornDate' },
+                _id: { $isoDayOfWeek: '$outfitDoc.date' },
                 wearCount: { $sum: 1 },
               },
             },
