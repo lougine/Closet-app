@@ -1,6 +1,7 @@
 const path = require('path');
 const { DEFAULT_UPLOADS_ROOT } = require('../services/storage/drivers/localStorageDriver');
 const { deleteManagedFile, listManagedFiles } = require('../services/storage');
+const { CLOUDINARY_FOLDER } = require('../config/upload');
 
 const uploadsRoot = path.resolve(DEFAULT_UPLOADS_ROOT);
 
@@ -24,9 +25,21 @@ const normalizeImageUrlPath = (imageUrl) => {
 
 const extractFilenameFromImageUrl = (imageUrl) => {
   const normalizedPath = normalizeImageUrlPath(imageUrl);
-  if (!normalizedPath || !normalizedPath.startsWith(UPLOADS_URL_PREFIX)) return null;
+  if (!normalizedPath) return null;
 
-  const relativePath = normalizedPath.slice(UPLOADS_URL_PREFIX.length);
+  if (normalizedPath.startsWith(UPLOADS_URL_PREFIX)) {
+    const relativePath = normalizedPath.slice(UPLOADS_URL_PREFIX.length);
+    if (!relativePath || relativePath.includes('/')) return null;
+    if (!isSafeFilename(relativePath)) return null;
+
+    return relativePath;
+  }
+
+  const folderPrefix = `/${String(CLOUDINARY_FOLDER || '').trim().replace(/^\/+|\/+$/g, '')}/`;
+  const folderIndex = folderPrefix === '//' ? -1 : normalizedPath.indexOf(folderPrefix);
+  if (folderIndex === -1) return null;
+
+  const relativePath = normalizedPath.slice(folderIndex + folderPrefix.length);
   if (!relativePath || relativePath.includes('/')) return null;
   if (!isSafeFilename(relativePath)) return null;
 

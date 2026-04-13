@@ -410,7 +410,7 @@ Confirmed incomplete/stubbed or partially implemented areas:
 - No explicit global Express error middleware; each controller handles errors ad hoc.
 - No role/permission model beyond owner checks and route auth.
 - No CI pipeline files (`.github/workflows/*`) found.
-- No deployment descriptors found (no Dockerfile, docker-compose, railway.toml, Procfile, or .env.example at repo root).
+- No `.env.example` template found to document required environment variables for new contributors.
 - Frontend `app.json` contains duplicate `ios` keys; in JSON the latter key overwrites the earlier one (likely unintended config loss for `supportsTablet`/`bundleIdentifier`).
 
 ## Conventions & patterns
@@ -447,15 +447,16 @@ This is functional but inconsistent for client parsing (`message` vs `error`, wr
 ### Present
 - `.env` file exists locally (not committed details here).
 - Runtime startup via `server.js`.
+- `Dockerfile` exists at repo root.
+- `docker-compose.yml` exists at repo root.
 - Jest integration test setup.
 - Operational docs:
   - Atlas + Compass setup
   - Storage rollout and rollback checklist
 
 ### Missing (as of current repo state)
-- No Dockerfile / container orchestration config.
-- No platform deployment manifest (Railway/Render/Heroku/etc.).
 - No GitHub Actions or other CI config in repo.
+- No platform deployment manifest (Railway/Render/Heroku/Procfile) beyond Docker assets.
 - No `.env.example` template documenting required vars.
 - No explicit production process manager config (PM2/ecosystem file).
 
@@ -506,3 +507,53 @@ This is functional but inconsistent for client parsing (`message` vs `error`, wr
 - No centralized validation strategy for all endpoints.
 - Frontend includes local context state (`userContext`) that can diverge from backend source-of-truth if used broadly.
 - Installed but currently unused dependency: `@aws-sdk/client-s3`.
+
+## Potential improvements
+Prioritized improvements that fit the current architecture:
+
+### 1) API contract and error consistency
+- Adopt a consistent response envelope for success and errors (e.g., `{ data, meta }` and `{ error: { code, message, details } }`).
+- Add a global Express error handler and route-level async wrapper to remove duplicated `try/catch` boilerplate.
+- Introduce stable error codes for frontend branching (auth expired, validation failed, ownership denied, etc.).
+
+### 2) Validation and security hardening
+- Apply request validation middleware to all mutating endpoints (`POST/PUT/PATCH/DELETE`) with shared schemas.
+- Add per-route rate limits for sensitive flows (`/api/auth/*`, image upload endpoints, remove.bg and Serper proxy endpoints).
+- Add security headers (`helmet`) and explicit CORS allowlist by environment.
+- Move token strategy toward short-lived access tokens + refresh token rotation/revocation support.
+
+### 3) Data model and query performance
+- Add indexes for frequent filter/sort paths in garments/outfits/community feed (including compound owner+date patterns).
+- Add partial indexes where appropriate for sparse fields.
+- Add pagination defaults and hard caps consistently across all list endpoints.
+- Consider soft-delete strategy (or archive collection) for recoverability instead of immediate hard delete.
+
+### 4) Storage and media lifecycle
+- Add background job/queue support for heavy image workflows (resizing, metadata extraction, delayed cleanup).
+- Persist image derivatives (thumbnail/preview) to reduce mobile bandwidth and improve feed latency.
+- Add signed URL strategy for private cloud assets where direct proxying becomes expensive.
+- Add periodic integrity job schedule with report artifacts (verify + orphan cleanup + anomaly summary).
+
+### 5) Observability and operations
+- Introduce structured logging (`pino`/`winston`) with request IDs and correlation IDs across backend and scripts.
+- Add health/readiness checks for DB and storage dependencies separately.
+- Add metrics for endpoint latency/error rate and storage provider failures.
+- Add CI pipeline for lint + test + basic security scanning on PRs.
+
+### 6) Developer experience
+- Add `.env.example` and startup validation docs for required/optional env vars.
+- Add script-level dry-run defaults where mutation is risky (`repair`, `restore`, `cleanup`).
+- Add OpenAPI/Swagger spec generation to keep frontend/backend contracts synchronized.
+- Remove unused deps (e.g., `@aws-sdk/client-s3`) or complete their integration intentionally.
+
+### 7) Frontend reliability and product polish
+- Fix duplicate `ios` key in `frontend/closet/app.json`.
+- Introduce typed API client layer with centralized auth refresh/retry policy.
+- Add optimistic update + rollback patterns for likes/comments/preferences to improve perceived performance.
+- Add offline-aware caching strategy for core wardrobe/outfit/calendar reads.
+
+### 8) Testing strategy expansion
+- Add unit tests for utility-heavy modules (image utils, metadata mapping, storage reference parsing).
+- Add contract tests for key endpoints and error payload shapes.
+- Add end-to-end smoke tests for register/login/upload/create outfit flow.
+- Add regression tests for storage migration scripts using representative backup fixtures.

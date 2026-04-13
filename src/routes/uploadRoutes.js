@@ -1,12 +1,11 @@
 const express = require('express');
-const fs = require('fs/promises');
 
 const Garment = require('../models/garment');
 const Outfit = require('../models/outfit');
 const User = require('../models/user');
 const authMiddleware = require('../middleware/authMiddleware');
 const { isSafeFilename } = require('../utils/imageFileUtils');
-const { getReadableLocalPath, getManagedReadUrl } = require('../services/storage');
+const { getManagedReadUrl } = require('../services/storage');
 
 const router = express.Router();
 
@@ -38,16 +37,6 @@ router.get('/:filename', async (req, res) => {
 
     if (!garmentExists && !userImageExists && !outfitImageExists) {
       return res.status(404).json({ message: 'Image not found.' });
-    }
-
-    const fullPath = await getReadableLocalPath(filename);
-    if (fullPath) {
-      try {
-        await fs.access(fullPath);
-        return res.sendFile(fullPath);
-      } catch {
-        // Fall through to managed remote storage lookup.
-      }
     }
 
     const managedReadUrl = await getManagedReadUrl(filename);

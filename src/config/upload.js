@@ -2,7 +2,7 @@ const DEFAULT_MAX_MB = 5;
 const DEFAULT_MAX_DIMENSION_PX = 6000;
 const DEFAULT_MAX_MEGAPIXELS = 25;
 const DEFAULT_ORPHAN_RETENTION_DAYS = 30;
-const DEFAULT_STORAGE_PRIMARY_DRIVER = 'local';
+const DEFAULT_STORAGE_PRIMARY_DRIVER = 'cloudinary';
 const DEFAULT_CLOUDINARY_FOLDER = 'digital-wardrobe';
 
 const parsePositiveNumber = (value, fallback) => {
@@ -40,7 +40,7 @@ const IMAGE_UPLOAD_MAX_MEGAPIXELS = parsePositiveNumber(process.env.IMAGE_UPLOAD
 const IMAGE_UPLOAD_MAX_PIXELS = Math.round(IMAGE_UPLOAD_MAX_MEGAPIXELS * 1000000);
 const ORPHAN_UPLOAD_RETENTION_DAYS = Math.round(parsePositiveNumber(process.env.ORPHAN_UPLOAD_RETENTION_DAYS, DEFAULT_ORPHAN_RETENTION_DAYS));
 const STORAGE_PRIMARY_DRIVER = parseStorageDriver(process.env.STORAGE_PRIMARY_DRIVER);
-const STORAGE_KEEP_LOCAL_COPY = parseBoolean(process.env.STORAGE_KEEP_LOCAL_COPY, false);
+const STORAGE_KEEP_LOCAL_COPY = false;
 
 const CLOUDINARY_CLOUD_NAME = String(process.env.CLOUDINARY_CLOUD_NAME || '').trim();
 const CLOUDINARY_API_KEY = String(process.env.CLOUDINARY_API_KEY || '').trim();
