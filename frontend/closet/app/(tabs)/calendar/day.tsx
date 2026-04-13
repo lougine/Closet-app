@@ -110,7 +110,13 @@ export default function DayScreen() {
   }
 
   function goToOutfitsIndex() {
-    router.push({ pathname: '/(tabs)' as any });
+    router.push({
+      pathname: '/(tabs)' as any,
+      params: {
+        tab: 'outfits',
+        pickForCalendar: '1',
+      },
+    });
   }
 
   function openOutfitDetail(outfit: OutfitEntry) {

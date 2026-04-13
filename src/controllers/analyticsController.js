@@ -2,7 +2,6 @@ const mongoose = require('mongoose');
 
 const Garment = require('../models/garment');
 const Outfit = require('../models/outfit');
-const Usage = require('../models/usage');
 
 const parseLimit = (value, fallback = 6, max = 50) => {
   const parsed = Number(value);
@@ -52,56 +51,91 @@ const buildDayOfWeekSeries = (dayRows) => {
   }));
 };
 
-const buildGarmentWearAggregation = (userObjectId, options = {}) => {
-  const { scopedToPastCalendarOutfits = false, now = new Date() } = options;
+const buildOutfitDateNormalizationStages = ({ fromDate = null, toDate = null } = {}) => {
+  const dateBounds = {};
+  if (fromDate) dateBounds.$gte = fromDate;
+  if (toDate) dateBounds.$lte = toDate;
 
-  const usagePipeline = [
+  return [
+    {
+      $addFields: {
+        analyticsDate: {
+          $switch: {
+            branches: [
+              {
+                case: { $eq: [{ $type: '$date' }, 'date'] },
+                then: '$date',
+              },
+              {
+                case: { $eq: [{ $type: '$date' }, 'string'] },
+                then: {
+                  $dateFromString: {
+                    dateString: '$date',
+                    onError: null,
+                    onNull: null,
+                  },
+                },
+              },
+            ],
+            default: null,
+          },
+        },
+      },
+    },
     {
       $match: {
-        $expr: {
-          $and: [
-            { $eq: ['$garment', '$$garmentId'] },
-            { $eq: ['$user', userObjectId] },
-          ],
+        analyticsDate: {
+          $ne: null,
+          ...dateBounds,
         },
       },
     },
   ];
+};
 
-  if (scopedToPastCalendarOutfits) {
-    usagePipeline.push(
-      { $match: { outfit: { $ne: null } } },
-      {
-        $lookup: {
-          from: 'outfits',
-          localField: 'outfit',
-          foreignField: '_id',
-          as: 'outfitDoc',
-        },
+const buildGarmentWearAggregation = (userObjectId, options = {}) => {
+  const {
+    scopedToPastCalendarOutfits = false,
+    now = new Date(),
+    fromDate = null,
+  } = options;
+
+  const outfitPipeline = [
+    {
+      $match: {
+        owner: userObjectId,
+        isLookbook: { $ne: true },
       },
-      { $unwind: '$outfitDoc' },
-      {
-        $match: {
-          'outfitDoc.owner': userObjectId,
-          'outfitDoc.isLookbook': { $ne: true },
-          'outfitDoc.date': {
-            $type: 'date',
-            $lte: now,
-          },
-        },
-      },
+    },
+  ];
+
+  if (scopedToPastCalendarOutfits || fromDate) {
+    outfitPipeline.push(
+      ...buildOutfitDateNormalizationStages({
+        fromDate,
+        toDate: scopedToPastCalendarOutfits ? now : null,
+      })
     );
   }
 
-  usagePipeline.push({ $count: 'wearCount' });
+  outfitPipeline.push(
+    {
+      $match: {
+        $expr: {
+          $in: ['$$garmentId', { $ifNull: ['$garments', []] }],
+        },
+      },
+    },
+    { $count: 'wearCount' },
+  );
 
   return [
     { $match: { owner: userObjectId } },
     {
       $lookup: {
-        from: 'usages',
+        from: 'outfits',
         let: { garmentId: '$_id' },
-        pipeline: usagePipeline,
+        pipeline: outfitPipeline,
         as: 'wearMeta',
       },
     },
@@ -141,53 +175,32 @@ exports.getOverview = async (req, res) => {
     const owner = req.user.userId;
     const ownerObjectId = new mongoose.Types.ObjectId(owner);
     const now = new Date();
-    const nonLookbookOutfitFilter = {
-      owner: ownerObjectId,
-      isLookbook: { $ne: true },
-    };
-    const pastCalendarOutfitFilter = {
-      ...nonLookbookOutfitFilter,
-      date: {
-        $type: 'date',
-        $lte: now,
-      },
-    };
-
-    const [totalItems, totalOutfits, usageScopedStats] = await Promise.all([
+    const [totalItems, totalOutfits, outfitScopedStats] = await Promise.all([
       Garment.countDocuments({ owner: ownerObjectId }),
-      Outfit.countDocuments(pastCalendarOutfitFilter),
-      Usage.aggregate([
+      Outfit.countDocuments({
+        owner: ownerObjectId,
+        isLookbook: { $ne: true },
+      }),
+      Outfit.aggregate([
         {
           $match: {
-            user: ownerObjectId,
-            outfit: { $ne: null },
+            owner: ownerObjectId,
+            isLookbook: { $ne: true },
           },
         },
-        {
-          $lookup: {
-            from: 'outfits',
-            localField: 'outfit',
-            foreignField: '_id',
-            as: 'outfitDoc',
-          },
-        },
-        { $unwind: '$outfitDoc' },
+        ...buildOutfitDateNormalizationStages({ toDate: now }),
         {
           $match: {
-            'outfitDoc.owner': ownerObjectId,
-            'outfitDoc.isLookbook': { $ne: true },
-            'outfitDoc.date': {
-              $type: 'date',
-              $lte: now,
-            },
+            garments: { $exists: true, $ne: [] },
           },
         },
+        { $unwind: '$garments' },
         {
           $group: {
             _id: null,
             totalWearEvents: { $sum: 1 },
-            uniqueGarments: { $addToSet: '$garment' },
-            uniqueOutfits: { $addToSet: '$outfit' },
+            uniqueGarments: { $addToSet: '$garments' },
+            uniqueOutfits: { $addToSet: '$_id' },
           },
         },
         {
@@ -201,7 +214,7 @@ exports.getOverview = async (req, res) => {
       ]),
     ]);
 
-    const stats = usageScopedStats[0] || {
+    const stats = outfitScopedStats[0] || {
       totalWearEvents: 0,
       wornGarmentCount: 0,
       outfitsWornCount: 0,
@@ -428,31 +441,33 @@ exports.getUsageTrends = async (req, res) => {
     fromDate.setUTCHours(0, 0, 0, 0);
     fromDate.setUTCMonth(fromDate.getUTCMonth() - (months - 1));
 
-    const trends = await Usage.aggregate([
+    const trends = await Outfit.aggregate([
       {
         $match: {
-          user: ownerObjectId,
-          outfit: { $ne: null },
+          owner: ownerObjectId,
+          isLookbook: { $ne: true },
         },
       },
+      ...buildOutfitDateNormalizationStages({ fromDate, toDate: now }),
+      {
+        $project: {
+          date: '$analyticsDate',
+          garments: { $ifNull: ['$garments', []] },
+        },
+      },
+      { $unwind: '$garments' },
       {
         $lookup: {
-          from: 'outfits',
-          localField: 'outfit',
+          from: 'garments',
+          localField: 'garments',
           foreignField: '_id',
-          as: 'outfitDoc',
+          as: 'garmentDoc',
         },
       },
-      { $unwind: '$outfitDoc' },
       {
-        $match: {
-          'outfitDoc.owner': ownerObjectId,
-          'outfitDoc.isLookbook': { $ne: true },
-          'outfitDoc.date': {
-            $type: 'date',
-            $gte: fromDate,
-            $lte: now,
-          },
+        $unwind: {
+          path: '$garmentDoc',
+          preserveNullAndEmptyArrays: true,
         },
       },
       {
@@ -460,7 +475,7 @@ exports.getUsageTrends = async (req, res) => {
           monthly: [
             {
               $group: {
-                _id: { $dateToString: { format: '%Y-%m', date: '$outfitDoc.date' } },
+                _id: { $dateToString: { format: '%Y-%m', date: '$date' } },
                 wearCount: { $sum: 1 },
               },
             },
@@ -476,22 +491,13 @@ exports.getUsageTrends = async (req, res) => {
           dayOfWeek: [
             {
               $group: {
-                _id: { $isoDayOfWeek: '$outfitDoc.date' },
+                _id: { $isoDayOfWeek: '$date' },
                 wearCount: { $sum: 1 },
               },
             },
             { $sort: { _id: 1 } },
           ],
           byCategory: [
-            {
-              $lookup: {
-                from: 'garments',
-                localField: 'garment',
-                foreignField: '_id',
-                as: 'garmentDoc',
-              },
-            },
-            { $unwind: '$garmentDoc' },
             {
               $group: {
                 _id: { $ifNull: ['$garmentDoc.category', 'Unknown'] },
