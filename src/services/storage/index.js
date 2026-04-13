@@ -33,13 +33,7 @@ const getPrimaryDriverName = () => {
     return 'cloudinary';
   }
 
-  return 'local';
-};
-
-const getPrimaryDriver = () => {
-  return getPrimaryDriverName() === 'cloudinary'
-    ? cloudinaryStorageDriver
-    : localStorageDriver;
+  return 'unavailable';
 };
 
 const registerUploadedFile = async (file) => {
@@ -48,16 +42,16 @@ const registerUploadedFile = async (file) => {
   }
 
   const primaryDriverName = getPrimaryDriverName();
-  if (primaryDriverName === 'local') {
-    return localStorageDriver.registerUploadedFile(file);
+  if (primaryDriverName !== 'cloudinary') {
+    const err = new Error('Cloudinary storage is not configured. Uploads are disabled until Cloudinary credentials are set.');
+    err.code = 'CLOUDINARY_NOT_CONFIGURED';
+    throw err;
   }
 
   try {
     const result = await cloudinaryStorageDriver.registerUploadedFile(file);
 
-    if (!STORAGE_KEEP_LOCAL_COPY) {
-      await localStorageDriver.deleteManagedFile(file.filename);
-    }
+    await localStorageDriver.deleteManagedFile(file.filename);
 
     return result;
   } catch (error) {
@@ -68,14 +62,8 @@ const registerUploadedFile = async (file) => {
   }
 };
 
-const getReadableLocalPath = async (filename) => {
-  return localStorageDriver.getReadableLocalPath(filename);
-};
-
 const getManagedReadUrl = async (filename) => {
-  const primaryDriver = getPrimaryDriver();
-
-  if (primaryDriver === cloudinaryStorageDriver) {
+  if (getPrimaryDriverName() === 'cloudinary') {
     try {
       return await cloudinaryStorageDriver.getManagedReadUrl(filename);
     } catch (error) {
@@ -110,18 +98,15 @@ const deleteManagedFile = async (filename) => {
 };
 
 const listManagedFiles = async () => {
-  const localFiles = await localStorageDriver.listManagedFiles();
-
   if (getPrimaryDriverName() !== 'cloudinary') {
-    return localFiles;
+    return [];
   }
 
   try {
-    const cloudFiles = await cloudinaryStorageDriver.listManagedFiles();
-    return Array.from(new Set([...localFiles, ...cloudFiles]));
+    return await cloudinaryStorageDriver.listManagedFiles();
   } catch (error) {
     markFailure('listFailures', error);
-    return localFiles;
+    return [];
   }
 };
 
@@ -156,7 +141,6 @@ const getStorageHealthSnapshot = () => {
 module.exports = {
   getPrimaryDriverName,
   registerUploadedFile,
-  getReadableLocalPath,
   getManagedReadUrl,
   deleteManagedFile,
   listManagedFiles,

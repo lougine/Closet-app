@@ -152,7 +152,7 @@ const registerUploadedFile = async (file) => {
 
   return {
     provider: 'cloudinary',
-    managedUrl: file?.filename ? `/uploads/${file.filename}` : null,
+    managedUrl: response.secure_url || null,
     publicId: response.public_id,
     secureUrl: response.secure_url,
     assetId: response.asset_id || null,
@@ -259,10 +259,7 @@ const getManagedReadUrl = async (filename) => {
   }
 
   const encodedPublicId = encodePublicIdForDelivery(publicId);
-  const extension = path.extname(publicId).replace('.', '').toLowerCase();
-  const formatSuffix = extension ? `.${encodeURIComponent(extension)}` : '';
-
-  return `https://res.cloudinary.com/${encodeURIComponent(CLOUDINARY_CLOUD_NAME)}/image/upload/${encodedPublicId}${formatSuffix}`;
+  return `https://res.cloudinary.com/${encodeURIComponent(CLOUDINARY_CLOUD_NAME)}/image/upload/${encodedPublicId}`;
 };
 
 module.exports = {

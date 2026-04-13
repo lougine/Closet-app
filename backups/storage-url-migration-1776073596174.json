@@ -1,0 +1,198 @@
+{
+  "generatedAt": "2026-04-13T09:46:37.710Z",
+  "dryRun": false,
+  "apply": true,
+  "verifyCloudAsset": false,
+  "plannedChanges": [
+    {
+      "model": "Garment",
+      "docId": "69dc9fe8805be30ff653ea4c",
+      "field": "imageUrl",
+      "from": "/uploads/image-1776066547951-3068543baedaee7e.png",
+      "to": "https://res.cloudinary.com/dazn6zthy/image/upload/digital-wardrobe/image-1776066547951-3068543baedaee7e.png"
+    },
+    {
+      "model": "Garment",
+      "docId": "69dca254805be30ff653eaad",
+      "field": "imageUrl",
+      "from": "/uploads/image-1776068498995-77c9d5c260f7e2f1.png",
+      "to": "https://res.cloudinary.com/dazn6zthy/image/upload/digital-wardrobe/image-1776068498995-77c9d5c260f7e2f1.png"
+    },
+    {
+      "model": "Garment",
+      "docId": "69dca327805be30ff653eac2",
+      "field": "imageUrl",
+      "from": "/uploads/image-1776068671123-cbc3f33e5e037f96.png",
+      "to": "https://res.cloudinary.com/dazn6zthy/image/upload/digital-wardrobe/image-1776068671123-cbc3f33e5e037f96.png"
+    },
+    {
+      "model": "Garment",
+      "docId": "69dca76f805be30ff653eb4a",
+      "field": "imageUrl",
+      "from": "/uploads/image-1776068460450-bb2da0cf8b1f3ab1.png",
+      "to": "https://res.cloudinary.com/dazn6zthy/image/upload/digital-wardrobe/image-1776068460450-bb2da0cf8b1f3ab1.png"
+    },
+    {
+      "model": "Garment",
+      "docId": "69dca81f805be30ff653eba2",
+      "field": "imageUrl",
+      "from": "/uploads/image-1776068637402-a728ecb0b86e74c8.png",
+      "to": "https://res.cloudinary.com/dazn6zthy/image/upload/digital-wardrobe/image-1776068637402-a728ecb0b86e74c8.png"
+    },
+    {
+      "model": "Garment",
+      "docId": "69dca87f805be30ff653ebd4",
+      "field": "imageUrl",
+      "from": "/uploads/image-1776068733056-897af853cfcf5ce5.png",
+      "to": "https://res.cloudinary.com/dazn6zthy/image/upload/digital-wardrobe/image-1776068733056-897af853cfcf5ce5.png"
+    },
+    {
+      "model": "Garment",
+      "docId": "69dca915805be30ff653ebd9",
+      "field": "imageUrl",
+      "from": "/uploads/image-1776068884133-cbe8386bc70c2b57.png",
+      "to": "https://res.cloudinary.com/dazn6zthy/image/upload/digital-wardrobe/image-1776068884133-cbe8386bc70c2b57.png"
+    },
+    {
+      "model": "Garment",
+      "docId": "69dca939805be30ff653ebde",
+      "field": "imageUrl",
+      "from": "/uploads/image-1776068919599-d10c30c11f823401.png",
+      "to": "https://res.cloudinary.com/dazn6zthy/image/upload/digital-wardrobe/image-1776068919599-d10c30c11f823401.png"
+    },
+    {
+      "model": "Garment",
+      "docId": "69dca9c1805be30ff653ebe3",
+      "field": "imageUrl",
+      "from": "/uploads/image-1776069055506-788e3e04e5489e26.png",
+      "to": "https://res.cloudinary.com/dazn6zthy/image/upload/digital-wardrobe/image-1776069055506-788e3e04e5489e26.png"
+    },
+    {
+      "model": "Garment",
+      "docId": "69dca9fd805be30ff653ebfa",
+      "field": "imageUrl",
+      "from": "/uploads/image-1776069114889-af63790d6c314526.png",
+      "to": "https://res.cloudinary.com/dazn6zthy/image/upload/digital-wardrobe/image-1776069114889-af63790d6c314526.png"
+    },
+    {
+      "model": "Garment",
+      "docId": "69dcaa60805be30ff653ebff",
+      "field": "imageUrl",
+      "from": "/uploads/image-1776069214250-fb811ba0bd3369e5.png",
+      "to": "https://res.cloudinary.com/dazn6zthy/image/upload/digital-wardrobe/image-1776069214250-fb811ba0bd3369e5.png"
+    },
+    {
+      "model": "Garment",
+      "docId": "69dcaa75805be30ff653ec04",
+      "field": "imageUrl",
+      "from": "/uploads/image-1776069236037-6a7868cc71dbf76d.png",
+      "to": "https://res.cloudinary.com/dazn6zthy/image/upload/digital-wardrobe/image-1776069236037-6a7868cc71dbf76d.png"
+    },
+    {
+      "model": "Garment",
+      "docId": "69dcaaa8805be30ff653ec21",
+      "field": "imageUrl",
+      "from": "/uploads/image-1776069286104-8242e4f0fa647378.png",
+      "to": "https://res.cloudinary.com/dazn6zthy/image/upload/digital-wardrobe/image-1776069286104-8242e4f0fa647378.png"
+    },
+    {
+      "model": "Garment",
+      "docId": "69dcaadb805be30ff653ec26",
+      "field": "imageUrl",
+      "from": "/uploads/image-1776069337308-1522214607d01182.png",
+      "to": "https://res.cloudinary.com/dazn6zthy/image/upload/digital-wardrobe/image-1776069337308-1522214607d01182.png"
+    },
+    {
+      "model": "Garment",
+      "docId": "69dcab7d805be30ff653ec2b",
+      "field": "imageUrl",
+      "from": "/uploads/image-1776069499222-67fc43e15d5e5143.png",
+      "to": "https://res.cloudinary.com/dazn6zthy/image/upload/digital-wardrobe/image-1776069499222-67fc43e15d5e5143.png"
+    },
+    {
+      "model": "Garment",
+      "docId": "69dcab8e805be30ff653ec30",
+      "field": "imageUrl",
+      "from": "/uploads/image-1776069517062-19d5fcfcaf4f7d84.png",
+      "to": "https://res.cloudinary.com/dazn6zthy/image/upload/digital-wardrobe/image-1776069517062-19d5fcfcaf4f7d84.png"
+    },
+    {
+      "model": "Garment",
+      "docId": "69dcab9f805be30ff653ec35",
+      "field": "imageUrl",
+      "from": "/uploads/image-1776069534315-6910260f16902e50.png",
+      "to": "https://res.cloudinary.com/dazn6zthy/image/upload/digital-wardrobe/image-1776069534315-6910260f16902e50.png"
+    },
+    {
+      "model": "Garment",
+      "docId": "69dcabe5805be30ff653ec3a",
+      "field": "imageUrl",
+      "from": "/uploads/image-1776069603927-93052bf23dd2cebf.png",
+      "to": "https://res.cloudinary.com/dazn6zthy/image/upload/digital-wardrobe/image-1776069603927-93052bf23dd2cebf.png"
+    },
+    {
+      "model": "Garment",
+      "docId": "69dcac0d805be30ff653ec3f",
+      "field": "imageUrl",
+      "from": "/uploads/image-1776069644103-4b8d76c6bd5c5d60.png",
+      "to": "https://res.cloudinary.com/dazn6zthy/image/upload/digital-wardrobe/image-1776069644103-4b8d76c6bd5c5d60.png"
+    },
+    {
+      "model": "User",
+      "docId": "69dc95635bcfc7742725390a",
+      "field": "profilePicture",
+      "from": "/uploads/profileImage-1776071469853-9ffe5a823d845b32.jpg",
+      "to": "https://res.cloudinary.com/dazn6zthy/image/upload/digital-wardrobe/profileImage-1776071469853-9ffe5a823d845b32.jpg"
+    },
+    {
+      "model": "User",
+      "docId": "69dc95635bcfc7742725390a",
+      "field": "bannerImage",
+      "from": "/uploads/bannerImage-1776064037532-2f58fa8542579f12.jpg",
+      "to": "https://res.cloudinary.com/dazn6zthy/image/upload/digital-wardrobe/bannerImage-1776064037532-2f58fa8542579f12.jpg"
+    },
+    {
+      "model": "Outfit",
+      "docId": "69dcac5c805be30ff653ec8d",
+      "field": "previewImage",
+      "from": "/uploads/image-1776068460450-bb2da0cf8b1f3ab1.png",
+      "to": "https://res.cloudinary.com/dazn6zthy/image/upload/digital-wardrobe/image-1776068460450-bb2da0cf8b1f3ab1.png"
+    },
+    {
+      "model": "Outfit",
+      "docId": "69dcac6d805be30ff653ec95",
+      "field": "previewImage",
+      "from": "/uploads/image-1776066547951-3068543baedaee7e.png",
+      "to": "https://res.cloudinary.com/dazn6zthy/image/upload/digital-wardrobe/image-1776066547951-3068543baedaee7e.png"
+    },
+    {
+      "model": "Outfit",
+      "docId": "69dcac79805be30ff653ec9d",
+      "field": "previewImage",
+      "from": "/uploads/image-1776068460450-bb2da0cf8b1f3ab1.png",
+      "to": "https://res.cloudinary.com/dazn6zthy/image/upload/digital-wardrobe/image-1776068460450-bb2da0cf8b1f3ab1.png"
+    },
+    {
+      "model": "Outfit",
+      "docId": "69dcac89805be30ff653eca5",
+      "field": "previewImage",
+      "from": "/uploads/image-1776068498995-77c9d5c260f7e2f1.png",
+      "to": "https://res.cloudinary.com/dazn6zthy/image/upload/digital-wardrobe/image-1776068498995-77c9d5c260f7e2f1.png"
+    },
+    {
+      "model": "Outfit",
+      "docId": "69dcadbc805be30ff653ecef",
+      "field": "previewImage",
+      "from": "/uploads/image-1776068498995-77c9d5c260f7e2f1.png",
+      "to": "https://res.cloudinary.com/dazn6zthy/image/upload/digital-wardrobe/image-1776068498995-77c9d5c260f7e2f1.png"
+    },
+    {
+      "model": "Outfit",
+      "docId": "69dcb3d2cb67d4bc47c7d938",
+      "field": "previewImage",
+      "from": "/uploads/coverImage-1776071686628-577871c23d2b7f07.jpg",
+      "to": "https://res.cloudinary.com/dazn6zthy/image/upload/digital-wardrobe/coverImage-1776071686628-577871c23d2b7f07.jpg"
+    }
+  ],
+  "skipped": []
+}

@@ -71,6 +71,10 @@ const RELEVANCE_TOKENS = [
 
 exports.uploadImage = createImageUpload("image");
 
+const getUploadedImageUrl = (file) => {
+  return file?.storage?.secureUrl || file?.storage?.managedUrl || null;
+};
+
 const parseThirdPartyErrorMessage = async (response, fallbackMessage) => {
   try {
     const payload = await response.json();
@@ -254,7 +258,10 @@ exports.createGarment = async (req, res) => {
 
     // If an image was uploaded, add the path to the garment data
     if (req.file) {
-      garmentData.imageUrl = `/uploads/${req.file.filename}`;
+      garmentData.imageUrl = getUploadedImageUrl(req.file);
+      if (!garmentData.imageUrl) {
+        return res.status(502).json({ message: 'Image upload to cloud storage failed.' });
+      }
       garmentData.imageMetadata = buildImageMetadata(req.file, garmentData.imageUrl);
     }
 
@@ -390,7 +397,7 @@ exports.updateGarment = async (req, res) => {
 
     if (!garment) {
       if (req.file) {
-        await deleteImageByUrl(`/uploads/${req.file.filename}`);
+        await deleteImageByUrl(getUploadedImageUrl(req.file));
       }
       return res.status(404).json({ message: "Garment not found" });
     }
@@ -404,7 +411,10 @@ exports.updateGarment = async (req, res) => {
     }
 
     if (req.file) {
-      garment.imageUrl = `/uploads/${req.file.filename}`;
+      garment.imageUrl = getUploadedImageUrl(req.file);
+      if (!garment.imageUrl) {
+        return res.status(502).json({ message: 'Image upload to cloud storage failed.' });
+      }
       garment.imageMetadata = buildImageMetadata(req.file, garment.imageUrl);
     }
 

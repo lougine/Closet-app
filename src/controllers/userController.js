@@ -9,6 +9,10 @@ const { buildImageMetadata } = require('../utils/imageMetadata');
 exports.uploadProfileImage = createImageUpload('profileImage');
 exports.uploadBannerImage = createImageUpload('bannerImage');
 
+const getUploadedImageUrl = (file) => {
+  return file?.storage?.secureUrl || file?.storage?.managedUrl || null;
+};
+
 const toClientUser = (userDoc) => {
   const payload = userDoc.toObject();
   payload.username = payload.name;
@@ -54,14 +58,19 @@ exports.updateProfileImage = async (req, res) => {
       return res.status(400).json({ message: 'profileImage file is required.' });
     }
 
+    const uploadedImageUrl = getUploadedImageUrl(req.file);
+    if (!uploadedImageUrl) {
+      return res.status(502).json({ message: 'Image upload to cloud storage failed.' });
+    }
+
     const user = await User.findById(req.user.userId).select('-password');
     if (!user) {
-      await deleteImageByUrl(`/uploads/${req.file.filename}`);
+      await deleteImageByUrl(uploadedImageUrl);
       return res.status(404).json({ message: 'User not found' });
     }
 
     const previousImage = user.profilePicture;
-    user.profilePicture = `/uploads/${req.file.filename}`;
+    user.profilePicture = uploadedImageUrl;
     user.profilePictureMetadata = buildImageMetadata(req.file, user.profilePicture);
     await user.save();
 
@@ -81,14 +90,19 @@ exports.updateBannerImage = async (req, res) => {
       return res.status(400).json({ message: 'bannerImage file is required.' });
     }
 
+    const uploadedImageUrl = getUploadedImageUrl(req.file);
+    if (!uploadedImageUrl) {
+      return res.status(502).json({ message: 'Image upload to cloud storage failed.' });
+    }
+
     const user = await User.findById(req.user.userId).select('-password');
     if (!user) {
-      await deleteImageByUrl(`/uploads/${req.file.filename}`);
+      await deleteImageByUrl(uploadedImageUrl);
       return res.status(404).json({ message: 'User not found' });
     }
 
     const previousBanner = user.bannerImage;
-    user.bannerImage = `/uploads/${req.file.filename}`;
+    user.bannerImage = uploadedImageUrl;
     user.bannerImageMetadata = buildImageMetadata(req.file, user.bannerImage);
     await user.save();
 

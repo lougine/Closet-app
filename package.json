@@ -12,6 +12,7 @@
     "storage:verify": "node scripts/verify-storage-integrity.js",
     "storage:repair": "node scripts/repair-storage-references.js",
     "storage:restore": "node scripts/restore-storage-references.js",
+    "storage:migrate-legacy-urls": "node scripts/migrate-legacy-upload-urls.js",
     "storage:import-images": "node scripts/import-images-to-cloudinary.js",
     "storage:export-image-template": "node scripts/export-image-import-template.js"
   },

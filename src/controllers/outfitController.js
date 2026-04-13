@@ -136,6 +136,10 @@ const mapGarment = (garment) => ({
 
 exports.uploadCoverImage = createImageUpload('coverImage');
 
+const getUploadedImageUrl = (file) => {
+  return file?.storage?.secureUrl || file?.storage?.managedUrl || null;
+};
+
 const cleanupReplacedPreviewImage = async (owner, previousPreviewImage, nextPreviewImage, options = {}) => {
   if (!previousPreviewImage || previousPreviewImage === nextPreviewImage) return;
 
@@ -267,7 +271,7 @@ exports.updateOutfit = async (req, res) => {
 
     if (!outfit) {
       if (req.file) {
-        await deleteImageByUrl(`/uploads/${req.file.filename}`);
+        await deleteImageByUrl(getUploadedImageUrl(req.file));
       }
       return res.status(404).json({ message: 'Outfit not found' });
     }
@@ -276,7 +280,10 @@ exports.updateOutfit = async (req, res) => {
 
     Object.assign(outfit, req.body);
     if (req.file) {
-      outfit.previewImage = `/uploads/${req.file.filename}`;
+      outfit.previewImage = getUploadedImageUrl(req.file);
+      if (!outfit.previewImage) {
+        return res.status(502).json({ message: 'Image upload to cloud storage failed.' });
+      }
       outfit.previewImageMetadata = buildImageMetadata(req.file, outfit.previewImage);
     } else if (Object.prototype.hasOwnProperty.call(req.body || {}, 'previewImage') && !req.body.previewImage) {
       outfit.previewImageMetadata = null;
@@ -307,7 +314,7 @@ exports.updateOutfitCover = async (req, res) => {
 
     if (!outfit) {
       if (req.file) {
-        await deleteImageByUrl(`/uploads/${req.file.filename}`);
+        await deleteImageByUrl(getUploadedImageUrl(req.file));
       }
       return res.status(404).json({ message: 'Outfit not found' });
     }
@@ -315,7 +322,10 @@ exports.updateOutfitCover = async (req, res) => {
     const previousPreviewImage = outfit.previewImage;
 
     if (req.file) {
-      outfit.previewImage = `/uploads/${req.file.filename}`;
+      outfit.previewImage = getUploadedImageUrl(req.file);
+      if (!outfit.previewImage) {
+        return res.status(502).json({ message: 'Image upload to cloud storage failed.' });
+      }
       outfit.previewImageMetadata = buildImageMetadata(req.file, outfit.previewImage);
     } else if (Object.prototype.hasOwnProperty.call(req.body || {}, 'previewImage')) {
       outfit.previewImage = req.body.previewImage || '';
