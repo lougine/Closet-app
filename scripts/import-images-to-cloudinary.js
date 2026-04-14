@@ -317,7 +317,10 @@ const importImages = async (options = {}) => {
         path: validation.absoluteImagePath,
       });
 
-      const imageUrl = `/uploads/${uploadFilename}`;
+      const imageUrl = uploadResult.secureUrl || uploadResult.managedUrl || null;
+      if (!imageUrl) {
+        throw new Error('Cloudinary upload did not return a secure URL.');
+      }
       const updatePayload = {
         [validation.fieldConfig.imageField]: imageUrl,
       };

@@ -10,15 +10,15 @@ const MODEL_CONFIG = [
   {
     label: 'Garment',
     model: Garment,
-    fields: [{ key: 'imageUrl', emptyValue: null }],
+    fields: [{ key: 'imageUrl', metadataKey: 'imageMetadata', emptyValue: null }],
     query: { imageUrl: { $exists: true, $ne: null } },
   },
   {
     label: 'User',
     model: User,
     fields: [
-      { key: 'profilePicture', emptyValue: null },
-      { key: 'bannerImage', emptyValue: null },
+      { key: 'profilePicture', metadataKey: 'profilePictureMetadata', emptyValue: null },
+      { key: 'bannerImage', metadataKey: 'bannerImageMetadata', emptyValue: null },
     ],
     query: {
       $or: [
@@ -30,13 +30,13 @@ const MODEL_CONFIG = [
   {
     label: 'Outfit',
     model: Outfit,
-    fields: [{ key: 'previewImage', emptyValue: '' }],
+    fields: [{ key: 'previewImage', metadataKey: 'previewImageMetadata', emptyValue: '' }],
     query: { previewImage: { $exists: true, $ne: null, $ne: '' } },
   },
   {
     label: 'CommunityPost',
     model: CommunityPost,
-    fields: [{ key: 'imageUrl', emptyValue: null }],
+    fields: [{ key: 'imageUrl', metadataKey: null, emptyValue: null }],
     query: { imageUrl: { $exists: true, $ne: null } },
   },
 ];
@@ -45,7 +45,9 @@ const collectImageReferences = async () => {
   const references = [];
 
   for (const config of MODEL_CONFIG) {
-    const fieldProjection = config.fields.map((field) => field.key).join(' ');
+    const projectionKeys = config.fields
+      .flatMap((field) => [field.key, field.metadataKey].filter(Boolean));
+    const fieldProjection = projectionKeys.join(' ');
     const docs = await config.model.find(config.query).select(fieldProjection).lean();
 
     for (const doc of docs) {
@@ -59,6 +61,8 @@ const collectImageReferences = async () => {
           docId: doc._id,
           docIdString: String(doc._id),
           field: field.key,
+          metadataField: field.metadataKey,
+          hasMetadataObject: Boolean(field.metadataKey && doc[field.metadataKey]),
           emptyValue: field.emptyValue,
           imageUrl,
           filename: extractFilenameFromImageUrl(imageUrl),
@@ -75,9 +79,18 @@ const writeReferenceValue = async (reference, value) => {
     return { matchedCount: 0, modifiedCount: 0 };
   }
 
+  const setPayload = {
+    [reference.field]: value,
+  };
+
+  if (reference.metadataField && reference.hasMetadataObject) {
+    setPayload[`${reference.metadataField}.imageUrl`] = value;
+    setPayload[`${reference.metadataField}.secureUrl`] = value;
+  }
+
   return reference.model.updateOne(
     { _id: reference.docId },
-    { $set: { [reference.field]: value } }
+    { $set: setPayload }
   );
 };
 
