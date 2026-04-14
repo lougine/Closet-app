@@ -8,6 +8,7 @@ const Garment = require('../models/garment');
 const Outfit = require('../models/outfit');
 const Usage = require('../models/usage');
 const { uploadsRoot } = require('../utils/imageFileUtils');
+const cloudinaryStorageDriver = require('../services/storage/drivers/cloudinaryStorageDriver');
 
 const PROFILE_CONFIG = {
   medium: {
@@ -93,6 +94,62 @@ async function ensureSeedImageFile(imageUrl) {
   await fs.writeFile(fullPath, fileBuffer);
 }
 
+const buildSeedImageMetadata = (storageUpload, imageUrl, originalFilename) => {
+  if (!storageUpload) return null;
+
+  return {
+    imageUrl,
+    provider: storageUpload.provider || 'cloudinary',
+    publicId: storageUpload.publicId || null,
+    secureUrl: storageUpload.secureUrl || null,
+    assetId: storageUpload.assetId || null,
+    version: Number.isFinite(storageUpload.version) ? storageUpload.version : null,
+    resourceType: storageUpload.resourceType || null,
+    format: storageUpload.format || null,
+    width: Number.isFinite(storageUpload.width) ? storageUpload.width : null,
+    height: Number.isFinite(storageUpload.height) ? storageUpload.height : null,
+    bytes: Number.isFinite(storageUpload.bytes) ? storageUpload.bytes : null,
+    mimeType: storageUpload.mimeType || 'image/png',
+    originalFilename,
+    uploadedAt: storageUpload.uploadedAt ? new Date(storageUpload.uploadedAt) : new Date(),
+  };
+};
+
+const uploadSeedImageIfPossible = async (localImageUrl) => {
+  await ensureSeedImageFile(localImageUrl);
+
+  if (!cloudinaryStorageDriver.isEnabled()) {
+    return {
+      imageUrl: localImageUrl,
+      imageMetadata: null,
+    };
+  }
+
+  const filename = localImageUrl.split('/').filter(Boolean).pop();
+  if (!filename) {
+    return {
+      imageUrl: localImageUrl,
+      imageMetadata: null,
+    };
+  }
+
+  const filePath = path.join(uploadsRoot, filename);
+  const stats = await fs.stat(filePath);
+  const storageUpload = await cloudinaryStorageDriver.registerUploadedFile({
+    filename,
+    path: filePath,
+    originalname: filename,
+    mimetype: 'image/png',
+    size: stats.size,
+  });
+
+  const imageUrl = storageUpload.secureUrl || storageUpload.managedUrl || localImageUrl;
+  return {
+    imageUrl,
+    imageMetadata: buildSeedImageMetadata(storageUpload, imageUrl, filename),
+  };
+};
+
 function validateRequest(req, res) {
   if (process.env.NODE_ENV === 'production') {
     res.status(403).json({ message: 'Seeder endpoint is disabled in production' });
@@ -139,20 +196,27 @@ exports.generateUserWithData = async (req, res) => {
   const generatedName = `seed-user-${uniqueSuffix}`;
   const generatedEmail = `seed-user-${uniqueSuffix}@example.com`;
 
-  const profilePicture = `/uploads/seed-profile-${uniqueSuffix}.jpg`;
-  const bannerImage = `/uploads/seed-banner-${uniqueSuffix}.jpg`;
+  const profilePictureLocal = `/uploads/seed-profile-${uniqueSuffix}.jpg`;
+  const bannerImageLocal = `/uploads/seed-banner-${uniqueSuffix}.jpg`;
 
   let createdUser = null;
 
   try {
     const hashedPassword = await bcrypt.hash(plainPassword, 10);
 
+    const [profileImageUpload, bannerImageUpload] = await Promise.all([
+      uploadSeedImageIfPossible(profilePictureLocal),
+      uploadSeedImageIfPossible(bannerImageLocal),
+    ]);
+
     createdUser = await User.create({
       name: generatedName,
       email: generatedEmail,
       password: hashedPassword,
-      profilePicture,
-      bannerImage,
+      profilePicture: profileImageUpload.imageUrl,
+      profilePictureMetadata: profileImageUpload.imageMetadata,
+      bannerImage: bannerImageUpload.imageUrl,
+      bannerImageMetadata: bannerImageUpload.imageMetadata,
       bannerPreset: 'pink',
       age: randomInt(random, 19, 34),
       heightCm: randomInt(random, 155, 188),
@@ -165,12 +229,7 @@ exports.generateUserWithData = async (req, res) => {
       },
     });
 
-    await Promise.all([
-      ensureSeedImageFile(profilePicture),
-      ensureSeedImageFile(bannerImage),
-    ]);
-
-    const garmentDocs = Array.from({ length: config.garments }).map((_, index) => {
+    const garmentDrafts = Array.from({ length: config.garments }).map((_, index) => {
       const category = pick(random, CATEGORY_OPTIONS);
       const color = pick(random, COLOR_OPTIONS);
       const season = pick(random, SEASON_OPTIONS);
@@ -181,12 +240,25 @@ exports.generateUserWithData = async (req, res) => {
         color,
         season,
         purchasePrice: randomInt(random, 20, 250),
-        imageUrl: `/uploads/seed-garment-${uniqueSuffix}-${index + 1}.jpg`,
+        localImageUrl: `/uploads/seed-garment-${uniqueSuffix}-${index + 1}.jpg`,
       };
     });
 
+    const garmentDocs = await Promise.all(garmentDrafts.map(async (garment) => {
+      const uploadedImage = await uploadSeedImageIfPossible(garment.localImageUrl);
+      return {
+        owner: garment.owner,
+        name: garment.name,
+        category: garment.category,
+        color: garment.color,
+        season: garment.season,
+        purchasePrice: garment.purchasePrice,
+        imageUrl: uploadedImage.imageUrl,
+        imageMetadata: uploadedImage.imageMetadata,
+      };
+    }));
+
     const garments = await Garment.insertMany(garmentDocs);
-    await Promise.all(garmentDocs.map((garment) => ensureSeedImageFile(garment.imageUrl)));
     const garmentIds = garments.map((g) => g._id);
 
     const outfitDocs = Array.from({ length: config.outfits }).map((_, index) => {
