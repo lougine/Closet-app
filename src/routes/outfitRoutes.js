@@ -7,6 +7,7 @@ const { imageUploadErrorHandler } = require('../middleware/imageUploadMiddleware
 const {
 	validateDateField,
 	validateObjectIdField,
+	validatePositiveIntegerQuery,
 } = require('../middleware/validationMiddleware');
 
 router.use(authMiddleware);
@@ -14,8 +15,19 @@ router.use(authMiddleware);
 router.get('/randomize', outfitController.getRandomizedOutfit);
 router.post('/recommendations', outfitController.getAiRecommendations);
 router.post("/", outfitController.createOutfit);
-router.get("/", outfitController.getOutfits);
-router.get('/date/:date', validateDateField({ source: 'params', field: 'date', required: true }), outfitController.getOutfitsByDate);
+router.get(
+	"/",
+	validatePositiveIntegerQuery({ field: 'page', min: 1 }),
+	validatePositiveIntegerQuery({ field: 'limit', min: 1, max: 100 }),
+	outfitController.getOutfits
+);
+router.get(
+	'/date/:date',
+	validateDateField({ source: 'params', field: 'date', required: true }),
+	validatePositiveIntegerQuery({ field: 'page', min: 1 }),
+	validatePositiveIntegerQuery({ field: 'limit', min: 1, max: 100 }),
+	outfitController.getOutfitsByDate
+);
 router.put(
 	'/:id',
 	validateObjectIdField({ source: 'params', field: 'id', required: true }),

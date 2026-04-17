@@ -2,11 +2,20 @@ const mongoose = require('mongoose');
 
 const Garment = require('../models/garment');
 const Outfit = require('../models/outfit');
+const Usage = require('../models/usage');
 
 const parseLimit = (value, fallback = 6, max = 50) => {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
   return Math.min(Math.floor(parsed), max);
+};
+
+const wornEventMatch = {
+  $or: [
+    { eventStatus: 'worn' },
+    { eventStatus: { $exists: false } },
+    { eventStatus: null },
+  ],
 };
 
 const getMonthKey = (date) => (
@@ -100,48 +109,116 @@ const buildGarmentWearAggregation = (userObjectId, options = {}) => {
     fromDate = null,
   } = options;
 
-  const outfitPipeline = [
+  const usagePipeline = [
     {
       $match: {
-        owner: userObjectId,
-        isLookbook: { $ne: true },
+        ...wornEventMatch,
+        $expr: {
+          $and: [
+            { $eq: ['$garment', '$$garmentId'] },
+            { $eq: ['$user', '$$ownerId'] },
+          ],
+        },
       },
     },
   ];
 
   if (scopedToPastCalendarOutfits || fromDate) {
-    outfitPipeline.push(
-      ...buildOutfitDateNormalizationStages({
-        fromDate,
-        toDate: scopedToPastCalendarOutfits ? now : null,
-      })
-    );
+    usagePipeline.push({
+      $match: {
+        wornDate: {
+          ...(fromDate ? { $gte: fromDate } : {}),
+          ...(scopedToPastCalendarOutfits ? { $lte: now } : {}),
+        },
+      },
+    });
   }
 
-  outfitPipeline.push(
+  usagePipeline.push({ $count: 'wearCount' });
+
+  const outfitFallbackPipeline = [
     {
       $match: {
         $expr: {
-          $in: ['$$garmentId', { $ifNull: ['$garments', []] }],
+          $and: [
+            { $eq: ['$owner', '$$ownerId'] },
+            { $ne: ['$isLookbook', true] },
+            { $in: ['$$garmentId', { $ifNull: ['$garments', []] }] },
+          ],
+        },
+      },
+    },
+    {
+      $addFields: {
+        analyticsDate: {
+          $switch: {
+            branches: [
+              {
+                case: { $eq: [{ $type: '$date' }, 'date'] },
+                then: '$date',
+              },
+              {
+                case: { $eq: [{ $type: '$date' }, 'string'] },
+                then: {
+                  $dateFromString: {
+                    dateString: '$date',
+                    onError: null,
+                    onNull: null,
+                  },
+                },
+              },
+            ],
+            default: null,
+          },
+        },
+      },
+    },
+    {
+      $match: {
+        analyticsDate: {
+          $ne: null,
+          ...(fromDate ? { $gte: fromDate } : {}),
+          ...(scopedToPastCalendarOutfits ? { $lte: now } : {}),
         },
       },
     },
     { $count: 'wearCount' },
-  );
+  ];
 
   return [
     { $match: { owner: userObjectId } },
     {
       $lookup: {
-        from: 'outfits',
-        let: { garmentId: '$_id' },
-        pipeline: outfitPipeline,
+        from: 'usages',
+        let: { garmentId: '$_id', ownerId: userObjectId },
+        pipeline: usagePipeline,
         as: 'wearMeta',
       },
     },
     {
+      $lookup: {
+        from: 'outfits',
+        let: { garmentId: '$_id', ownerId: userObjectId },
+        pipeline: outfitFallbackPipeline,
+        as: 'outfitWearMeta',
+      },
+    },
+    {
       $addFields: {
-        wearCount: { $ifNull: [{ $first: '$wearMeta.wearCount' }, 0] },
+        usageWearCount: { $ifNull: [{ $first: '$wearMeta.wearCount' }, 0] },
+        outfitWearCount: { $ifNull: [{ $first: '$outfitWearMeta.wearCount' }, 0] },
+      },
+    },
+    {
+      $addFields: {
+        // Use explicit usage logs when present, otherwise fall back to calendar outfit history.
+        wearCount: {
+          $cond: [
+            { $gt: ['$usageWearCount', 0] },
+            '$usageWearCount',
+            '$outfitWearCount',
+          ],
+        },
       },
     },
     {
@@ -175,12 +252,54 @@ exports.getOverview = async (req, res) => {
     const owner = req.user.userId;
     const ownerObjectId = new mongoose.Types.ObjectId(owner);
     const now = new Date();
-    const [totalItems, totalOutfits, outfitScopedStats] = await Promise.all([
+    const [totalItems, totalOutfits, usageStatsResult, outfitFallbackStatsResult] = await Promise.all([
       Garment.countDocuments({ owner: ownerObjectId }),
-      Outfit.countDocuments({
-        owner: ownerObjectId,
-        isLookbook: { $ne: true },
-      }),
+      Outfit.aggregate([
+        {
+          $match: {
+            owner: ownerObjectId,
+            isLookbook: { $ne: true },
+          },
+        },
+        { $count: 'total' },
+      ]),
+      Usage.aggregate([
+        {
+          $match: {
+            user: ownerObjectId,
+            ...wornEventMatch,
+            wornDate: { $lte: now },
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            totalWearEvents: { $sum: 1 },
+            uniqueGarments: { $addToSet: '$garment' },
+            uniqueOutfits: {
+              $addToSet: {
+                $cond: [{ $ne: ['$outfit', null] }, '$outfit', null],
+              },
+            },
+          },
+        },
+        {
+          $project: {
+            _id: 0,
+            totalWearEvents: 1,
+            wornGarmentCount: { $size: '$uniqueGarments' },
+            outfitsWornCount: {
+              $size: {
+                $filter: {
+                  input: '$uniqueOutfits',
+                  as: 'outfitId',
+                  cond: { $ne: ['$$outfitId', null] },
+                },
+              },
+            },
+          },
+        },
+      ]),
       Outfit.aggregate([
         {
           $match: {
@@ -214,11 +333,21 @@ exports.getOverview = async (req, res) => {
       ]),
     ]);
 
-    const stats = outfitScopedStats[0] || {
+    const totalOutfitsCount = totalOutfits[0]?.total || 0;
+
+    const usageStats = usageStatsResult[0] || {
       totalWearEvents: 0,
       wornGarmentCount: 0,
       outfitsWornCount: 0,
     };
+
+    const outfitFallbackStats = outfitFallbackStatsResult[0] || {
+      totalWearEvents: 0,
+      wornGarmentCount: 0,
+      outfitsWornCount: 0,
+    };
+
+    const stats = usageStats.totalWearEvents > 0 ? usageStats : outfitFallbackStats;
 
     const safeWornCount = Math.max(0, Math.min(totalItems, stats.wornGarmentCount));
 
@@ -232,14 +361,14 @@ exports.getOverview = async (req, res) => {
       totalItems,
       wardrobeUsagePercent,
       outfitsWorn: stats.outfitsWornCount,
-      totalOutfits,
+      totalOutfits: totalOutfitsCount,
       totalWearEvents: stats.totalWearEvents,
       averageWearPerItem: totalItems === 0
         ? 0
         : Number((stats.totalWearEvents / totalItems).toFixed(2)),
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
@@ -282,7 +411,7 @@ exports.getCategories = async (req, res) => {
     ]);
     res.json(result);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
@@ -309,7 +438,7 @@ exports.getColours = async (req, res) => {
     ]);
     res.json(result);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
@@ -328,7 +457,7 @@ exports.getMostWorn = async (req, res) => {
 
     res.json(items);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
@@ -347,7 +476,7 @@ exports.getLeastWorn = async (req, res) => {
 
     res.json(items);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
@@ -366,7 +495,7 @@ exports.getNeverWorn = async (req, res) => {
 
     res.json(items);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
@@ -427,7 +556,7 @@ exports.getCostPerWear = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
@@ -441,25 +570,18 @@ exports.getUsageTrends = async (req, res) => {
     fromDate.setUTCHours(0, 0, 0, 0);
     fromDate.setUTCMonth(fromDate.getUTCMonth() - (months - 1));
 
-    const trends = await Outfit.aggregate([
+    const usageTrends = await Usage.aggregate([
       {
         $match: {
-          owner: ownerObjectId,
-          isLookbook: { $ne: true },
+          user: ownerObjectId,
+          ...wornEventMatch,
+          wornDate: { $gte: fromDate, $lte: now },
         },
       },
-      ...buildOutfitDateNormalizationStages({ fromDate, toDate: now }),
-      {
-        $project: {
-          date: '$analyticsDate',
-          garments: { $ifNull: ['$garments', []] },
-        },
-      },
-      { $unwind: '$garments' },
       {
         $lookup: {
           from: 'garments',
-          localField: 'garments',
+          localField: 'garment',
           foreignField: '_id',
           as: 'garmentDoc',
         },
@@ -471,11 +593,19 @@ exports.getUsageTrends = async (req, res) => {
         },
       },
       {
+        $match: {
+          $or: [
+            { garmentDoc: null },
+            { 'garmentDoc.owner': ownerObjectId },
+          ],
+        },
+      },
+      {
         $facet: {
           monthly: [
             {
               $group: {
-                _id: { $dateToString: { format: '%Y-%m', date: '$date' } },
+                _id: { $dateToString: { format: '%Y-%m', date: '$wornDate' } },
                 wearCount: { $sum: 1 },
               },
             },
@@ -491,7 +621,7 @@ exports.getUsageTrends = async (req, res) => {
           dayOfWeek: [
             {
               $group: {
-                _id: { $isoDayOfWeek: '$date' },
+                _id: { $isoDayOfWeek: '$wornDate' },
                 wearCount: { $sum: 1 },
               },
             },
@@ -516,7 +646,91 @@ exports.getUsageTrends = async (req, res) => {
         },
       },
     ]);
-    const result = trends[0] || { monthly: [], dayOfWeek: [], byCategory: [] };
+
+    let result = usageTrends[0] || { monthly: [], dayOfWeek: [], byCategory: [] };
+
+    const hasUsageTrendData = result.monthly.some((row) => row.wearCount > 0);
+
+    if (!hasUsageTrendData) {
+      const outfitTrends = await Outfit.aggregate([
+        {
+          $match: {
+            owner: ownerObjectId,
+            isLookbook: { $ne: true },
+          },
+        },
+        ...buildOutfitDateNormalizationStages({ fromDate, toDate: now }),
+        {
+          $project: {
+            date: '$analyticsDate',
+            garments: { $ifNull: ['$garments', []] },
+          },
+        },
+        { $unwind: '$garments' },
+        {
+          $lookup: {
+            from: 'garments',
+            localField: 'garments',
+            foreignField: '_id',
+            as: 'garmentDoc',
+          },
+        },
+        {
+          $unwind: {
+            path: '$garmentDoc',
+            preserveNullAndEmptyArrays: true,
+          },
+        },
+        {
+          $facet: {
+            monthly: [
+              {
+                $group: {
+                  _id: { $dateToString: { format: '%Y-%m', date: '$date' } },
+                  wearCount: { $sum: 1 },
+                },
+              },
+              { $sort: { _id: 1 } },
+              {
+                $project: {
+                  _id: 0,
+                  month: '$_id',
+                  wearCount: 1,
+                },
+              },
+            ],
+            dayOfWeek: [
+              {
+                $group: {
+                  _id: { $isoDayOfWeek: '$date' },
+                  wearCount: { $sum: 1 },
+                },
+              },
+              { $sort: { _id: 1 } },
+            ],
+            byCategory: [
+              {
+                $group: {
+                  _id: { $ifNull: ['$garmentDoc.category', 'Unknown'] },
+                  wearCount: { $sum: 1 },
+                },
+              },
+              { $sort: { wearCount: -1, _id: 1 } },
+              {
+                $project: {
+                  _id: 0,
+                  category: '$_id',
+                  wearCount: 1,
+                },
+              },
+            ],
+          },
+        },
+      ]);
+
+      result = outfitTrends[0] || result;
+    }
+
     const monthly = buildMonthSeries(months, result.monthly);
     const dayOfWeek = buildDayOfWeekSeries(result.dayOfWeek);
     const totalWearEventsInRange = monthly.reduce((sum, item) => sum + item.wearCount, 0);
@@ -540,6 +754,7 @@ exports.getUsageTrends = async (req, res) => {
     });
 
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
+

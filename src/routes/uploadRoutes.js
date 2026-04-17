@@ -6,7 +6,9 @@ const User = require('../models/user');
 const authMiddleware = require('../middleware/authMiddleware');
 const { isSafeFilename } = require('../utils/imageFileUtils');
 const { getManagedReadUrl } = require('../services/storage');
+const localStorageDriver = require('../services/storage/drivers/localStorageDriver');
 const { CLOUDINARY_FOLDER } = require('../config/upload');
+const { fetchWithTimeout } = require('../utils/fetchWithTimeout');
 
 const router = express.Router();
 
@@ -80,14 +82,15 @@ router.get('/:filename', async (req, res) => {
     }
 
     if (!managedReadUrl) {
-      return res.status(404).json({ message: 'Image not found.' });
+      const localPath = await localStorageDriver.getReadableLocalPath(filename);
+      if (!localPath) {
+        return res.status(404).json({ message: 'Image not found.' });
+      }
+
+      return res.sendFile(localPath);
     }
 
-    if (typeof fetch !== 'function') {
-      return res.status(500).json({ message: 'Server runtime does not support remote fetch.' });
-    }
-
-    const upstream = await fetch(managedReadUrl);
+    const upstream = await fetchWithTimeout(managedReadUrl, {}, 10000);
     if (upstream.status === 404) {
       return res.status(404).json({ message: 'Image not found.' });
     }
@@ -108,7 +111,11 @@ router.get('/:filename', async (req, res) => {
     const payload = Buffer.from(await upstream.arrayBuffer());
     return res.send(payload);
   } catch (error) {
-    return res.status(500).json({ error: error.message });
+    if (error?.code === 'FETCH_TIMEOUT') {
+      return res.status(502).json({ message: 'Image retrieval timed out.' });
+    }
+
+    return res.status(500).json({ message: 'Failed to retrieve image.' });
   }
 });
 
