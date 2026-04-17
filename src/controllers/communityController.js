@@ -15,6 +15,8 @@ const parsePage = (value, fallback = 1) => {
   return Math.floor(parsed);
 };
 
+const escapeRegex = (value) => String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 const serializePost = (postDoc, userId) => {
   const post = postDoc.toObject();
   const likedByMe = post.likes.some((likeUserId) => String(likeUserId) === String(userId));
@@ -56,7 +58,7 @@ exports.getFeed = async (req, res) => {
   try {
     const userId = req.user.userId;
     const filter = String(req.query.filter || 'for-you').toLowerCase();
-    const search = (req.query.search || '').trim();
+    const search = String(req.query.search || '').trim().slice(0, 80);
 
     const page = parsePage(req.query.page, 1);
     const limit = parseLimit(req.query.limit, 20, 50);
@@ -68,9 +70,10 @@ exports.getFeed = async (req, res) => {
     }
 
     if (search) {
+      const safeSearch = escapeRegex(search);
       query.$or = [
-        { caption: { $regex: search, $options: 'i' } },
-        { tags: { $in: [new RegExp(search, 'i')] } },
+        { caption: { $regex: safeSearch, $options: 'i' } },
+        { tags: { $in: [new RegExp(safeSearch, 'i')] } },
       ];
     }
 
@@ -94,7 +97,7 @@ exports.getFeed = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
@@ -153,7 +156,7 @@ exports.createPost = async (req, res) => {
 
     res.status(201).json(serializePost(post, authorId));
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
@@ -180,7 +183,7 @@ exports.toggleLike = async (req, res) => {
 
     res.json(serializePost(updated, userId));
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
@@ -220,7 +223,7 @@ exports.getComments = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
@@ -256,7 +259,7 @@ exports.addComment = async (req, res) => {
       author: hydrated.author,
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
@@ -307,6 +310,7 @@ exports.voteOnPoll = async (req, res) => {
 
     res.json(serializePost(hydrated, userId));
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
+

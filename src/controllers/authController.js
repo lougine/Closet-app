@@ -1,12 +1,31 @@
 const User = require('../models/user');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { fetchWithTimeout } = require('../utils/fetchWithTimeout');
 
 const JWT_EXPIRY = '7d';
+const requiresStrongJwtSecret = () => String(process.env.NODE_ENV || '').toLowerCase() === 'production';
+
+const getJwtSecret = () => {
+  const secret = process.env.JWT_SECRET;
+  if (typeof secret !== 'string' || secret.length === 0) {
+    const err = new Error('JWT_SECRET must be set and at least 32 characters long.');
+    err.code = 'JWT_SECRET_INVALID';
+    throw err;
+  }
+
+  if (requiresStrongJwtSecret() && secret.length < 32) {
+    const err = new Error('JWT_SECRET must be set and at least 32 characters long.');
+    err.code = 'JWT_SECRET_INVALID';
+    throw err;
+  }
+
+  return secret;
+};
 
 const buildSessionToken = (userId) => jwt.sign(
   { userId },
-  process.env.JWT_SECRET,
+  getJwtSecret(),
   { expiresIn: JWT_EXPIRY },
 );
 
@@ -60,7 +79,7 @@ exports.register = async (req, res) => {
     res.status(201).json({ message: "User registered successfully", token });
 
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
@@ -91,7 +110,7 @@ exports.login = async (req, res) => {
     res.json({ token });
 
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
@@ -102,7 +121,7 @@ exports.exchangeGoogleToken = async (req, res) => {
       return res.status(400).json({ message: 'accessToken is required' });
     }
 
-    const googleResponse = await fetch('https://www.googleapis.com/userinfo/v2/me', {
+    const googleResponse = await fetchWithTimeout('https://www.googleapis.com/userinfo/v2/me', {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
 
@@ -142,6 +161,14 @@ exports.exchangeGoogleToken = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    if (error?.code === 'FETCH_TIMEOUT') {
+      return res.status(502).json({ message: 'Authentication provider timed out. Please try again.' });
+    }
+
+    if (error?.code === 'JWT_SECRET_INVALID') {
+      return res.status(500).json({ message: 'Server authentication is not configured.' });
+    }
+
+    return res.status(500).json({ message: 'Failed to complete Google sign-in.' });
   }
 };
