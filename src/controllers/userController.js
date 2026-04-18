@@ -24,7 +24,7 @@ const toClientRelationshipUser = (userDoc, meFollowingIds = new Set()) => {
   return {
     _id: userId,
     name: payload.name,
-    username: payload.name,
+    username: payload.username || payload.name,
     profilePicture: payload.profilePicture || null,
     followerCount,
     followingCount,
@@ -34,11 +34,16 @@ const toClientRelationshipUser = (userDoc, meFollowingIds = new Set()) => {
 
 const toClientUser = (userDoc) => {
   const payload = userDoc.toObject();
-  payload.username = payload.name;
+  payload.username = payload.username || payload.name;
   payload.followerCount = Array.isArray(payload.followers) ? payload.followers.length : 0;
   payload.followingCount = Array.isArray(payload.following) ? payload.following.length : 0;
   return payload;
 };
+
+const normalizeSearchText = (value) => String(value || '')
+  .trim()
+  .replace(/^@+/, '')
+  .slice(0, 64);
 
 exports.getMe = async (req, res) => {
   try {
@@ -226,7 +231,7 @@ exports.getActivity = async (req, res) => {
 
 exports.searchUsers = async (req, res) => {
   try {
-    const queryText = String(req.query.q || req.query.search || '').trim();
+    const queryText = normalizeSearchText(req.query.q || req.query.search || '');
     const rawLimit = Number.parseInt(String(req.query.limit || '20'), 10);
     const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(rawLimit, 1), 50) : 20;
 
@@ -244,9 +249,12 @@ exports.searchUsers = async (req, res) => {
 
     const users = await User.find({
       _id: { $ne: req.user.userId },
-      name: { $regex: escapedQuery, $options: 'i' },
+      $or: [
+        { name: { $regex: escapedQuery, $options: 'i' } },
+        { username: { $regex: escapedQuery, $options: 'i' } },
+      ],
     })
-      .select('name profilePicture followers following')
+      .select('name username profilePicture followers following')
       .limit(limit)
       .sort({ name: 1 });
 

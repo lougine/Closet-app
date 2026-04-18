@@ -1,6 +1,7 @@
 const express = require('express');
 
 const communityController = require('../controllers/communityController');
+const userController = require('../controllers/userController');
 const authMiddleware = require('../middleware/authMiddleware');
 const {
   validateObjectIdField,
@@ -10,6 +11,8 @@ const {
 const router = express.Router();
 
 router.use(authMiddleware);
+
+router.get('/users/search', userController.searchUsers);
 
 router.get(
   '/feed',
