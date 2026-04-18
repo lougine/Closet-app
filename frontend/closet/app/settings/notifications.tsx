@@ -15,6 +15,20 @@ type NotifSettings = {
   weeklyRecap: boolean;        
   streakAlerts: boolean;       
   newFeatures: boolean;        
+  styledOutfitShares: boolean;
+};
+
+type StyledInboxItem = {
+  _id: string;
+  type: string;
+  message: string;
+  createdAt: string;
+  actor: {
+    _id: string;
+    name?: string;
+    username?: string;
+    profilePicture?: string | null;
+  } | null;
 };
 
 export default function NotificationsScreen() {
@@ -26,9 +40,10 @@ export default function NotificationsScreen() {
     weeklyRecap: true,
     streakAlerts: true,
     newFeatures: false,
+    styledOutfitShares: true,
   });
+  const [styledInbox, setStyledInbox] = useState<StyledInboxItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const theme = getAppTheme(isDarkMode);
 
   useEffect(() => {
@@ -42,7 +57,16 @@ export default function NotificationsScreen() {
         headers: buildAuthHeaders(token),
       });
       const data = await res.json();
-      setSettings(data);
+      setSettings({
+        dailyOutfitReminder: Boolean(data?.dailyOutfitReminder),
+        outfitPlanning: Boolean(data?.outfitPlanning),
+        weeklyRecap: Boolean(data?.weeklyRecap),
+        streakAlerts: Boolean(data?.streakAlerts),
+        newFeatures: Boolean(data?.newFeatures),
+        styledOutfitShares: Boolean(data?.styledOutfitShares ?? true),
+      });
+      const incoming = Array.isArray(data?.notifications) ? data.notifications : [];
+      setStyledInbox(incoming.filter((entry: any) => entry?.type === 'styled_outfit_shared'));
     } catch (e) {
       console.warn('Could not load notification settings, using defaults');
     } finally {
@@ -51,6 +75,7 @@ export default function NotificationsScreen() {
   }
 
   async function toggleSetting(key: keyof NotifSettings) {
+    const previous = { ...settings };
     const updated = { ...settings, [key]: !settings[key] };
     setSettings(updated);
 
@@ -65,10 +90,15 @@ export default function NotificationsScreen() {
         body: JSON.stringify(updated),
       });
     } catch (e) {
-      setSettings(settings);
+      setSettings(previous);
       Alert.alert('Error', 'Could not update notification setting.');
     }
   }
+
+  const openStylistProfile = (stylistId?: string) => {
+    if (!stylistId) return;
+    router.push({ pathname: '/features/user-profile', params: { userId: stylistId } } as any);
+  };
 
   if (loading) {
     return (
@@ -145,6 +175,46 @@ export default function NotificationsScreen() {
           theme={theme}
           isDarkMode={isDarkMode}
         />
+        <Divider border={theme.border} />
+        <NotifRow
+          title="Styled outfit shares"
+          subtitle="Notify me when someone styles a look for me"
+          value={settings.styledOutfitShares}
+          onToggle={() => toggleSetting('styledOutfitShares')}
+          theme={theme}
+          isDarkMode={isDarkMode}
+        />
+      </View>
+
+      <Text style={[styles.sectionLabel, { color: theme.subText }]}>Styled for You</Text>
+      <View style={[styles.card, { backgroundColor: theme.card }] }>
+        {styledInbox.length === 0 ? (
+          <View style={styles.notifRow}>
+            <View style={styles.notifText}>
+              <Text style={[styles.notifTitle, { color: theme.text }]}>No styled looks yet</Text>
+              <Text style={[styles.notifSub, { color: theme.subText }]}>When someone shares a styled outfit for you, it appears here.</Text>
+            </View>
+          </View>
+        ) : (
+          styledInbox.map((item, index) => (
+            <View key={item._id}>
+              <TouchableOpacity
+                style={styles.notifRow}
+                activeOpacity={0.75}
+                onPress={() => openStylistProfile(item.actor?._id)}
+              >
+                <View style={styles.notifText}>
+                  <Text style={[styles.notifTitle, { color: theme.text }]}>{item.message}</Text>
+                  <Text style={[styles.notifSub, { color: theme.subText }]}>
+                    {item.actor?.username ? `From @${item.actor.username}` : 'From another stylist'} • {new Date(item.createdAt).toLocaleDateString()}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={theme.subText} />
+              </TouchableOpacity>
+              {index < styledInbox.length - 1 && <Divider border={theme.border} />}
+            </View>
+          ))
+        )}
       </View>
 
     </ScrollView>

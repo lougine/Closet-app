@@ -15,6 +15,21 @@ router.get(
 	validateObjectIdField({ source: 'params', field: 'userId', required: true }),
 	userController.getPublicProfile,
 );
+router.get(
+	'/:userId/garments',
+	validateObjectIdField({ source: 'params', field: 'userId', required: true }),
+	userController.getPublicUserGarments,
+);
+router.get(
+	'/:userId/posts',
+	validateObjectIdField({ source: 'params', field: 'userId', required: true }),
+	userController.getPublicUserPosts,
+);
+router.post(
+	'/:userId/style-outfits',
+	validateObjectIdField({ source: 'params', field: 'userId', required: true }),
+	userController.createStyledOutfitForUser,
+);
 router.put('/me', userController.updateMe);
 router.put(
 	'/me/profile-image',
@@ -32,6 +47,7 @@ router.put('/me/banner-preset', userController.updateBannerPreset);
 router.put('/me/password', userController.updatePassword);
 router.put('/me/privacy', userController.updatePrivacy);
 router.get('/me/notifications', userController.getNotifications);
+router.put('/me/notifications', userController.updateNotificationSettings);
 router.get('/me/activity', userController.getActivity);
 router.post('/:userId/follow', userController.toggleFollowUser);
 

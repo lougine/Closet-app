@@ -5,6 +5,10 @@ const bcrypt = require('bcryptjs');
 const { createImageUpload } = require('../middleware/imageUploadMiddleware');
 const { deleteImageByUrl } = require('../utils/imageFileUtils');
 const { buildImageMetadata } = require('../utils/imageMetadata');
+const Garment = require('../models/garment');
+const CommunityPost = require('../models/communityPost');
+const Outfit = require('../models/outfit');
+const Notification = require('../models/notification');
 
 exports.uploadProfileImage = createImageUpload('profileImage');
 exports.uploadBannerImage = createImageUpload('bannerImage');
@@ -14,6 +18,18 @@ const getUploadedImageUrl = (file) => {
 };
 
 const toIdString = (value) => String(value);
+
+const parseLimit = (value, fallback = 20, max = 50) => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return Math.min(Math.floor(parsed), max);
+};
+
+const parsePage = (value, fallback = 1) => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return Math.floor(parsed);
+};
 
 const toClientRelationshipUser = (userDoc, meFollowingIds = new Set()) => {
   const payload = userDoc.toObject ? userDoc.toObject() : userDoc;
@@ -44,6 +60,15 @@ const normalizeSearchText = (value) => String(value || '')
   .trim()
   .replace(/^@+/, '')
   .slice(0, 64);
+
+const getNotificationSettings = (payload = {}) => ({
+  dailyOutfitReminder: Boolean(payload.dailyOutfitReminder ?? true),
+  outfitPlanning: Boolean(payload.outfitPlanning ?? false),
+  weeklyRecap: Boolean(payload.weeklyRecap ?? true),
+  streakAlerts: Boolean(payload.streakAlerts ?? true),
+  newFeatures: Boolean(payload.newFeatures ?? false),
+  styledOutfitShares: Boolean(payload.styledOutfitShares ?? true),
+});
 
 exports.getMe = async (req, res) => {
   try {
@@ -192,8 +217,69 @@ exports.updatePassword = async (req, res) => {
 };
 
 exports.getNotifications = async (req, res) => {
-  // Placeholder: return an empty set of notifications. Expand this as needed.
-  res.json({ notifications: [] });
+  try {
+    const userId = String(req.user.userId || '');
+
+    const [user, notifications] = await Promise.all([
+      User.findById(userId).select('preferences.notifications'),
+      Notification.find({ recipient: userId })
+        .sort({ createdAt: -1, _id: -1 })
+        .limit(50)
+        .populate('actor', 'name username profilePicture')
+        .lean(),
+    ]);
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const settings = getNotificationSettings(user?.preferences?.notifications || {});
+
+    res.json({
+      ...settings,
+      notifications: notifications.map((notification) => ({
+        _id: String(notification._id),
+        type: notification.type,
+        message: notification.message,
+        outfitId: notification.outfit ? String(notification.outfit) : null,
+        communityPostId: notification.communityPost ? String(notification.communityPost) : null,
+        actor: notification.actor
+          ? {
+            _id: String(notification.actor._id),
+            name: notification.actor.name,
+            username: notification.actor.username || notification.actor.name,
+            profilePicture: notification.actor.profilePicture || null,
+          }
+          : null,
+        metadata: notification.metadata || {},
+        createdAt: notification.createdAt,
+        readAt: notification.readAt,
+      })),
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.updateNotificationSettings = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    user.preferences = user.preferences || {};
+    const existing = getNotificationSettings(user.preferences.notifications || {});
+    user.preferences.notifications = getNotificationSettings({
+      ...existing,
+      ...req.body,
+    });
+    await user.save();
+
+    res.json(user.preferences.notifications);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 };
 
 exports.updatePrivacy = async (req, res) => {
@@ -355,7 +441,7 @@ exports.getPublicProfile = async (req, res) => {
 
     const [me, target] = await Promise.all([
       User.findById(meUserId).select('following'),
-      User.findById(targetUserId).select('name username profilePicture bannerImage followers following createdAt'),
+      User.findById(targetUserId).select('name username bio closetGoal profilePicture bannerImage followers following createdAt'),
     ]);
 
     if (!me || !target) {
@@ -368,6 +454,7 @@ exports.getPublicProfile = async (req, res) => {
       _id: String(target._id),
       name: target.name,
       username: target.username || target.name,
+      bio: target.bio || target.closetGoal || '',
       profilePicture: target.profilePicture || null,
       bannerImage: target.bannerImage || null,
       followerCount: Array.isArray(target.followers) ? target.followers.length : 0,
@@ -375,6 +462,165 @@ exports.getPublicProfile = async (req, res) => {
       isFollowing: meFollowingIds.has(String(target._id)),
       isMe: String(target._id) === meUserId,
       joinedAt: target.createdAt || null,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.getPublicUserGarments = async (req, res) => {
+  try {
+    const targetUserId = String(req.params.userId || '');
+    const page = parsePage(req.query.page, 1);
+    const limit = parseLimit(req.query.limit, 24, 60);
+    const skip = (page - 1) * limit;
+
+    const [items, total] = await Promise.all([
+      Garment.find({ owner: targetUserId, isHidden: { $ne: true } })
+        .select('_id name category color season imageUrl createdAt')
+        .sort({ createdAt: -1, _id: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Garment.countDocuments({ owner: targetUserId, isHidden: { $ne: true } }),
+    ]);
+
+    res.json({
+      items,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.getPublicUserPosts = async (req, res) => {
+  try {
+    const targetUserId = String(req.params.userId || '');
+    const page = parsePage(req.query.page, 1);
+    const limit = parseLimit(req.query.limit, 12, 40);
+    const skip = (page - 1) * limit;
+
+    const [posts, total] = await Promise.all([
+      CommunityPost.find({ author: targetUserId })
+        .sort({ createdAt: -1, _id: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      CommunityPost.countDocuments({ author: targetUserId }),
+    ]);
+
+    res.json({
+      items: posts.map((post) => ({
+        _id: post._id,
+        type: post.type,
+        caption: post.caption,
+        imageUrl: post.imageUrl,
+        createdAt: post.createdAt,
+        likeCount: Array.isArray(post.likes) ? post.likes.length : 0,
+        commentsCount: Number(post.commentsCount || 0),
+      })),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.createStyledOutfitForUser = async (req, res) => {
+  try {
+    const stylistUserId = String(req.user.userId || '');
+    const targetUserId = String(req.params.userId || '');
+    const garmentIds = Array.isArray(req.body.garments)
+      ? req.body.garments.map((entry) => String(entry || '').trim()).filter(Boolean)
+      : [];
+    const name = String(req.body.name || '').trim();
+    const styleNote = String(req.body.styleNote || '').trim().slice(0, 280);
+    const shareWithProfileOwner = Boolean(req.body.shareWithProfileOwner);
+
+    if (!name) {
+      return res.status(400).json({ message: 'name is required' });
+    }
+
+    if (garmentIds.length < 2) {
+      return res.status(400).json({ message: 'Select at least 2 garments' });
+    }
+
+    const [targetUser, garments] = await Promise.all([
+      User.findById(targetUserId).select('name'),
+      Garment.find({
+        _id: { $in: garmentIds },
+        owner: targetUserId,
+        isHidden: { $ne: true },
+      }).select('_id imageUrl'),
+    ]);
+
+    if (!targetUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (garments.length !== garmentIds.length) {
+      return res.status(400).json({ message: 'One or more garments are invalid for this user' });
+    }
+
+    const previewImage = garments.find((garment) => garment.imageUrl)?.imageUrl || '';
+
+    const outfit = await Outfit.create({
+      name,
+      garments: garments.map((garment) => garment._id),
+      previewImage,
+      owner: stylistUserId,
+      styledFor: targetUserId,
+      styleNote,
+      isSharedWithStyledUser: shareWithProfileOwner,
+    });
+
+    let sharedPostId = null;
+    if (shareWithProfileOwner) {
+      const sharedPost = await CommunityPost.create({
+        author: stylistUserId,
+        type: 'post',
+        caption: `Styled an outfit for @${targetUser.name}: ${name}${styleNote ? ` - ${styleNote}` : ''}`,
+        imageUrl: previewImage || null,
+        tags: [`styled-for:${targetUserId}`],
+      });
+      sharedPostId = sharedPost._id;
+
+      await Notification.create({
+        recipient: targetUserId,
+        actor: stylistUserId,
+        type: 'styled_outfit_shared',
+        message: `@${targetUser.name}, a new styled outfit was created for you: ${name}`,
+        outfit: outfit._id,
+        communityPost: sharedPost._id,
+        metadata: {
+          stylistUserId,
+          targetUserId,
+          outfitName: name,
+        },
+      });
+    }
+
+    res.status(201).json({
+      _id: outfit._id,
+      name: outfit.name,
+      styledFor: outfit.styledFor,
+      garments: outfit.garments,
+      styleNote: outfit.styleNote,
+      isSharedWithStyledUser: outfit.isSharedWithStyledUser,
+      sharedPostId,
+      previewImage: outfit.previewImage,
+      createdAt: outfit.createdAt,
     });
   } catch (error) {
     res.status(500).json({ error: error.message });

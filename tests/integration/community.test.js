@@ -6,6 +6,8 @@ const { MongoMemoryServer } = require('mongodb-memory-server');
 const User = require('../../src/models/user');
 const CommunityPost = require('../../src/models/communityPost');
 const CommunityComment = require('../../src/models/communityComment');
+const Garment = require('../../src/models/garment');
+const Outfit = require('../../src/models/outfit');
 
 let mongoServer;
 let app;
@@ -44,6 +46,8 @@ beforeAll(async () => {
 afterEach(async () => {
   await Promise.all([
     User.deleteMany({}),
+    Garment.deleteMany({}),
+    Outfit.deleteMany({}),
     CommunityPost.deleteMany({}),
     CommunityComment.deleteMany({}),
   ]);
@@ -100,6 +104,7 @@ describe('Community endpoints', () => {
       email: `publicprofile-${Date.now()}-${Math.floor(Math.random() * 1000)}@test.com`,
       password: 'hashed-password',
       followers: [me._id],
+      bio: 'Streetwear lover and capsule closet builder.',
     });
 
     const response = await request(app)
@@ -112,6 +117,97 @@ describe('Community endpoints', () => {
     expect(response.body.followerCount).toBe(1);
     expect(response.body.followingCount).toBe(0);
     expect(response.body.isMe).toBe(false);
+    expect(response.body.bio).toMatch(/streetwear/i);
+  });
+
+  test('GET /api/users/:userId/garments and /posts return public data', async () => {
+    const me = await createUser();
+    const other = await createUser();
+
+    await Garment.create({
+      owner: other._id,
+      name: 'Black Blazer',
+      category: 'outerwear',
+      color: 'black',
+      imageUrl: 'https://example.com/blazer.jpg',
+    });
+
+    await CommunityPost.create({
+      author: other._id,
+      type: 'post',
+      caption: 'Office fit check',
+      imageUrl: 'https://example.com/outfit.jpg',
+    });
+
+    const garmentsResponse = await request(app)
+      .get(`/api/users/${other._id}/garments?limit=10&page=1`)
+      .set(authHeader(me._id.toString()));
+
+    expect(garmentsResponse.status).toBe(200);
+    expect(Array.isArray(garmentsResponse.body.items)).toBe(true);
+    expect(garmentsResponse.body.items.length).toBeGreaterThan(0);
+    expect(garmentsResponse.body.items[0].name).toBe('Black Blazer');
+
+    const postsResponse = await request(app)
+      .get(`/api/users/${other._id}/posts?limit=10&page=1`)
+      .set(authHeader(me._id.toString()));
+
+    expect(postsResponse.status).toBe(200);
+    expect(Array.isArray(postsResponse.body.items)).toBe(true);
+    expect(postsResponse.body.items.length).toBeGreaterThan(0);
+    expect(postsResponse.body.items[0].caption).toBe('Office fit check');
+  });
+
+  test('POST /api/users/:userId/style-outfits creates styled outfit and optional shared post', async () => {
+    const me = await createUser();
+    const other = await createUser();
+
+    const [top, bottom] = await Garment.create([
+      {
+        owner: other._id,
+        name: 'White Tee',
+        category: 'top',
+        color: 'white',
+        imageUrl: 'https://example.com/tee.jpg',
+      },
+      {
+        owner: other._id,
+        name: 'Blue Jeans',
+        category: 'bottom',
+        color: 'blue',
+        imageUrl: 'https://example.com/jeans.jpg',
+      },
+    ]);
+
+    const response = await request(app)
+      .post(`/api/users/${other._id}/style-outfits`)
+      .set(authHeader(me._id.toString()))
+      .send({
+        name: 'Weekend Casual',
+        garments: [top._id, bottom._id],
+        styleNote: 'Clean, comfortable, and easy to layer.',
+        shareWithProfileOwner: true,
+      });
+
+    expect(response.status).toBe(201);
+    expect(response.body.name).toBe('Weekend Casual');
+    expect(response.body.styledFor).toBe(other._id.toString());
+    expect(response.body.isSharedWithStyledUser).toBe(true);
+    expect(response.body.sharedPostId).toBeTruthy();
+
+    const savedOutfit = await Outfit.findById(response.body._id);
+    expect(savedOutfit).toBeTruthy();
+    expect(savedOutfit.styledFor.toString()).toBe(other._id.toString());
+
+    const notificationsResponse = await request(app)
+      .get('/api/users/me/notifications')
+      .set(authHeader(other._id.toString()));
+
+    expect(notificationsResponse.status).toBe(200);
+    expect(Array.isArray(notificationsResponse.body.notifications)).toBe(true);
+    expect(notificationsResponse.body.notifications.length).toBeGreaterThan(0);
+    expect(notificationsResponse.body.notifications[0].type).toBe('styled_outfit_shared');
+    expect(notificationsResponse.body.notifications[0].actor._id).toBe(me._id.toString());
   });
 
   test('POST /api/community/posts and GET /api/community/feed return created post', async () => {

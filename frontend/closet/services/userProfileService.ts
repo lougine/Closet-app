@@ -18,6 +18,7 @@ export type PublicUserProfile = {
   _id: string;
   name?: string;
   username: string;
+  bio: string;
   profilePicture: string | null;
   bannerImage: string | null;
   followerCount: number;
@@ -25,6 +26,26 @@ export type PublicUserProfile = {
   isFollowing: boolean;
   isMe: boolean;
   joinedAt: string | null;
+};
+
+export type PublicUserGarment = {
+  _id: string;
+  name: string;
+  category: string;
+  color?: string;
+  season?: string;
+  imageUrl: string | null;
+  createdAt?: string;
+};
+
+export type PublicUserPost = {
+  _id: string;
+  type: 'post' | 'poll';
+  caption: string;
+  imageUrl: string | null;
+  createdAt: string;
+  likeCount: number;
+  commentsCount: number;
 };
 
 const DEFAULT_BANNER_PRESET = 'pink';
@@ -80,6 +101,7 @@ function normalizePublicUserProfile(payload: any): PublicUserProfile {
     _id: String(payload?._id || ''),
     name: payload?.name,
     username: payload?.username || payload?.name || 'User',
+    bio: String(payload?.bio || ''),
     profilePicture: payload?.profilePicture ? buildImageUrl(payload.profilePicture) : null,
     bannerImage: payload?.bannerImage ? buildImageUrl(payload.bannerImage) : null,
     followerCount: Number(payload?.followerCount || 0),
@@ -87,6 +109,30 @@ function normalizePublicUserProfile(payload: any): PublicUserProfile {
     isFollowing: Boolean(payload?.isFollowing),
     isMe: Boolean(payload?.isMe),
     joinedAt: payload?.joinedAt || null,
+  };
+}
+
+function normalizePublicUserGarment(payload: any): PublicUserGarment {
+  return {
+    _id: String(payload?._id || ''),
+    name: String(payload?.name || 'Garment'),
+    category: String(payload?.category || 'Uncategorized'),
+    color: payload?.color,
+    season: payload?.season,
+    imageUrl: payload?.imageUrl ? buildImageUrl(payload.imageUrl) : null,
+    createdAt: payload?.createdAt,
+  };
+}
+
+function normalizePublicUserPost(payload: any): PublicUserPost {
+  return {
+    _id: String(payload?._id || ''),
+    type: payload?.type === 'poll' ? 'poll' : 'post',
+    caption: String(payload?.caption || ''),
+    imageUrl: payload?.imageUrl ? buildImageUrl(payload.imageUrl) : null,
+    createdAt: payload?.createdAt || new Date().toISOString(),
+    likeCount: Number(payload?.likeCount || 0),
+    commentsCount: Number(payload?.commentsCount || 0),
   };
 }
 
@@ -119,6 +165,103 @@ export async function fetchPublicUserProfile(userId: string): Promise<PublicUser
 
   const payload = await parseResponse(res, 'Failed to load user profile.');
   return normalizePublicUserProfile(payload);
+}
+
+export async function fetchPublicUserGarments(
+  userId: string,
+  options?: { page?: number; limit?: number },
+): Promise<{ items: PublicUserGarment[]; pagination: { page: number; limit: number; total: number; totalPages: number } }> {
+  const normalizedUserId = String(userId || '').trim();
+  if (!normalizedUserId) {
+    throw new Error('User id is required.');
+  }
+
+  const token = await getRequiredToken();
+  const params = new URLSearchParams();
+  params.append('page', String(options?.page || 1));
+  params.append('limit', String(options?.limit || 24));
+
+  const res = await fetchWithRouteFallback([
+    `/api/community/users/${normalizedUserId}/garments?${params.toString()}`,
+    `/community/users/${normalizedUserId}/garments?${params.toString()}`,
+    `/api/users/${normalizedUserId}/garments?${params.toString()}`,
+    `/users/${normalizedUserId}/garments?${params.toString()}`,
+  ], {
+    headers: buildAuthHeaders(token),
+  });
+
+  const payload = await parseResponse(res, 'Failed to load garments.');
+  const items = Array.isArray(payload?.items) ? payload.items.map(normalizePublicUserGarment) : [];
+  const pagination = {
+    page: Number(payload?.pagination?.page || 1),
+    limit: Number(payload?.pagination?.limit || 24),
+    total: Number(payload?.pagination?.total || items.length),
+    totalPages: Number(payload?.pagination?.totalPages || 1),
+  };
+
+  return { items, pagination };
+}
+
+export async function fetchPublicUserPosts(
+  userId: string,
+  options?: { page?: number; limit?: number },
+): Promise<{ items: PublicUserPost[]; pagination: { page: number; limit: number; total: number; totalPages: number } }> {
+  const normalizedUserId = String(userId || '').trim();
+  if (!normalizedUserId) {
+    throw new Error('User id is required.');
+  }
+
+  const token = await getRequiredToken();
+  const params = new URLSearchParams();
+  params.append('page', String(options?.page || 1));
+  params.append('limit', String(options?.limit || 12));
+
+  const res = await fetchWithRouteFallback([
+    `/api/community/users/${normalizedUserId}/posts?${params.toString()}`,
+    `/community/users/${normalizedUserId}/posts?${params.toString()}`,
+    `/api/users/${normalizedUserId}/posts?${params.toString()}`,
+    `/users/${normalizedUserId}/posts?${params.toString()}`,
+  ], {
+    headers: buildAuthHeaders(token),
+  });
+
+  const payload = await parseResponse(res, 'Failed to load posts.');
+  const items = Array.isArray(payload?.items) ? payload.items.map(normalizePublicUserPost) : [];
+  const pagination = {
+    page: Number(payload?.pagination?.page || 1),
+    limit: Number(payload?.pagination?.limit || 12),
+    total: Number(payload?.pagination?.total || items.length),
+    totalPages: Number(payload?.pagination?.totalPages || 1),
+  };
+
+  return { items, pagination };
+}
+
+export async function createStyledOutfitForUser(
+  userId: string,
+  input: { name: string; garments: string[]; styleNote?: string; shareWithProfileOwner?: boolean },
+) {
+  const normalizedUserId = String(userId || '').trim();
+  if (!normalizedUserId) {
+    throw new Error('User id is required.');
+  }
+
+  const token = await getRequiredToken();
+  const res = await fetchWithRouteFallback([
+    `/api/community/users/${normalizedUserId}/style-outfits`,
+    `/community/users/${normalizedUserId}/style-outfits`,
+    `/api/users/${normalizedUserId}/style-outfits`,
+    `/users/${normalizedUserId}/style-outfits`,
+  ], {
+    method: 'POST',
+    headers: {
+      ...buildAuthHeaders(token),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(input),
+  });
+
+  return parseResponse(res, 'Failed to create outfit for user.');
 }
 
 export async function updateProfileDetails({
