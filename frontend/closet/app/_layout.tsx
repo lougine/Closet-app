@@ -25,6 +25,7 @@ function AppShell() {
           <Stack.Screen name="features/settings" options={{ animation: "slide_from_right" }} />
           <Stack.Screen name="features/analytics" options={{ animation: "slide_from_right" }} />
           <Stack.Screen name="features/friends" options={{ animation: "slide_from_right" }} />
+          <Stack.Screen name="features/user-profile" options={{ animation: "slide_from_right" }} />
           <Stack.Screen name="settings" />
         </Stack>
       </View>

@@ -347,3 +347,36 @@ exports.getMyFriends = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+exports.getPublicProfile = async (req, res) => {
+  try {
+    const targetUserId = String(req.params.userId || '');
+    const meUserId = String(req.user.userId || '');
+
+    const [me, target] = await Promise.all([
+      User.findById(meUserId).select('following'),
+      User.findById(targetUserId).select('name username profilePicture bannerImage followers following createdAt'),
+    ]);
+
+    if (!me || !target) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const meFollowingIds = new Set((me.following || []).map((id) => String(id)));
+
+    res.json({
+      _id: String(target._id),
+      name: target.name,
+      username: target.username || target.name,
+      profilePicture: target.profilePicture || null,
+      bannerImage: target.bannerImage || null,
+      followerCount: Array.isArray(target.followers) ? target.followers.length : 0,
+      followingCount: Array.isArray(target.following) ? target.following.length : 0,
+      isFollowing: meFollowingIds.has(String(target._id)),
+      isMe: String(target._id) === meUserId,
+      joinedAt: target.createdAt || null,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};

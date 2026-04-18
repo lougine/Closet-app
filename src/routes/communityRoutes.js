@@ -13,6 +13,11 @@ const router = express.Router();
 router.use(authMiddleware);
 
 router.get('/users/search', userController.searchUsers);
+router.get(
+  '/users/:userId/profile',
+  validateObjectIdField({ source: 'params', field: 'userId', required: true }),
+  userController.getPublicProfile,
+);
 
 router.get(
   '/feed',

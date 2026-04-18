@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, FlatList, Image, RefreshControl, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
@@ -56,6 +56,7 @@ const COMMUNITY_BASE = '/api/community';
 const LEGACY_COMMUNITY_BASE = '/community';
 
 const CommunityScreen: React.FC = () => {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const { isDarkMode } = useAppTheme();
   const styles = useMemo(() => createCommunityStyles(isDarkMode), [isDarkMode]);
@@ -201,12 +202,14 @@ const CommunityScreen: React.FC = () => {
     }
   }, []);
 
-  const onPressAuthorSearch = (authorName: string) => {
-    const normalized = authorName.trim();
+  const openUserProfile = (userId: string) => {
+    const normalized = String(userId || "").trim();
     if (!normalized) return;
 
-    setSearchQuery(normalized);
-    void runUserSearch(normalized);
+    router.push({
+      pathname: "/features/user-profile",
+      params: { userId: normalized },
+    } as any);
   };
 
   useEffect(() => {
@@ -353,7 +356,7 @@ const CommunityScreen: React.FC = () => {
   const renderPost = ({ item: post }: { item: CommunityPost }) => (
     <View style={styles.feedCard}>
       <View style={styles.feedHeader}>
-        <View style={styles.avatarWrap}>
+        <TouchableOpacity style={styles.avatarWrap} onPress={() => openUserProfile(post.author._id)} activeOpacity={0.75}>
           {post.author.profilePicture ? (
             <AuthenticatedImage
               source={{ uri: buildImageUrl(post.author.profilePicture) }}
@@ -365,10 +368,10 @@ const CommunityScreen: React.FC = () => {
               <Ionicons name="person" size={14} color={isDarkMode ? "#A8A8A8" : "#666"} />
             </View>
           )}
-        </View>
+        </TouchableOpacity>
         <View style={styles.feedHeaderText}>
           <TouchableOpacity
-            onPress={() => onPressAuthorSearch(post.author.name || "")}
+            onPress={() => openUserProfile(post.author._id)}
             activeOpacity={0.7}
           >
             <Text style={styles.authorName}>{post.author.name}</Text>
@@ -566,7 +569,11 @@ const CommunityScreen: React.FC = () => {
           ) : (
             searchResults.map((user) => (
               <View key={user._id} style={styles.userRow}>
-                <View style={styles.userRowLeft}>
+                <TouchableOpacity
+                  style={styles.userRowLeft}
+                  onPress={() => openUserProfile(user._id)}
+                  activeOpacity={0.7}
+                >
                   {user.profilePicture ? (
                     <AuthenticatedImage
                       source={{ uri: user.profilePicture }}
@@ -582,7 +589,7 @@ const CommunityScreen: React.FC = () => {
                     <Text style={styles.userNameText}>@{user.username || user.name}</Text>
                     <Text style={styles.userCountsText}>{user.followerCount} followers � {user.followingCount} following</Text>
                   </View>
-                </View>
+                </TouchableOpacity>
 
                 <TouchableOpacity
                   style={[styles.followButton, user.isFollowing && styles.followingButton]}

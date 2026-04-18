@@ -67,6 +67,16 @@ export default function FriendsScreen() {
 
   const activeUsers = activeTab === "followers" ? followers : following;
 
+  const openUserProfile = (userId: string) => {
+    const normalized = String(userId || "").trim();
+    if (!normalized) return;
+
+    router.push({
+      pathname: "/features/user-profile",
+      params: { userId: normalized },
+    } as any);
+  };
+
   return (
     <View style={{ flex: 1, backgroundColor: palette.screen }}>
       <View
@@ -150,8 +160,10 @@ export default function FriendsScreen() {
             </Text>
           ) : (
             activeUsers.map((user) => (
-              <View
+              <TouchableOpacity
                 key={user._id}
+                onPress={() => openUserProfile(user._id)}
+                activeOpacity={0.8}
                 style={{
                   borderRadius: 12,
                   borderWidth: 1,
@@ -184,7 +196,7 @@ export default function FriendsScreen() {
                     {activeTab === "following" ? "Following" : "Follower"}
                   </Text>
                 </View>
-              </View>
+              </TouchableOpacity>
             ))
           )}
         </ScrollView>

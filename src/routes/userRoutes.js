@@ -3,12 +3,18 @@ const router = express.Router();
 const userController = require('../controllers/userController');
 const authMiddleware = require('../middleware/authMiddleware');
 const { imageUploadErrorHandler } = require('../middleware/imageUploadMiddleware');
+const { validateObjectIdField } = require('../middleware/validationMiddleware');
 
 router.use(authMiddleware);
 
 router.get('/me', userController.getMe);
 router.get('/me/friends', userController.getMyFriends);
 router.get('/search', userController.searchUsers);
+router.get(
+	'/:userId/profile',
+	validateObjectIdField({ source: 'params', field: 'userId', required: true }),
+	userController.getPublicProfile,
+);
 router.put('/me', userController.updateMe);
 router.put(
 	'/me/profile-image',
