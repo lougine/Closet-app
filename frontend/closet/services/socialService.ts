@@ -77,12 +77,19 @@ async function fetchWithRouteFallback(
 }
 
 export async function searchUsers(query: string, limit = 20): Promise<SocialUser[]> {
+  const normalizedQuery = query.trim().replace(/^@+/, '').slice(0, 64);
+  if (!normalizedQuery) {
+    return [];
+  }
+
   const token = await getRequiredToken();
   const params = new URLSearchParams();
-  params.append('q', query.trim());
+  params.append('q', normalizedQuery);
   params.append('limit', String(limit));
 
   const res = await fetchWithRouteFallback([
+    `/api/community/users/search?${params.toString()}`,
+    `/community/users/search?${params.toString()}`,
     `/api/users/search?${params.toString()}`,
     `/users/search?${params.toString()}`,
   ], {

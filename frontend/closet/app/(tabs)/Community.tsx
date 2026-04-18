@@ -201,6 +201,14 @@ const CommunityScreen: React.FC = () => {
     }
   }, []);
 
+  const onPressAuthorSearch = (authorName: string) => {
+    const normalized = authorName.trim();
+    if (!normalized) return;
+
+    setSearchQuery(normalized);
+    void runUserSearch(normalized);
+  };
+
   useEffect(() => {
     const normalized = searchQuery.trim();
     if (!normalized) {
@@ -359,7 +367,12 @@ const CommunityScreen: React.FC = () => {
           )}
         </View>
         <View style={styles.feedHeaderText}>
-          <Text style={styles.authorName}>{post.author.name}</Text>
+          <TouchableOpacity
+            onPress={() => onPressAuthorSearch(post.author.name || "")}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.authorName}>{post.author.name}</Text>
+          </TouchableOpacity>
           <Text style={styles.postMeta}>{formatDate(post.createdAt)}</Text>
         </View>
       </View>
@@ -567,7 +580,7 @@ const CommunityScreen: React.FC = () => {
                   )}
                   <View style={styles.userMetaWrap}>
                     <Text style={styles.userNameText}>@{user.username || user.name}</Text>
-                    <Text style={styles.userCountsText}>{user.followerCount} followers • {user.followingCount} following</Text>
+                    <Text style={styles.userCountsText}>{user.followerCount} followers ï¿½ {user.followingCount} following</Text>
                   </View>
                 </View>
 

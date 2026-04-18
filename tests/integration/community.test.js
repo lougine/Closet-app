@@ -57,6 +57,42 @@ afterAll(async () => {
 });
 
 describe('Community endpoints', () => {
+  test('GET /api/users/search supports @username query in community user search', async () => {
+    const me = await createUser();
+    const other = await User.create({
+      name: `stylebuddy-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      email: `stylebuddy-${Date.now()}-${Math.floor(Math.random() * 1000)}@test.com`,
+      password: 'hashed-password',
+    });
+
+    const response = await request(app)
+      .get(`/api/users/search?q=@${encodeURIComponent(other.name)}`)
+      .set(authHeader(me._id.toString()));
+
+    expect(response.status).toBe(200);
+    expect(Array.isArray(response.body.items)).toBe(true);
+    expect(response.body.items.length).toBeGreaterThan(0);
+    expect(response.body.items[0].username).toBe(other.name);
+  });
+
+  test('GET /api/community/users/search supports username lookups', async () => {
+    const me = await createUser();
+    const other = await User.create({
+      name: `closetfriend-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      email: `closetfriend-${Date.now()}-${Math.floor(Math.random() * 1000)}@test.com`,
+      password: 'hashed-password',
+    });
+
+    const response = await request(app)
+      .get(`/api/community/users/search?q=${encodeURIComponent(other.name)}`)
+      .set(authHeader(me._id.toString()));
+
+    expect(response.status).toBe(200);
+    expect(Array.isArray(response.body.items)).toBe(true);
+    expect(response.body.items.length).toBeGreaterThan(0);
+    expect(response.body.items[0].username).toBe(other.name);
+  });
+
   test('POST /api/community/posts and GET /api/community/feed return created post', async () => {
     const user = await createUser();
 
