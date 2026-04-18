@@ -47,6 +47,88 @@ const createCommunityStyles = (isDarkMode = false) => {
     borderRadius: 20,
     margin: 10,
   },
+  userSearchCard: {
+    marginHorizontal: 10,
+    marginBottom: 8,
+    backgroundColor: palette.card,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: palette.border,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 8,
+  },
+  userSearchHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  userSearchTitle: {
+    color: palette.text,
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  userSearchEmptyText: {
+    color: palette.subText,
+    fontSize: 12,
+  },
+  userRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  userRowLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    gap: 8,
+  },
+  userAvatar: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+  },
+  userAvatarPlaceholder: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: isDarkMode ? "#2C2C2C" : "#efefef",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  userMetaWrap: {
+    flex: 1,
+  },
+  userNameText: {
+    color: palette.text,
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  userCountsText: {
+    color: palette.subText,
+    fontSize: 11,
+    marginTop: 2,
+  },
+  followButton: {
+    borderRadius: 999,
+    backgroundColor: "#ff4d73",
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+  },
+  followingButton: {
+    backgroundColor: isDarkMode ? "#2B2B2B" : "#F0F0F0",
+    borderWidth: 1,
+    borderColor: palette.border,
+  },
+  followButtonText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  followingButtonText: {
+    color: palette.text,
+  },
   searchInput: {
     flex: 1,
     marginLeft: 8,

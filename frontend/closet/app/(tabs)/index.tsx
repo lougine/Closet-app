@@ -349,6 +349,8 @@ export default function WardrobeScreen() {
   const [profilePic, setProfilePic] = useState<string | null>(null);
   const [bgImage, setBgImage] = useState<string | null>(null);
   const [username, setUsername] = useState("wizliz");
+  const [followerCount, setFollowerCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
   const [activeTopTab, setActiveTopTab] = useState(0);
   const [activeFilter, setActiveFilter] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
@@ -428,6 +430,8 @@ export default function WardrobeScreen() {
       setUsername(profile.username || profile.name || "wizliz");
       setProfilePic(profile.profilePicture ?? null);
       setBgImage(profile.bannerImage ?? null);
+      setFollowerCount(profile.followerCount || 0);
+      setFollowingCount(profile.followingCount || 0);
     } catch (error) {
       console.warn("Failed to load header images:", error);
     }
@@ -498,11 +502,12 @@ export default function WardrobeScreen() {
       };
 
       refreshAfterRandomizeSave();
+      fetchUserHeaderImages();
 
       return () => {
         cancelled = true;
       };
-    }, [fetchOutfits, refreshItems]),
+    }, [fetchOutfits, fetchUserHeaderImages, refreshItems]),
   );
 
   const onPullRefresh = useCallback(async () => {
@@ -530,6 +535,10 @@ export default function WardrobeScreen() {
 
   const switchTab = (idx: number) => {
     setActiveTopTab(idx);
+  };
+
+  const openConnectionsPage = (tab: "followers" | "following") => {
+    router.push({ pathname: "/features/friends" as any, params: { tab } });
   };
 
   const setCategory = (cat: string) =>
@@ -819,6 +828,34 @@ export default function WardrobeScreen() {
               onPress={() => router.push("/features/analytics" as any)}
             >
               <Text style={[s.analyticsLink, { color: isDarkMode ? "#FF83A7" : undefined }]}>Style Analytics ›</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={s.profileActionsRow}>
+            <TouchableOpacity
+              onPress={() => openConnectionsPage("followers")}
+              style={[
+                s.profileActionBtn,
+                {
+                  borderColor: theme.border,
+                  backgroundColor: theme.card,
+                },
+              ]}
+            >
+              <Text style={[s.profileActionText, { color: theme.subText }]}>Followers</Text>
+              <Text style={[s.profileActionCount, { color: theme.text }]}>{followerCount}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => openConnectionsPage("following")}
+              style={[
+                s.profileActionBtn,
+                {
+                  borderColor: theme.border,
+                  backgroundColor: theme.card,
+                },
+              ]}
+            >
+              <Text style={[s.profileActionText, { color: theme.subText }]}>Following</Text>
+              <Text style={[s.profileActionCount, { color: theme.text }]}>{followingCount}</Text>
             </TouchableOpacity>
           </View>
           {uploadingHeaderImage ? (
@@ -1163,6 +1200,7 @@ export default function WardrobeScreen() {
               </View>
             )
           )}
+
         </View>
       </ScrollView>
 

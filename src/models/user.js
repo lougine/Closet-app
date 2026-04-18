@@ -55,6 +55,8 @@ const userSchema = new mongoose.Schema({
   closetGoal: { type: String, default: null },
   shoppingFrequency: { type: String, default: null },
   stylePreferences: { type: [String], default: [] },
+  followers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+  following: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
 
   preferences: {
     style: [String],

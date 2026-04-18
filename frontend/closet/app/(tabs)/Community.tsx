@@ -1,10 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
 import * as SecureStore from "expo-secure-store";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, FlatList, Image, RefreshControl, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AuthenticatedImage from "../../components/AuthenticatedImage";
 import { buildApiUrl, buildAuthHeaders, buildImageUrl } from "../../constants/api";
+import { searchUsers, toggleFollow, type SocialUser } from "@/services/socialService";
 import createCommunityStyles from "../../Styles/communityStyles";
 import { useAppTheme } from "../../context/themeContext";
 
@@ -54,6 +56,7 @@ const COMMUNITY_BASE = '/api/community';
 const LEGACY_COMMUNITY_BASE = '/community';
 
 const CommunityScreen: React.FC = () => {
+  const insets = useSafeAreaInsets();
   const { isDarkMode } = useAppTheme();
   const styles = useMemo(() => createCommunityStyles(isDarkMode), [isDarkMode]);
   const iconColor = isDarkMode ? "#D8D8D8" : "#333";
@@ -67,6 +70,9 @@ const CommunityScreen: React.FC = () => {
   const [feed, setFeed] = useState<CommunityPost[]>([]);
   const [activeFilter, setActiveFilter] = useState<CommunityFilter>("for-you");
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<SocialUser[]>([]);
+  const [searchingUsers, setSearchingUsers] = useState(false);
+  const [updatingFollowUserId, setUpdatingFollowUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -99,7 +105,6 @@ const CommunityScreen: React.FC = () => {
     const normalizedPath = path.startsWith('/') ? path : `/${path}`;
     const primary = await fetch(buildApiUrl(`${COMMUNITY_BASE}${normalizedPath}`), init);
 
-    // Fallback for environments where backend is mounted at /community instead of /api/community.
     if (primary.status === 404) {
       return fetch(buildApiUrl(`${LEGACY_COMMUNITY_BASE}${normalizedPath}`), init);
     }
@@ -122,9 +127,6 @@ const CommunityScreen: React.FC = () => {
       params.append("filter", activeFilter);
       params.append("limit", String(FEED_PAGE_SIZE));
       params.append("page", String(targetPage));
-      if (searchQuery.trim()) {
-        params.append("search", searchQuery.trim());
-      }
 
       const response = await communityFetch(`/feed?${params.toString()}`, {
         headers: buildAuthHeaders(token),
@@ -158,13 +160,14 @@ const CommunityScreen: React.FC = () => {
       setLoadingMore(false);
       setRefreshing(false);
     }
-  }, [activeFilter, searchQuery]);
+  }, [activeFilter]);
 
   useFocusEffect(
     useCallback(() => {
       fetchFeed();
     }, [fetchFeed])
   );
+
   const onRefresh = () => {
     setRefreshing(true);
     setHasMore(true);
@@ -172,8 +175,66 @@ const CommunityScreen: React.FC = () => {
   };
 
   const onSubmitSearch = () => {
-    setHasMore(true);
-    fetchFeed({ pageOverride: 1 });
+    const query = searchQuery.trim();
+    if (!query) {
+      setSearchResults([]);
+      return;
+    }
+    void runUserSearch(query);
+  };
+
+  const runUserSearch = useCallback(async (query: string) => {
+    const normalized = query.trim();
+    if (!normalized) {
+      setSearchResults([]);
+      return;
+    }
+
+    try {
+      setSearchingUsers(true);
+      const results = await searchUsers(normalized, 20);
+      setSearchResults(results);
+    } catch (error: any) {
+      Alert.alert("Community", error.message || "Could not search users right now.");
+    } finally {
+      setSearchingUsers(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const normalized = searchQuery.trim();
+    if (!normalized) {
+      setSearchResults([]);
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      void runUserSearch(normalized);
+    }, 300);
+
+    return () => clearTimeout(timeout);
+  }, [runUserSearch, searchQuery]);
+
+  const onToggleFollow = async (userId: string) => {
+    if (updatingFollowUserId) return;
+
+    try {
+      setUpdatingFollowUserId(userId);
+      const payload = await toggleFollow(userId);
+      setSearchResults((prev) => prev.map((user) => (
+        user._id === userId
+          ? {
+              ...user,
+              isFollowing: payload.isFollowing,
+              followerCount: payload.targetUser.followerCount,
+            }
+          : user
+      )));
+    } catch (error: any) {
+      Alert.alert("Community", error.message || "Could not update follow status.");
+    } finally {
+      setUpdatingFollowUserId(null);
+    }
   };
 
   const loadMore = () => {
@@ -390,7 +451,6 @@ const CommunityScreen: React.FC = () => {
 
   const listHeader = (
     <>
-      {/* CLOSET STYLE CARD */}
       <ScrollView
         horizontal
         pagingEnabled
@@ -404,7 +464,6 @@ const CommunityScreen: React.FC = () => {
               resizeMode="cover"
             />
 
-            {/* overlay text */}
             <View style={styles.overlay}>
               <Text style={styles.overlayTitle}>Style This Item You Own</Text>
               <Text style={styles.overlaySub}>
@@ -415,7 +474,6 @@ const CommunityScreen: React.FC = () => {
         ))}
       </ScrollView>
 
-      {/* FILTER CHIPS */}
       <View style={styles.chipRow}>
         {filterChips.map((chip) => {
           const active = activeFilter === chip.key;
@@ -462,18 +520,18 @@ const CommunityScreen: React.FC = () => {
   );
 
   return (
-    <View style={styles.container}>
-      {/* HEADER */}
+    <View style={[styles.container, { paddingTop: insets.top }] }>
       <View style={styles.header}>
         <Ionicons name="search-outline" size={22} color={iconColor} />
 
         <TextInput
-          placeholder="What will today's fit be?"
+          placeholder="Find users to follow"
           style={styles.searchInput}
           placeholderTextColor={isDarkMode ? "#8F8F8F" : "#888"}
           value={searchQuery}
           onChangeText={setSearchQuery}
           onSubmitEditing={onSubmitSearch}
+          autoCapitalize="none"
           returnKeyType="search"
         />
 
@@ -482,6 +540,55 @@ const CommunityScreen: React.FC = () => {
           <Ionicons name="person-circle-outline" size={24} color={iconColor} />
         </View>
       </View>
+
+      {(searchQuery.trim().length > 0 || searchingUsers) && (
+        <View style={styles.userSearchCard}>
+          <View style={styles.userSearchHeaderRow}>
+            <Text style={styles.userSearchTitle}>User results</Text>
+            {searchingUsers && <ActivityIndicator size="small" color="#ff4d73" />}
+          </View>
+
+          {!searchingUsers && searchResults.length === 0 ? (
+            <Text style={styles.userSearchEmptyText}>No users found.</Text>
+          ) : (
+            searchResults.map((user) => (
+              <View key={user._id} style={styles.userRow}>
+                <View style={styles.userRowLeft}>
+                  {user.profilePicture ? (
+                    <AuthenticatedImage
+                      source={{ uri: user.profilePicture }}
+                      style={styles.userAvatar}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <View style={styles.userAvatarPlaceholder}>
+                      <Ionicons name="person" size={14} color={isDarkMode ? "#A8A8A8" : "#666"} />
+                    </View>
+                  )}
+                  <View style={styles.userMetaWrap}>
+                    <Text style={styles.userNameText}>@{user.username || user.name}</Text>
+                    <Text style={styles.userCountsText}>{user.followerCount} followers • {user.followingCount} following</Text>
+                  </View>
+                </View>
+
+                <TouchableOpacity
+                  style={[styles.followButton, user.isFollowing && styles.followingButton]}
+                  onPress={() => onToggleFollow(user._id)}
+                  disabled={updatingFollowUserId === user._id}
+                >
+                  <Text style={[styles.followButtonText, user.isFollowing && styles.followingButtonText]}>
+                    {updatingFollowUserId === user._id
+                      ? "..."
+                      : user.isFollowing
+                        ? "Following"
+                        : "Follow"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ))
+          )}
+        </View>
+      )}
 
       <FlatList
         data={feed}

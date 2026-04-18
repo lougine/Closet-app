@@ -10,6 +10,8 @@ export type UserProfile = {
   profilePicture: string | null;
   bannerImage: string | null;
   bannerPreset: string;
+  followerCount: number;
+  followingCount: number;
 };
 
 const DEFAULT_BANNER_PRESET = 'pink';
@@ -31,6 +33,8 @@ function normalizeUserProfile(payload: any): UserProfile {
     profilePicture: payload?.profilePicture ? buildImageUrl(payload.profilePicture) : null,
     bannerImage: payload?.bannerImage ? buildImageUrl(payload.bannerImage) : null,
     bannerPreset: payload?.bannerPreset || DEFAULT_BANNER_PRESET,
+    followerCount: Number(payload?.followerCount || 0),
+    followingCount: Number(payload?.followingCount || 0),
   };
 }
 
