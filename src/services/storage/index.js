@@ -29,11 +29,20 @@ const markFailure = (kind, error) => {
 };
 
 const getPrimaryDriverName = () => {
-  if (STORAGE_PRIMARY_DRIVER === 'cloudinary' && cloudinaryStorageDriver.isEnabled()) {
-    return 'cloudinary';
+  if (STORAGE_PRIMARY_DRIVER === 'cloudinary') {
+    if (cloudinaryStorageDriver.isEnabled()) {
+      return 'cloudinary';
+    }
+
+    // Keep uploads functional when cloudinary is selected but not configured.
+    return 'local';
   }
 
-  return 'unavailable';
+  if (STORAGE_PRIMARY_DRIVER === 'local') {
+    return 'local';
+  }
+
+  return 'local';
 };
 
 const registerUploadedFile = async (file) => {
@@ -42,10 +51,8 @@ const registerUploadedFile = async (file) => {
   }
 
   const primaryDriverName = getPrimaryDriverName();
-  if (primaryDriverName !== 'cloudinary') {
-    const err = new Error('Cloudinary storage is not configured. Uploads are disabled until Cloudinary credentials are set.');
-    err.code = 'CLOUDINARY_NOT_CONFIGURED';
-    throw err;
+  if (primaryDriverName === 'local') {
+    return localStorageDriver.registerUploadedFile(file);
   }
 
   try {
@@ -98,7 +105,13 @@ const deleteManagedFile = async (filename) => {
 };
 
 const listManagedFiles = async () => {
-  if (getPrimaryDriverName() !== 'cloudinary') {
+  const primary = getPrimaryDriverName();
+
+  if (primary === 'local') {
+    return localStorageDriver.listManagedFiles();
+  }
+
+  if (primary !== 'cloudinary') {
     return [];
   }
 

@@ -70,12 +70,14 @@ const connectDB = async () => {
       if (deployment === 'atlas' && !isTruthy(process.env.ALLOW_ATLAS_ORPHAN_CLEANUP)) {
         console.warn('Orphan cleanup skipped for Atlas (set ALLOW_ATLAS_ORPHAN_CLEANUP=true to allow).');
       } else {
-        try {
-          const summary = await cleanupOrphanedUserData();
-          console.log(`Orphan cleanup complete: ${JSON.stringify(summary)}`);
-        } catch (cleanupError) {
-          console.error('Orphan cleanup failed:', cleanupError);
-        }
+        setImmediate(async () => {
+          try {
+            const summary = await cleanupOrphanedUserData();
+            console.log(`Orphan cleanup complete: ${JSON.stringify(summary)}`);
+          } catch (cleanupError) {
+            console.error('Orphan cleanup failed:', cleanupError);
+          }
+        });
       }
     } else {
       console.log('Orphan auto-cleanup is disabled (set AUTO_CLEANUP_ORPHANS=true to enable).');

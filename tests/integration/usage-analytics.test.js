@@ -113,10 +113,126 @@ describe('Usage endpoints', () => {
     expect(response.status).toBe(400);
     expect(response.body.message).toMatch(/startDate/i);
   });
+
+  test('POST /api/usage/log returns 400 for invalid eventStatus', async () => {
+    const user = await createUser();
+    const garment = await Garment.create({
+      owner: user._id,
+      name: 'Validation Tee',
+      category: 'Tops',
+      color: 'White',
+    });
+
+    const response = await request(app)
+      .post('/api/usage/log')
+      .set(authHeader(user._id.toString()))
+      .send({
+        garmentId: garment._id.toString(),
+        eventStatus: 'maybe',
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.message).toMatch(/eventStatus/i);
+  });
+
+  test('POST /api/usage/bulk-log returns 400 for invalid eventLocalDate', async () => {
+    const user = await createUser();
+    const garment = await Garment.create({
+      owner: user._id,
+      name: 'Validation Pants',
+      category: 'Bottoms',
+      color: 'Black',
+    });
+
+    const response = await request(app)
+      .post('/api/usage/bulk-log')
+      .set(authHeader(user._id.toString()))
+      .send({
+        garmentIds: [garment._id.toString()],
+        eventLocalDate: '2026-02-30',
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.message).toMatch(/eventLocalDate/i);
+  });
+
+  test('POST /api/usage/log returns 400 for non-worn event without date', async () => {
+    const user = await createUser();
+    const garment = await Garment.create({
+      owner: user._id,
+      name: 'Validation Coat',
+      category: 'Outerwear',
+      color: 'Brown',
+    });
+
+    const response = await request(app)
+      .post('/api/usage/log')
+      .set(authHeader(user._id.toString()))
+      .send({
+        garmentId: garment._id.toString(),
+        eventStatus: 'scheduled',
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.message).toMatch(/wornDate|eventLocalDate/i);
+  });
+
+  test('POST /api/usage/log returns 400 for cancelled event with outfitId', async () => {
+    const user = await createUser();
+    const garment = await Garment.create({
+      owner: user._id,
+      name: 'Validation Skirt',
+      category: 'Bottoms',
+      color: 'Red',
+    });
+    const outfit = await Outfit.create({
+      owner: user._id,
+      name: 'Cancelled Look',
+      garments: [garment._id],
+      isLookbook: false,
+    });
+
+    const response = await request(app)
+      .post('/api/usage/log')
+      .set(authHeader(user._id.toString()))
+      .send({
+        garmentId: garment._id.toString(),
+        outfitId: outfit._id.toString(),
+        eventStatus: 'cancelled',
+        eventLocalDate: '2026-04-17',
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.message).toMatch(/outfitId/i);
+  });
+
+  test('POST /api/usage/log derives wornDate from eventLocalDate for non-worn events', async () => {
+    const user = await createUser();
+    const garment = await Garment.create({
+      owner: user._id,
+      name: 'Scheduled Shirt',
+      category: 'Tops',
+      color: 'Blue',
+    });
+
+    const response = await request(app)
+      .post('/api/usage/log')
+      .set(authHeader(user._id.toString()))
+      .send({
+        garmentId: garment._id.toString(),
+        eventStatus: 'scheduled',
+        eventLocalDate: '2026-04-20',
+      });
+
+    expect(response.status).toBe(201);
+    expect(response.body.eventStatus).toBe('scheduled');
+    expect(response.body.eventLocalDate).toBe('2026-04-20');
+    expect(response.body.wornDate.slice(0, 10)).toBe('2026-04-20');
+  });
 });
 
 describe('Analytics endpoints', () => {
-  test('GET /api/analytics/overview counts only non-lookbook outfits and worn outfits in that scope', async () => {
+  test('GET /api/analytics/overview derives wear metrics from worn usage events', async () => {
     const user = await createUser();
     const garmentA = await Garment.create({
       owner: user._id,
@@ -164,7 +280,7 @@ describe('Analytics endpoints', () => {
       wornDate: new Date('2026-03-10T00:00:00.000Z'),
     });
 
-    // A lookbook usage should not affect the outfitsWorn/totalOutfits ratio.
+    // Lookbook/non-lookbook is not part of wear-event counting semantics.
     await Usage.create({
       user: user._id,
       garment: garmentB._id,
@@ -178,12 +294,12 @@ describe('Analytics endpoints', () => {
 
     expect(response.status).toBe(200);
     expect(response.body.totalOutfits).toBe(2);
-    expect(response.body.outfitsWorn).toBe(1);
-    expect(response.body.wardrobeUsagePercent).toBe(50);
-    expect(response.body.totalWearEvents).toBe(1);
+    expect(response.body.outfitsWorn).toBe(2);
+    expect(response.body.wardrobeUsagePercent).toBe(100);
+    expect(response.body.totalWearEvents).toBe(2);
   });
 
-  test('GET /api/analytics/overview ignores undated outfits for worn calculations', async () => {
+  test('GET /api/analytics/overview counts saved outfits even when undated', async () => {
     const user = await createUser();
     const garment = await Garment.create({
       owner: user._id,
@@ -212,10 +328,10 @@ describe('Analytics endpoints', () => {
       .set(authHeader(user._id.toString()));
 
     expect(response.status).toBe(200);
-    expect(response.body.totalOutfits).toBe(0);
-    expect(response.body.outfitsWorn).toBe(0);
-    expect(response.body.wardrobeUsagePercent).toBe(0);
-    expect(response.body.totalWearEvents).toBe(0);
+    expect(response.body.totalOutfits).toBe(1);
+    expect(response.body.outfitsWorn).toBe(1);
+    expect(response.body.wardrobeUsagePercent).toBe(100);
+    expect(response.body.totalWearEvents).toBe(1);
   });
 
   test('GET /api/analytics/cost-per-wear returns computed data', async () => {
@@ -309,11 +425,11 @@ describe('Analytics endpoints', () => {
     expect(Array.isArray(response.body.byCategory)).toBe(true);
     expect(response.body.monthly).toHaveLength(12);
     expect(response.body.dayOfWeek).toHaveLength(7);
-    expect(response.body.summary.totalWearEventsInRange).toBe(3);
+    expect(response.body.summary.totalWearEventsInRange).toBe(4);
     expect(response.body.byCategory[0].category).toBe('Tops');
   });
 
-  test('GET /api/analytics most/least/never worn only count past calendar outfit usage', async () => {
+  test('GET /api/analytics most/least/never worn count worn usage events regardless of outfit date', async () => {
     const user = await createUser();
     const datedGarment = await Garment.create({
       owner: user._id,
@@ -369,9 +485,47 @@ describe('Analytics endpoints', () => {
     expect(leastWornRes.status).toBe(200);
     expect(neverWornRes.status).toBe(200);
 
-    expect(mostWornRes.body.some((item) => item.name === 'Planned Pants')).toBe(false);
-    expect(leastWornRes.body.some((item) => item.name === 'Planned Pants')).toBe(false);
-    expect(neverWornRes.body.some((item) => item.name === 'Planned Pants')).toBe(true);
+    expect(mostWornRes.body.some((item) => item.name === 'Planned Pants')).toBe(true);
+    expect(leastWornRes.body.some((item) => item.name === 'Planned Pants')).toBe(true);
+    expect(neverWornRes.body.some((item) => item.name === 'Planned Pants')).toBe(false);
+  });
+
+  test('GET /api/analytics wear rankings fall back to dated outfits when usage events are missing', async () => {
+    const user = await createUser();
+    const wornViaCalendar = await Garment.create({
+      owner: user._id,
+      name: 'Calendar Blouse',
+      category: 'Tops',
+      color: 'Ivory',
+    });
+    const neverWorn = await Garment.create({
+      owner: user._id,
+      name: 'Unworn Shorts',
+      category: 'Bottoms',
+      color: 'Khaki',
+    });
+
+    await Outfit.create({
+      owner: user._id,
+      name: 'Calendar Outfit',
+      garments: [wornViaCalendar._id],
+      date: new Date('2026-03-20T00:00:00.000Z'),
+      isLookbook: false,
+    });
+
+    const headers = authHeader(user._id.toString());
+
+    const [mostWornRes, neverWornRes] = await Promise.all([
+      request(app).get('/api/analytics/most-worn?limit=10').set(headers),
+      request(app).get('/api/analytics/never-worn?limit=10').set(headers),
+    ]);
+
+    expect(mostWornRes.status).toBe(200);
+    expect(neverWornRes.status).toBe(200);
+
+    expect(mostWornRes.body.some((item) => item.name === 'Calendar Blouse')).toBe(true);
+    expect(neverWornRes.body.some((item) => item.name === 'Calendar Blouse')).toBe(false);
+    expect(neverWornRes.body.some((item) => item.name === 'Unworn Shorts')).toBe(true);
   });
 
   test('GET /api/analytics/usage-trends returns 400 for invalid months', async () => {

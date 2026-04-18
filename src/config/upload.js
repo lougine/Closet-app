@@ -2,7 +2,7 @@ const DEFAULT_MAX_MB = 5;
 const DEFAULT_MAX_DIMENSION_PX = 6000;
 const DEFAULT_MAX_MEGAPIXELS = 25;
 const DEFAULT_ORPHAN_RETENTION_DAYS = 30;
-const DEFAULT_STORAGE_PRIMARY_DRIVER = 'cloudinary';
+const DEFAULT_STORAGE_PRIMARY_DRIVER = 'local';
 const DEFAULT_CLOUDINARY_FOLDER = 'digital-wardrobe';
 
 const parsePositiveNumber = (value, fallback) => {
@@ -26,6 +26,9 @@ const parseBoolean = (value, fallback = false) => {
 
 const parseStorageDriver = (value) => {
   const normalized = String(value || '').trim().toLowerCase();
+  if (normalized === 'local') {
+    return 'local';
+  }
   if (normalized === 'cloudinary') {
     return 'cloudinary';
   }

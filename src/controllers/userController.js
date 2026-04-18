@@ -47,7 +47,7 @@ exports.getMe = async (req, res) => {
 
     res.json(toClientUser(user));
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
@@ -69,7 +69,7 @@ exports.updateMe = async (req, res) => {
     if (!user) return res.status(404).json({ message: 'User not found' });
     res.json(toClientUser(user));
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
@@ -101,7 +101,7 @@ exports.updateProfileImage = async (req, res) => {
 
     res.json(toClientUser(user));
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
@@ -133,7 +133,7 @@ exports.updateBannerImage = async (req, res) => {
 
     res.json(toClientUser(user));
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
@@ -158,7 +158,7 @@ exports.updateBannerPreset = async (req, res) => {
     if (!user) return res.status(404).json({ message: 'User not found' });
     res.json(toClientUser(user));
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
@@ -182,7 +182,7 @@ exports.updatePassword = async (req, res) => {
 
     res.json({ message: 'Password updated' });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
@@ -203,7 +203,7 @@ exports.updatePrivacy = async (req, res) => {
 
     res.json({ message: 'Privacy updated' });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
@@ -220,7 +220,7 @@ exports.getActivity = async (req, res) => {
     ];
     res.json(activities);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 

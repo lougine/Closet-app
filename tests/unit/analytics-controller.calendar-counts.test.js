@@ -4,13 +4,17 @@ jest.mock('../../src/models/garment', () => ({
 }));
 
 jest.mock('../../src/models/outfit', () => ({
-  countDocuments: jest.fn(),
+  aggregate: jest.fn(),
+}));
+
+jest.mock('../../src/models/usage', () => ({
   aggregate: jest.fn(),
 }));
 
 const analyticsController = require('../../src/controllers/analyticsController');
 const Garment = require('../../src/models/garment');
 const Outfit = require('../../src/models/outfit');
+const Usage = require('../../src/models/usage');
 
 function createRes() {
   return {
@@ -24,13 +28,22 @@ describe('analyticsController calendar-based counting', () => {
     jest.clearAllMocks();
   });
 
-  test('getOverview computes wear metrics from past outfits', async () => {
+  test('getOverview computes wear metrics from usage events with outfit fallback available', async () => {
     const req = { user: { userId: '680000000000000000000001' } };
     const res = createRes();
 
     Garment.countDocuments.mockResolvedValue(10);
-    Outfit.countDocuments.mockResolvedValue(4);
-    Outfit.aggregate.mockResolvedValue([
+    Outfit.aggregate.mockResolvedValueOnce([
+      { total: 4 },
+    ]);
+    Outfit.aggregate.mockResolvedValueOnce([
+      {
+        totalWearEvents: 12,
+        wornGarmentCount: 9,
+        outfitsWornCount: 4,
+      },
+    ]);
+    Usage.aggregate.mockResolvedValue([
       {
         totalWearEvents: 8,
         wornGarmentCount: 6,
@@ -41,11 +54,19 @@ describe('analyticsController calendar-based counting', () => {
     await analyticsController.getOverview(req, res);
 
     expect(Garment.countDocuments).toHaveBeenCalledTimes(1);
-    expect(Outfit.countDocuments).toHaveBeenCalledTimes(1);
-    expect(Outfit.aggregate).toHaveBeenCalledTimes(1);
+    expect(Outfit.aggregate).toHaveBeenCalledTimes(2);
+    expect(Usage.aggregate).toHaveBeenCalledTimes(1);
 
-    const pipeline = Outfit.aggregate.mock.calls[0][0];
-    expect(pipeline).toEqual(expect.arrayContaining([
+    const countPipeline = Outfit.aggregate.mock.calls[0][0];
+    expect(countPipeline).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        $match: expect.objectContaining({ isLookbook: { $ne: true } }),
+      }),
+      expect.objectContaining({ $count: 'total' }),
+    ]));
+
+    const fallbackPipeline = Outfit.aggregate.mock.calls[1][0];
+    expect(fallbackPipeline).toEqual(expect.arrayContaining([
       expect.objectContaining({ $unwind: '$garments' }),
     ]));
 
@@ -60,14 +81,14 @@ describe('analyticsController calendar-based counting', () => {
     }));
   });
 
-  test('getUsageTrends returns monthly/day/category wear from outfits', async () => {
+  test('getUsageTrends returns monthly/day/category wear from usage events', async () => {
     const req = {
       user: { userId: '680000000000000000000001' },
       query: { months: '3' },
     };
     const res = createRes();
 
-    Outfit.aggregate.mockResolvedValue([
+    Usage.aggregate.mockResolvedValue([
       {
         monthly: [
           { month: '2026-02', wearCount: 2 },
@@ -87,11 +108,11 @@ describe('analyticsController calendar-based counting', () => {
 
     await analyticsController.getUsageTrends(req, res);
 
-    expect(Outfit.aggregate).toHaveBeenCalledTimes(1);
+    expect(Usage.aggregate).toHaveBeenCalledTimes(1);
+    expect(Outfit.aggregate).not.toHaveBeenCalled();
 
-    const pipeline = Outfit.aggregate.mock.calls[0][0];
+    const pipeline = Usage.aggregate.mock.calls[0][0];
     expect(pipeline).toEqual(expect.arrayContaining([
-      expect.objectContaining({ $unwind: '$garments' }),
       expect.objectContaining({
         $lookup: expect.objectContaining({ from: 'garments' }),
       }),
