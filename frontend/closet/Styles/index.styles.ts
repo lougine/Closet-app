@@ -81,7 +81,7 @@ export const s = StyleSheet.create({
     paddingTop: 6,
     paddingBottom: 4,
     paddingHorizontal: 16,
-    marginBottom: 6,
+    marginBottom: 4,
   },
   username: {
     fontSize: 15,
@@ -93,6 +93,56 @@ export const s = StyleSheet.create({
     left: 80,
     fontSize: 12,
     color: "#888",
+  },
+  profileActionsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginBottom: 8,
+  },
+  profileActionBtn: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#E2E2E2",
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    backgroundColor: "#fff",
+    alignItems: "center",
+  },
+  profileActionText: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  profileActionCount: {
+    fontSize: 12,
+    fontWeight: "800",
+    marginTop: 1,
+  },
+  socialPillsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    marginBottom: 8,
+  },
+  socialPill: {
+    minWidth: 122,
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  socialPillNumber: {
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  socialPillLabel: {
+    fontSize: 11,
+    marginTop: 1,
+    fontWeight: "600",
   },
   statsCard: {
     marginHorizontal: 18,
@@ -149,6 +199,82 @@ export const s = StyleSheet.create({
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
+  },
+  friendsSection: {
+    paddingHorizontal: 14,
+    paddingTop: 8,
+    paddingBottom: 110,
+    gap: 10,
+  },
+  friendsTabs: {
+    flexDirection: "row",
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 4,
+    gap: 6,
+    marginBottom: 4,
+  },
+  friendsTab: {
+    flex: 1,
+    borderRadius: 10,
+    paddingVertical: 9,
+    alignItems: "center",
+  },
+  friendsTabActive: {
+    backgroundColor: PINK,
+  },
+  friendsTabText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  friendsTabTextActive: {
+    color: "#fff",
+  },
+  friendEmptyText: {
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  friendRow: {
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  friendMeta: {
+    flex: 1,
+  },
+  friendName: {
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  friendSubText: {
+    fontSize: 11,
+    marginTop: 2,
+  },
+  friendTagWrap: {
+    borderRadius: 999,
+    backgroundColor: PINK,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  friendTagWrapMuted: {
+    borderRadius: 999,
+    backgroundColor: "#ECECEC",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  friendTag: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  friendTagMuted: {
+    color: "#666",
+    fontSize: 11,
+    fontWeight: "700",
   },
   itemsPage: {
     width: W,
