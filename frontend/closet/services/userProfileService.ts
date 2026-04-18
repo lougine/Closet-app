@@ -14,6 +14,19 @@ export type UserProfile = {
   followingCount: number;
 };
 
+export type PublicUserProfile = {
+  _id: string;
+  name?: string;
+  username: string;
+  profilePicture: string | null;
+  bannerImage: string | null;
+  followerCount: number;
+  followingCount: number;
+  isFollowing: boolean;
+  isMe: boolean;
+  joinedAt: string | null;
+};
+
 const DEFAULT_BANNER_PRESET = 'pink';
 
 async function getRequiredToken() {
@@ -47,6 +60,36 @@ async function parseResponse(res: Response, fallbackMessage: string) {
   return res.json();
 }
 
+async function fetchWithRouteFallback(paths: string[], init: RequestInit): Promise<Response> {
+  let lastResponse: Response | null = null;
+
+  for (const path of paths) {
+    const res = await fetch(buildApiUrl(path), init);
+    lastResponse = res;
+
+    if (res.status !== 404) {
+      return res;
+    }
+  }
+
+  return lastResponse as Response;
+}
+
+function normalizePublicUserProfile(payload: any): PublicUserProfile {
+  return {
+    _id: String(payload?._id || ''),
+    name: payload?.name,
+    username: payload?.username || payload?.name || 'User',
+    profilePicture: payload?.profilePicture ? buildImageUrl(payload.profilePicture) : null,
+    bannerImage: payload?.bannerImage ? buildImageUrl(payload.bannerImage) : null,
+    followerCount: Number(payload?.followerCount || 0),
+    followingCount: Number(payload?.followingCount || 0),
+    isFollowing: Boolean(payload?.isFollowing),
+    isMe: Boolean(payload?.isMe),
+    joinedAt: payload?.joinedAt || null,
+  };
+}
+
 export async function fetchCurrentUserProfile(): Promise<UserProfile> {
   const token = await getRequiredToken();
 
@@ -56,6 +99,26 @@ export async function fetchCurrentUserProfile(): Promise<UserProfile> {
 
   const payload = await parseResponse(res, 'Failed to load profile.');
   return normalizeUserProfile(payload);
+}
+
+export async function fetchPublicUserProfile(userId: string): Promise<PublicUserProfile> {
+  const normalizedUserId = String(userId || '').trim();
+  if (!normalizedUserId) {
+    throw new Error('User id is required.');
+  }
+
+  const token = await getRequiredToken();
+  const res = await fetchWithRouteFallback([
+    `/api/users/${normalizedUserId}/profile`,
+    `/users/${normalizedUserId}/profile`,
+    `/api/community/users/${normalizedUserId}/profile`,
+    `/community/users/${normalizedUserId}/profile`,
+  ], {
+    headers: buildAuthHeaders(token),
+  });
+
+  const payload = await parseResponse(res, 'Failed to load user profile.');
+  return normalizePublicUserProfile(payload);
 }
 
 export async function updateProfileDetails({

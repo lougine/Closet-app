@@ -93,6 +93,27 @@ describe('Community endpoints', () => {
     expect(response.body.items[0].username).toBe(other.name);
   });
 
+  test('GET /api/users/:userId/profile returns public profile fields', async () => {
+    const me = await createUser();
+    const other = await User.create({
+      name: `publicprofile-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      email: `publicprofile-${Date.now()}-${Math.floor(Math.random() * 1000)}@test.com`,
+      password: 'hashed-password',
+      followers: [me._id],
+    });
+
+    const response = await request(app)
+      .get(`/api/users/${other._id}/profile`)
+      .set(authHeader(me._id.toString()));
+
+    expect(response.status).toBe(200);
+    expect(response.body._id).toBe(other._id.toString());
+    expect(response.body.username).toBe(other.name);
+    expect(response.body.followerCount).toBe(1);
+    expect(response.body.followingCount).toBe(0);
+    expect(response.body.isMe).toBe(false);
+  });
+
   test('POST /api/community/posts and GET /api/community/feed return created post', async () => {
     const user = await createUser();
 
