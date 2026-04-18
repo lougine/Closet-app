@@ -4,12 +4,16 @@ const router = express.Router();
 const garmentController = require("../controllers/garmentController");
 const authMiddleware = require("../middleware/authMiddleware");
 const { imageUploadErrorHandler } = require("../middleware/imageUploadMiddleware");
+const {
+	searchRateLimit,
+	removeBackgroundRateLimit,
+} = require('../middleware/rateLimitMiddleware');
 
 router.use(authMiddleware);
 
 router.get("/", garmentController.getGarments);
-router.post('/search-images', garmentController.searchGarmentReferenceImages);
-router.post('/remove-background-url', garmentController.removeGarmentImageBackgroundByUrl);
+router.post('/search-images', searchRateLimit, garmentController.searchGarmentReferenceImages);
+router.post('/remove-background-url', removeBackgroundRateLimit, garmentController.removeGarmentImageBackgroundByUrl);
 
 router.post(
 	"/",

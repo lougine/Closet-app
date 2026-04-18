@@ -68,4 +68,7 @@ const garmentSchema = new mongoose.Schema({
 
 }, { timestamps: true });
 
+garmentSchema.index({ owner: 1, createdAt: -1 });
+garmentSchema.index({ owner: 1, category: 1, color: 1 });
+
 module.exports = mongoose.model("Garment", garmentSchema);

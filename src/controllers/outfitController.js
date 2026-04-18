@@ -8,6 +8,8 @@ const { buildImageMetadata } = require('../utils/imageMetadata');
 
 const DEFAULT_RANDOMIZE_COUNT = 4;
 const MAX_STYLING_COUNT = 8;
+const DEFAULT_OUTFIT_PAGE_SIZE = 25;
+const MAX_OUTFIT_PAGE_SIZE = 100;
 
 const toObjectIdString = (value) => {
   if (!value) return '';
@@ -48,6 +50,21 @@ const parseCount = (value, fallback = DEFAULT_RANDOMIZE_COUNT) => {
     return null;
   }
   return parsed;
+};
+
+const parsePagination = (query = {}) => {
+  const pageValue = Number(query.page);
+  const limitValue = Number(query.limit);
+
+  const page = Number.isInteger(pageValue) && pageValue > 0 ? pageValue : 1;
+  const parsedLimit = Number.isInteger(limitValue) && limitValue > 0 ? limitValue : DEFAULT_OUTFIT_PAGE_SIZE;
+  const limit = Math.min(parsedLimit, MAX_OUTFIT_PAGE_SIZE);
+
+  return {
+    page,
+    limit,
+    skip: (page - 1) * limit,
+  };
 };
 
 const categoryType = (category = '') => {
@@ -198,30 +215,35 @@ exports.createOutfit = async (req, res) => {
     res.status(201).json(outfit);
 
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
 
 exports.getOutfits = async (req, res) => {
   try {
+    const { skip, limit } = parsePagination(req.query);
 
     const outfits = await Outfit.find({
       owner: req.user.userId
     })
       .populate('garments', '_id imageUrl name category color season')
-      .sort({ date: -1, createdAt: -1 });
+      .sort({ date: -1, createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
 
     res.json(outfits.map(mapOutfitForCalendar));
 
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
 
 exports.getOutfitsByDate = async (req, res) => {
   try {
+    const { skip, limit } = parsePagination(req.query);
 
     const { start, end } = toUtcDayRange(req.params.date);
 
@@ -233,12 +255,15 @@ exports.getOutfitsByDate = async (req, res) => {
       },
     })
       .populate('garments', '_id imageUrl name category color season')
-      .sort({ date: -1, createdAt: -1 });
+      .sort({ date: -1, createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
 
     res.json(outfits.map(mapOutfitForCalendar));
 
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
@@ -299,7 +324,7 @@ exports.updateOutfit = async (req, res) => {
 
     return res.json(mapOutfitForCalendar(populated));
   } catch (error) {
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({ message: 'Internal server error' });
   }
 };
 
@@ -345,7 +370,7 @@ exports.updateOutfitCover = async (req, res) => {
 
     return res.json(mapOutfitForCalendar(populated));
   } catch (error) {
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({ message: 'Internal server error' });
   }
 };
 
@@ -376,7 +401,7 @@ exports.deleteOutfit = async (req, res) => {
     res.json({ message: "Outfit deleted" });
 
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
@@ -410,7 +435,7 @@ exports.getRandomizedOutfit = async (req, res) => {
       },
     });
   } catch (error) {
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({ message: 'Internal server error' });
   }
 };
 
@@ -499,8 +524,9 @@ exports.getAiRecommendations = async (req, res) => {
       },
     });
   } catch (error) {
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({ message: 'Internal server error' });
   }
 };
+
 
 

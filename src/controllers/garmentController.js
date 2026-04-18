@@ -4,6 +4,8 @@ const Usage = require('../models/usage');
 const { createImageUpload } = require("../middleware/imageUploadMiddleware");
 const { deleteImageByUrl } = require("../utils/imageFileUtils");
 const { buildImageMetadata } = require('../utils/imageMetadata');
+const { fetchWithTimeout } = require('../utils/fetchWithTimeout');
+const { validateOutboundImageUrl } = require('../utils/urlSafety');
 
 const SERPER_IMAGE_SEARCH_URL = 'https://google.serper.dev/images';
 const REMOVE_BG_API_URL = 'https://api.remove.bg/v1.0/removebg';
@@ -127,7 +129,7 @@ exports.searchGarmentReferenceImages = async (req, res) => {
   }
 
   try {
-    const response = await fetch(SERPER_IMAGE_SEARCH_URL, {
+    const response = await fetchWithTimeout(SERPER_IMAGE_SEARCH_URL, {
       method: 'POST',
       headers: {
         'X-API-KEY': process.env.SERPER_API_KEY,
@@ -185,9 +187,14 @@ exports.searchGarmentReferenceImages = async (req, res) => {
 
     return res.json({ images: normalized });
   } catch (error) {
+    if (error?.code === 'FETCH_TIMEOUT') {
+      return res.status(502).json({
+        message: 'Image search provider timed out. Please try again.',
+      });
+    }
+
     return res.status(502).json({
       message: 'Unable to reach image search provider right now.',
-      error: error.message,
     });
   }
 };
@@ -204,12 +211,17 @@ exports.removeGarmentImageBackgroundByUrl = async (req, res) => {
     return res.status(500).json({ message: 'Remove.bg API key is not configured.' });
   }
 
+  const validatedImageUrl = await validateOutboundImageUrl(imageUrl);
+  if (!validatedImageUrl.ok) {
+    return res.status(400).json({ message: validatedImageUrl.reason || 'Invalid image URL.' });
+  }
+
   try {
     const body = new URLSearchParams();
-    body.append('image_url', imageUrl);
+    body.append('image_url', validatedImageUrl.normalizedUrl);
     body.append('size', size);
 
-    const response = await fetch(REMOVE_BG_API_URL, {
+    const response = await fetchWithTimeout(REMOVE_BG_API_URL, {
       method: 'POST',
       headers: {
         'X-Api-Key': process.env.REMOVE_BG_API_KEY,
@@ -242,9 +254,14 @@ exports.removeGarmentImageBackgroundByUrl = async (req, res) => {
       dataUrl: `data:${mimeType};base64,${base64}`,
     });
   } catch (error) {
+    if (error?.code === 'FETCH_TIMEOUT') {
+      return res.status(502).json({
+        message: 'Background removal provider timed out. Please try again.',
+      });
+    }
+
     return res.status(502).json({
       message: 'Unable to reach background removal provider right now.',
-      error: error.message,
     });
   }
 };
@@ -271,7 +288,7 @@ exports.createGarment = async (req, res) => {
     res.status(201).json(garment);
 
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
@@ -325,7 +342,7 @@ exports.getGarments = async (req, res) => {
     res.json(garmentsWithWearCount);
 
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
@@ -345,7 +362,7 @@ exports.getGarmentById = async (req, res) => {
     res.json(garment);
 
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
@@ -383,7 +400,7 @@ exports.updateGarmentPreferences = async (req, res) => {
 
     res.json(garment);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
@@ -427,7 +444,7 @@ exports.updateGarment = async (req, res) => {
     res.json(garment);
 
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
@@ -452,6 +469,7 @@ exports.deleteGarment = async (req, res) => {
     res.json({ message: "Garment deleted" });
 
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
+

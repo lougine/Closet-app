@@ -6,16 +6,16 @@ describe('storage health endpoint', () => {
     jest.clearAllMocks();
   });
 
-  test('GET /api/health returns storage status and failure counters', async () => {
+  test('GET /api/health reports degraded when readiness checks fail', async () => {
     jest.doMock('../../src/config/db', () => jest.fn(async () => {}));
     jest.doMock('../../src/services/storage', () => ({
       getStorageHealthSnapshot: () => ({
         configuredPrimaryDriver: 'cloudinary',
-        effectivePrimaryDriver: 'cloudinary',
+        effectivePrimaryDriver: 'unavailable',
         keepLocalCopy: true,
         cloudinary: {
-          configured: true,
-          enabled: true,
+          configured: false,
+          enabled: false,
           cloudNamePresent: true,
           apiKeyPresent: true,
           apiSecretPresent: true,
@@ -40,9 +40,11 @@ describe('storage health endpoint', () => {
 
     const response = await request(app).get('/api/health');
 
-    expect(response.status).toBe(200);
-    expect(response.body.status).toBe('ok');
-    expect(response.body.storage.effectivePrimaryDriver).toBe('cloudinary');
+    expect(response.status).toBe(503);
+    expect(response.body.status).toBe('degraded');
+    expect(response.body.checks.mongoReady).toBe(false);
+    expect(response.body.checks.storageReady).toBe(false);
+    expect(response.body.storage.effectivePrimaryDriver).toBe('unavailable');
     expect(response.body.storage.failures.total).toBe(1);
   });
 });

@@ -1,13 +1,81 @@
 const Garment = require('../models/garment');
 const Usage = require('../models/usage');
 
+const USAGE_EVENT_STATUSES = new Set(['scheduled', 'worn', 'skipped', 'cancelled']);
+
+const normalizeEventStatus = (value) => {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (USAGE_EVENT_STATUSES.has(normalized)) {
+    return normalized;
+  }
+
+  return 'worn';
+};
+
+const toDateFromIsoDateOnly = (value) => {
+  if (typeof value !== 'string') return null;
+
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const parsed = new Date(`${trimmed}T00:00:00.000Z`);
+  if (Number.isNaN(parsed.getTime())) return null;
+
+  return parsed;
+};
+
+const resolveEventDate = ({ eventStatus, wornDate, eventLocalDate }) => {
+  if (wornDate) {
+    return new Date(wornDate);
+  }
+
+  const derivedFromLocalDate = toDateFromIsoDateOnly(eventLocalDate);
+  if (derivedFromLocalDate) {
+    return derivedFromLocalDate;
+  }
+
+  if (eventStatus === 'worn') {
+    return new Date();
+  }
+
+  return null;
+};
+
+const toIsoDateOnly = (value) => {
+  if (!(value instanceof Date) || Number.isNaN(value.getTime())) return null;
+  return value.toISOString().slice(0, 10);
+};
+
 exports.logUsage = async (req, res) => {
   try {
     const userId = req.user.userId;
-    const { garmentId, wornDate, outfitId } = req.body;
+    const {
+      garmentId,
+      wornDate,
+      outfitId,
+      eventStatus,
+      eventSource,
+      eventTimezone,
+      eventLocalDate,
+      eventGroupId,
+      idempotencyKey,
+    } = req.body;
 
     if (!garmentId) {
       return res.status(400).json({ message: 'garmentId is required' });
+    }
+
+    const normalizedEventStatus = normalizeEventStatus(eventStatus);
+    const resolvedEventDate = resolveEventDate({
+      eventStatus: normalizedEventStatus,
+      wornDate,
+      eventLocalDate,
+    });
+
+    if (!resolvedEventDate) {
+      return res.status(400).json({
+        message: 'wornDate or eventLocalDate is required for non-worn events',
+      });
     }
 
     const garment = await Garment.findOne({ _id: garmentId, owner: userId }).select('_id');
@@ -19,22 +87,57 @@ exports.logUsage = async (req, res) => {
       user: userId,
       garment: garmentId,
       outfit: outfitId || null,
-      wornDate: wornDate ? new Date(wornDate) : new Date(),
+      wornDate: resolvedEventDate,
+      eventStatus: normalizedEventStatus,
+      eventSource: typeof eventSource === 'string' && eventSource.trim() ? eventSource.trim() : 'manual',
+      eventTimezone: typeof eventTimezone === 'string' && eventTimezone.trim() ? eventTimezone.trim() : null,
+      eventLocalDate: typeof eventLocalDate === 'string' && eventLocalDate.trim()
+        ? eventLocalDate.trim()
+        : toIsoDateOnly(resolvedEventDate),
+      eventGroupId: typeof eventGroupId === 'string' && eventGroupId.trim() ? eventGroupId.trim() : null,
+      idempotencyKey: typeof idempotencyKey === 'string' && idempotencyKey.trim() ? idempotencyKey.trim() : null,
     });
 
     res.status(201).json(usage);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    if (error?.code === 11000 && error?.keyPattern?.idempotencyKey) {
+      return res.status(409).json({ message: 'Duplicate wear event ignored.' });
+    }
+
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
 exports.logBulkUsage = async (req, res) => {
   try {
     const userId = req.user.userId;
-    const { garmentIds, wornDate, outfitId } = req.body;
+    const {
+      garmentIds,
+      wornDate,
+      outfitId,
+      eventStatus,
+      eventSource,
+      eventTimezone,
+      eventLocalDate,
+      eventGroupId,
+      idempotencyKey,
+    } = req.body;
 
     if (!Array.isArray(garmentIds) || garmentIds.length === 0) {
       return res.status(400).json({ message: 'garmentIds must be a non-empty array' });
+    }
+
+    const normalizedEventStatus = normalizeEventStatus(eventStatus);
+    const resolvedEventDate = resolveEventDate({
+      eventStatus: normalizedEventStatus,
+      wornDate,
+      eventLocalDate,
+    });
+
+    if (!resolvedEventDate) {
+      return res.status(400).json({
+        message: 'wornDate or eventLocalDate is required for non-worn events',
+      });
     }
 
     const ownedGarments = await Garment.find({
@@ -46,18 +149,31 @@ exports.logBulkUsage = async (req, res) => {
       return res.status(400).json({ message: 'One or more garments are invalid for this user' });
     }
 
-    const date = wornDate ? new Date(wornDate) : new Date();
     const docs = garmentIds.map((garmentId) => ({
       user: userId,
       garment: garmentId,
       outfit: outfitId || null,
-      wornDate: date,
+      wornDate: resolvedEventDate,
+      eventStatus: normalizedEventStatus,
+      eventSource: typeof eventSource === 'string' && eventSource.trim() ? eventSource.trim() : 'manual',
+      eventTimezone: typeof eventTimezone === 'string' && eventTimezone.trim() ? eventTimezone.trim() : null,
+      eventLocalDate: typeof eventLocalDate === 'string' && eventLocalDate.trim()
+        ? eventLocalDate.trim()
+        : toIsoDateOnly(resolvedEventDate),
+      eventGroupId: typeof eventGroupId === 'string' && eventGroupId.trim() ? eventGroupId.trim() : null,
+      idempotencyKey: typeof idempotencyKey === 'string' && idempotencyKey.trim()
+        ? `${idempotencyKey.trim()}:${garmentId}`
+        : null,
     }));
 
     const usages = await Usage.insertMany(docs);
     res.status(201).json({ created: usages.length, usages });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    if (error?.code === 11000 && error?.keyPattern?.idempotencyKey) {
+      return res.status(409).json({ message: 'Duplicate wear event ignored.' });
+    }
+
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
@@ -98,6 +214,7 @@ exports.getUsageHistory = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
+
