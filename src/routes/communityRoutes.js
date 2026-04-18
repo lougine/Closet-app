@@ -18,6 +18,21 @@ router.get(
   validateObjectIdField({ source: 'params', field: 'userId', required: true }),
   userController.getPublicProfile,
 );
+router.get(
+  '/users/:userId/garments',
+  validateObjectIdField({ source: 'params', field: 'userId', required: true }),
+  userController.getPublicUserGarments,
+);
+router.get(
+  '/users/:userId/posts',
+  validateObjectIdField({ source: 'params', field: 'userId', required: true }),
+  userController.getPublicUserPosts,
+);
+router.post(
+  '/users/:userId/style-outfits',
+  validateObjectIdField({ source: 'params', field: 'userId', required: true }),
+  userController.createStyledOutfitForUser,
+);
 
 router.get(
   '/feed',
