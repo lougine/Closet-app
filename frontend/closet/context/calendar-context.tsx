@@ -204,6 +204,9 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
   async function saveOutfitForDate(payload: { garmentIds: string[]; date: Date; name?: string; previewImage?: string }) {
     const { garmentIds, date, name, previewImage } = payload;
     const token = await SecureStore.getItemAsync('userToken');
+    if (!token) {
+      throw new Error('Session expired. Please log in again.');
+    }
     
     // Create a date at UTC midnight to avoid timezone shifting
     const dateKey = toDateKey(date);
@@ -232,7 +235,7 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
 
     const createdOutfit = await res.json();
 
-    if (previewImageIsLocal && createdOutfit?._id) {
+    if (previewImageIsLocal && createdOutfit?._id && previewImage) {
       const uploadFormData = new FormData();
       uploadFormData.append('coverImage', {
         uri: previewImage,

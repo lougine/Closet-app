@@ -66,6 +66,23 @@ const outfitSchema = new mongoose.Schema({
     default: null,
   },
 
+  styledFor: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null,
+  },
+
+  styleNote: {
+    type: String,
+    default: '',
+    maxlength: 280,
+  },
+
+  isSharedWithStyledUser: {
+    type: Boolean,
+    default: false,
+  },
+
   owner: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
@@ -76,5 +93,7 @@ const outfitSchema = new mongoose.Schema({
 
 outfitSchema.index({ owner: 1, date: -1, createdAt: -1 });
 outfitSchema.index({ owner: 1, createdAt: -1 });
+outfitSchema.index({ styledForUserId: 1, createdAt: -1 });
+outfitSchema.index({ styledFor: 1, createdAt: -1 });
 
 module.exports = mongoose.model("Outfit", outfitSchema);

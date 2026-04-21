@@ -50,6 +50,7 @@ const userSchema = new mongoose.Schema({
   heightCm: { type: Number, min: 1, max: 272, default: null },
   weightKg: { type: Number, min: 1, max: 300, default: null },
   bodyType: { type: String, default: null },
+  bio: { type: String, default: '', maxlength: 160 },
   outfitFormula: { type: String, default: null },
   styleWords: { type: [String], default: [] },
   closetGoal: { type: String, default: null },
@@ -60,7 +61,15 @@ const userSchema = new mongoose.Schema({
 
   preferences: {
     style: [String],
-    favoriteColors: [String]
+    favoriteColors: [String],
+    notifications: {
+      dailyOutfitReminder: { type: Boolean, default: true },
+      outfitPlanning: { type: Boolean, default: false },
+      weeklyRecap: { type: Boolean, default: true },
+      streakAlerts: { type: Boolean, default: true },
+      newFeatures: { type: Boolean, default: false },
+      styledOutfitShares: { type: Boolean, default: true },
+    },
   }
 
 }, { timestamps: true });

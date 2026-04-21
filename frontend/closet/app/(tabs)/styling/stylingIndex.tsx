@@ -1,6 +1,6 @@
 import { Feather, Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as SecureStore from "expo-secure-store";
 import { captureRef } from "react-native-view-shot";
 import { Alert, Animated, Dimensions, FlatList, Image, Modal, ScrollView, StatusBar, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from "react-native";
@@ -102,14 +102,15 @@ const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, timeoutMe
 };
 
 function WardrobePanel({
-  visible, onClose, onSelect, selected,
+  visible, onClose, onSelect, selected, items, panelTitle,
 }: {
   visible: boolean;
   onClose: () => void;
   onSelect: (id: string) => void;
   selected: string[];
+  items: any[];
+  panelTitle?: string;
 }) {
-  const { items } = useWardrobe();
   const { isDarkMode } = useAppTheme();
   const panelTheme = isDarkMode
     ? {
@@ -356,7 +357,7 @@ function WardrobePanel({
       >
         {/* Header */}
         <View style={s.panelHeader}>
-          <Text style={[s.panelTitle, { color: panelTheme.panelText }]}>Wardrobe</Text>
+          <Text style={[s.panelTitle, { color: panelTheme.panelText }]}>{panelTitle || "Wardrobe"}</Text>
           <TouchableOpacity onPress={onClose}>
             <Ionicons name="close" size={20} color={panelTheme.panelSubText} />
           </TouchableOpacity>
@@ -693,7 +694,11 @@ function WardrobePanel({
 }
 
 export default function StylingScreen() {
-  const params = useLocalSearchParams<{ mode?: string; date?: string; outfitJson?: string }>();
+  const params = useLocalSearchParams<{
+    mode?: string;
+    date?: string;
+    outfitJson?: string;
+  }>();
   const router = useRouter();
   const { isDarkMode } = useAppTheme();
   const theme = isDarkMode
@@ -1012,17 +1017,25 @@ export default function StylingScreen() {
 
       {/* Mode tabs */}
       <View style={[s.modeTabs, { backgroundColor: theme.card, borderColor: theme.border, borderWidth: 1 }] }>
-        {MODES.map(m => (
+        {MODES.map(m => {
+          return (
           <TouchableOpacity
             key={m}
             style={[s.modeTab, mode === m && s.modeTabActive]}
             onPress={() => handleModeChange(m)}
           >
-            <Text style={[s.modeTabTxt, { color: theme.subText }, mode === m && s.modeTabTxtActive]} numberOfLines={1}>
+            <Text
+              style={[
+                s.modeTabTxt,
+                { color: theme.subText },
+                mode === m && s.modeTabTxtActive,
+              ]}
+              numberOfLines={1}
+            >
               {m}
             </Text>
           </TouchableOpacity>
-        ))}
+        )})}
       </View>
 
       {/* Canvas */}
@@ -1209,6 +1222,8 @@ export default function StylingScreen() {
           onClose={() => setPanelOpen(false)}
           onSelect={createOutfit.toggleItem}
           selected={selected}
+          items={items}
+          panelTitle="Wardrobe"
         />
       )}
     </View>
