@@ -46,6 +46,7 @@ export interface ClothingItem {
   label: string;
   bg: string;
   category?: string[];
+  subcategory?: string;
   colors?: string[];
   size?: string;
   brand?: string;
@@ -140,6 +141,7 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
           label: garment.name,
           bg: getCategoryBg(garment.category),
           category: [garment.category],
+          subcategory: garment.subcategory || undefined,
           colors: garment.color ? [garment.color] : [],
           size: garment.size,
           brand: garment.brand,

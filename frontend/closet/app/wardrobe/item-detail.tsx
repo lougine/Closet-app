@@ -11,6 +11,11 @@ import {
   IMAGE_UPLOAD_QUALITY,
   validateImageFileSize,
 } from "../../constants/imageUpload";
+import {
+  GARMENT_SUBCATEGORY_TREE,
+  GARMENT_STYLE_TAG_OPTIONS,
+  GARMENT_STYLE_TAG_SET,
+} from "../../constants/garmentTaxonomy";
 import { getAppTheme } from "../../constants/appTheme";
 import { buildApiUrl, buildAuthHeaders, buildImageUrl } from "../../constants/api";
 import { getUploadErrorMessage, uploadMultipartWithRetry } from "../../services/uploadRequest";
@@ -31,21 +36,6 @@ const CATEGORY_OPTIONS = [
   "Bags",
   "Swimwear",
 ];
-
-const CATEGORY_TREE: Record<string, string[]> = {
-  Tops: ["T-Shirt", "Blouse", "Crop Top", "Tank Top", "Shirt", "Hoodie", "Sweater", "Cardigan"],
-  Bottoms: ["Jeans", "Skirt", "Shorts", "Trousers", "Leggings", "Cargo Pants", "Sweatpants"],
-  Dresses: ["Mini Dress", "Bodycon"],
-  Outerwear: ["Jacket", "Blazer", "Coat", "Trench Coat", "Puffer", "Leather Jacket", "Denim Jacket", "Vest"],
-  Footwear: ["Sneakers", "Heels", "Boots", "Sandals", "Platforms"],
-  Accessories: ["Bag", "Belt", "Hat", "Sunglasses", "Jewellery", "Scarf", "Watch"],
-  Bags: ["Handbag", "Tote", "Clutch", "Backpack", "Mini Bag", "Shoulder Bag"],
-  Swimwear: ["One-Piece", "Coverup", "Swim Shorts"],
-};
-
-const ALL_SUBCATEGORY_TAGS = new Set(
-  Object.values(CATEGORY_TREE).flat().map((subcategory) => subcategory.toLowerCase()),
-);
 
 const COLOR_OPTIONS = [
   { label: "Black", hex: "#111111" }, { label: "White", hex: "#FFFFFF" },
@@ -149,10 +139,7 @@ export default function ItemDetailScreen() {
   const [item, setItem] = useState<ClothingItem>(initialItem);
   const [activeTab, setActiveTab] = useState("Details");
   const [showColorPicker, setShowColorPicker] = useState(false);
-  const [showTagInput, setShowTagInput] = useState(false);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
-  const [showSubcategoryOptions, setShowSubcategoryOptions] = useState(false);
-  const [newTag, setNewTag] = useState("");
   const [editingSize, setEditingSize] = useState(false);
   const [editingBrand, setEditingBrand] = useState(false);
   const [editingPrice, setEditingPrice] = useState(false);
@@ -240,32 +227,32 @@ export default function ItemDetailScreen() {
     setItem((prev) => ({ ...prev, ...changes }));
 
   const selectedCategory = item.category?.[0] ?? "";
-  const selectedSubcategory = selectedCategory
-    ? (CATEGORY_TREE[selectedCategory] ?? []).find((subcategory) =>
-        (item.tags ?? []).some((tag) => tag.toLowerCase() === subcategory.toLowerCase()),
-      )
-    : undefined;
+  const selectedSubcategory = item.subcategory ?? "";
+  const selectedCategorySubcategories = selectedCategory ? (GARMENT_SUBCATEGORY_TREE[selectedCategory] ?? []) : [];
+  const selectedStyleTags = (item.tags ?? []).filter((tag) => GARMENT_STYLE_TAG_SET.has(tag.toLowerCase()));
 
-  const setCategoryWithSubcategoryReset = (category: string) => {
+  const setCategory = (category: string) => {
     update({
       category: [category],
-      tags: (item.tags ?? []).filter((tag) => !ALL_SUBCATEGORY_TAGS.has(tag.toLowerCase())),
+      subcategory: undefined,
     });
     setShowCategoryPicker(false);
-    setShowSubcategoryOptions(true);
   };
 
-  const toggleSubcategoryTag = (subcategory: string) => {
+  const toggleSubcategory = (subcategory: string) => {
+    const nextSubcategory = selectedSubcategory === subcategory ? undefined : subcategory;
+    update({ subcategory: nextSubcategory });
+  };
+
+  const toggleStyleTag = (tag: string) => {
+    const normalizedTag = tag.toLowerCase();
     const currentTags = item.tags ?? [];
-    const normalizedSelected = currentTags.find((tag) => ALL_SUBCATEGORY_TAGS.has(tag.toLowerCase()))?.toLowerCase();
-    const cleanedTags = currentTags.filter((tag) => !ALL_SUBCATEGORY_TAGS.has(tag.toLowerCase()));
-    const deselecting = normalizedSelected === subcategory.toLowerCase();
-    const nextTags = deselecting
-      ? cleanedTags
-      : [...cleanedTags, subcategory];
+
+    const nextTags = currentTags.some((existing) => existing.toLowerCase() === normalizedTag)
+      ? currentTags.filter((existing) => existing.toLowerCase() !== normalizedTag)
+      : [...currentTags, normalizedTag];
 
     update({ tags: nextTags });
-    setShowSubcategoryOptions(deselecting);
   };
 
   const sanitizePriceInput = (value: string) => {
@@ -318,16 +305,6 @@ export default function ItemDetailScreen() {
     }
   };
 
-  const removeTag = (tag: string) =>
-    update({ tags: (item.tags ?? []).filter((t) => t !== tag) });
-
-  const addTag = () => {
-    if (!newTag.trim()) return;
-    update({ tags: [...(item.tags ?? []), newTag.trim()] });
-    setNewTag("");
-    setShowTagInput(false);
-  };
-
   const persistItemDetails = async () => {
     const token = await SecureStore.getItemAsync("userToken");
     if (!token) {
@@ -346,7 +323,6 @@ export default function ItemDetailScreen() {
         size: item.size ?? null,
         brand: item.brand ?? null,
         purchasePrice: typeof item.totalCost === "number" ? item.totalCost : null,
-        tags: item.tags ?? [],
         color: item.colors?.[0] ?? null,
       }),
     });
@@ -361,6 +337,7 @@ export default function ItemDetailScreen() {
       ...item,
       label: garment.name ?? item.label,
       category: garment.category ? [garment.category] : (item.category ?? []),
+      subcategory: garment.subcategory ?? item.subcategory,
       size: garment.size ?? undefined,
       brand: garment.brand ?? undefined,
       tags: Array.isArray(garment.tags) ? garment.tags : (item.tags ?? []),
@@ -372,11 +349,62 @@ export default function ItemDetailScreen() {
     updateItem(updatedItem);
   };
 
+  const persistSubcategory = async () => {
+    const token = await SecureStore.getItemAsync("userToken");
+    if (!token) {
+      throw new Error("Session expired. Please log in again.");
+    }
+
+    const response = await fetch(buildApiUrl(`/api/garments/${item.id}/subcategory`), {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ subcategory: item.subcategory ?? null }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ message: "Unable to update subcategory." }));
+      throw new Error(errorData.message || "Unable to update subcategory.");
+    }
+  };
+
+  const persistTags = async () => {
+    const token = await SecureStore.getItemAsync("userToken");
+    if (!token) {
+      throw new Error("Session expired. Please log in again.");
+    }
+
+    const sanitizedTags = Array.from(
+      new Set(
+        (item.tags ?? [])
+          .map((tag) => tag.trim().toLowerCase())
+          .filter((tag) => GARMENT_STYLE_TAG_SET.has(tag)),
+      ),
+    );
+
+    const response = await fetch(buildApiUrl(`/api/garments/${item.id}/tags`), {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ tags: sanitizedTags }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ message: "Unable to update tags." }));
+      throw new Error(errorData.message || "Unable to update tags.");
+    }
+  };
+
   const saveItemDetails = async () => {
     if (savingDetails) return;
     try {
       setSavingDetails(true);
       await persistItemDetails();
+      await Promise.all([persistSubcategory(), persistTags()]);
       await refreshItems();
       router.replace("/(tabs)" as any);
     } catch (error: any) {
@@ -692,7 +720,7 @@ export default function ItemDetailScreen() {
                         s.addBtn,
                         selected && s.addBtnActive,
                       ]}
-                      onPress={() => setCategoryWithSubcategoryReset(category)}
+                      onPress={() => setCategory(category)}
                     >
                       <Text style={[s.addBtnText, selected && s.addBtnTextActive]}>{category}</Text>
                     </TouchableOpacity>
@@ -700,39 +728,31 @@ export default function ItemDetailScreen() {
                 })}
               </View>
             )}
-            {selectedCategory ? (
-              <>
-                <View style={s.row}>
-                  <Text style={[s.rowLabel, { color: theme.text }]}>Subcategory</Text>
+            <View style={s.row}>
+              <Text style={[s.rowLabel, { color: theme.text }]}>Subcategory</Text>
+              <Text style={[s.categoryText, { color: theme.subText }]}>Pick one</Text>
+            </View>
+            <View style={s.colorPicker}>
+              {selectedCategorySubcategories.map((subcategory) => {
+                const selected = selectedSubcategory.toLowerCase() === subcategory.toLowerCase();
+                return (
                   <TouchableOpacity
-                    style={[s.categoryPill, { backgroundColor: theme.inputBg, borderColor: theme.border }]}
-                    onPress={() => setShowSubcategoryOptions((v) => !v)}
+                    key={subcategory}
+                    style={[
+                      s.addBtn,
+                      selected && s.addBtnActive,
+                    ]}
+                    onPress={() => toggleSubcategory(subcategory)}
                   >
-                    <Text style={[s.categoryText, { color: theme.text }]}>
-                      {selectedSubcategory ? `${selectedCategory} > ${selectedSubcategory}` : "Select type"}
-                    </Text>
+                    <Text style={[s.addBtnText, selected && s.addBtnTextActive]}>{subcategory}</Text>
                   </TouchableOpacity>
-                </View>
-                {showSubcategoryOptions && (
-                  <View style={s.colorPicker}>
-                    {(CATEGORY_TREE[selectedCategory] ?? []).map((subcategory) => {
-                      const selected = selectedSubcategory === subcategory;
-                      return (
-                        <TouchableOpacity
-                          key={subcategory}
-                          style={[
-                            s.addBtn,
-                            selected && s.addBtnActive,
-                          ]}
-                          onPress={() => toggleSubcategoryTag(subcategory)}
-                        >
-                          <Text style={[s.addBtnText, selected && s.addBtnTextActive]}>{subcategory}</Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                )}
-              </>
+                );
+              })}
+            </View>
+            {!selectedCategory ? (
+              <View style={s.row}>
+                <Text style={[s.categoryText, { color: theme.subText }]}>Select a category first to pick subcategory chips.</Text>
+              </View>
             ) : null}
             <View style={[s.divider, { backgroundColor: theme.border }]} />
 
@@ -851,30 +871,24 @@ export default function ItemDetailScreen() {
 
             <View>
               <View style={s.rowBetween}>
-                <Text style={[s.rowLabel, { color: theme.text }]}>Tags</Text>
-                <TouchableOpacity onPress={() => setShowTagInput((v) => !v)}>
-                  <Feather name="edit-2" size={15} color={theme.subText} />
-                </TouchableOpacity>
+                <Text style={[s.rowLabel, { color: theme.text }]}>Style Tags</Text>
               </View>
               <View style={s.tagsWrap}>
-                {(item.tags ?? []).map((tag) => (
-                  <View key={tag} style={s.tagPill}>
-                    <Text style={s.tagText}>{tag}</Text>
-                    <TouchableOpacity onPress={() => removeTag(tag)}>
-                      <Text style={s.tagX}>×</Text>
+                {GARMENT_STYLE_TAG_OPTIONS.map((tag) => {
+                  const selected = selectedStyleTags.some((existing) => existing.toLowerCase() === tag);
+                  return (
+                    <TouchableOpacity
+                      key={tag}
+                      style={[
+                        s.addBtn,
+                        selected && s.addBtnActive,
+                      ]}
+                      onPress={() => toggleStyleTag(tag)}
+                    >
+                      <Text style={[s.addBtnText, selected && s.addBtnTextActive]}>{tag}</Text>
                     </TouchableOpacity>
-                  </View>
-                ))}
-                {showTagInput && (
-                  <View style={s.inlineRow}>
-                    <TextInput autoFocus style={[s.inlineInput, s.tagInlineInput, { backgroundColor: theme.inputBg, borderColor: theme.border, color: theme.text }]} value={newTag}
-                      onChangeText={setNewTag} onSubmitEditing={addTag}
-                      placeholder="new tag" placeholderTextColor={theme.subText} />
-                    <TouchableOpacity style={s.inlineSave} onPress={addTag}>
-                      <Text style={s.inlineSaveText}>+</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
+                  );
+                })}
               </View>
             </View>
             <View style={[s.divider, { backgroundColor: theme.border }]} />

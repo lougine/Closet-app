@@ -6,6 +6,12 @@ const { deleteImageByUrl } = require("../utils/imageFileUtils");
 const { buildImageMetadata } = require('../utils/imageMetadata');
 const { fetchWithTimeout } = require('../utils/fetchWithTimeout');
 const { validateOutboundImageUrl } = require('../utils/urlSafety');
+const {
+  ALLOWED_GARMENT_SUBCATEGORIES,
+  ALLOWED_GARMENT_STYLE_TAGS,
+  ALLOWED_GARMENT_SUBCATEGORY_SET,
+  ALLOWED_GARMENT_STYLE_TAG_SET,
+} = require('../constants/garmentTaxonomy');
 
 const SERPER_IMAGE_SEARCH_URL = 'https://google.serper.dev/images';
 const REMOVE_BG_API_URL = 'https://api.remove.bg/v1.0/removebg';
@@ -92,6 +98,21 @@ const parseThirdPartyErrorMessage = async (response, fallbackMessage) => {
   }
 
   return fallbackMessage;
+};
+
+const normalizeToken = (value) => {
+  if (typeof value !== 'string') return '';
+  return value.trim().toLowerCase();
+};
+
+const normalizeUniqueTagList = (rawTags) => {
+  if (!Array.isArray(rawTags)) return [];
+
+  const normalized = rawTags
+    .map((tag) => normalizeToken(tag))
+    .filter(Boolean);
+
+  return [...new Set(normalized)];
 };
 
 const scoreImage = (img) => {
@@ -401,6 +422,87 @@ exports.updateGarmentPreferences = async (req, res) => {
     res.json(garment);
   } catch (error) {
     res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+exports.updateGarmentSubcategory = async (req, res) => {
+  try {
+    if (!Object.prototype.hasOwnProperty.call(req.body || {}, 'subcategory')) {
+      return res.status(400).json({ message: 'subcategory is required.' });
+    }
+
+    const normalizedSubcategory = normalizeToken(req.body.subcategory);
+    const nextSubcategory = normalizedSubcategory || null;
+
+    if (nextSubcategory && !ALLOWED_GARMENT_SUBCATEGORY_SET.has(nextSubcategory)) {
+      return res.status(400).json({
+        message: 'Invalid subcategory value.',
+        allowedSubcategories: ALLOWED_GARMENT_SUBCATEGORIES,
+      });
+    }
+
+    const garment = await Garment.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        owner: req.user.userId,
+      },
+      {
+        subcategory: nextSubcategory,
+      },
+      {
+        new: true,
+        runValidators: true,
+      },
+    );
+
+    if (!garment) {
+      return res.status(404).json({ message: 'Garment not found' });
+    }
+
+    return res.json(garment);
+  } catch (error) {
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+exports.updateGarmentTags = async (req, res) => {
+  try {
+    if (!Array.isArray(req.body?.tags)) {
+      return res.status(400).json({ message: 'tags must be an array.' });
+    }
+
+    const normalizedTags = normalizeUniqueTagList(req.body.tags);
+    const invalidTags = normalizedTags.filter((tag) => !ALLOWED_GARMENT_STYLE_TAG_SET.has(tag));
+
+    if (invalidTags.length > 0) {
+      return res.status(400).json({
+        message: 'Invalid tags provided.',
+        invalidTags,
+        allowedTags: ALLOWED_GARMENT_STYLE_TAGS,
+      });
+    }
+
+    const garment = await Garment.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        owner: req.user.userId,
+      },
+      {
+        tags: normalizedTags,
+      },
+      {
+        new: true,
+        runValidators: true,
+      },
+    );
+
+    if (!garment) {
+      return res.status(404).json({ message: 'Garment not found' });
+    }
+
+    return res.json(garment);
+  } catch (error) {
+    return res.status(500).json({ message: 'Internal server error' });
   }
 };
 
