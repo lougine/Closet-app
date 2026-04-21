@@ -1,6 +1,6 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useMemo, useState } from "react";
-import { FlatList, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from "react-native";
+import { FlatList, ScrollView, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from "react-native";
 import AuthenticatedImage from "../../../components/AuthenticatedImage";
 import { s } from "../../../Styles/styling.styles";
 import { useAppTheme } from "../../../context/themeContext";
@@ -262,7 +262,11 @@ export default function AiRecommendedCanvas(props: Props) {
   } = props;
 
   return (
-    <>
+    <ScrollView
+      contentContainerStyle={{ flexGrow: 1 }}
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+    >
       <FlatList
         data={selectedItems}
         numColumns={selectedGridColumns}
@@ -356,6 +360,6 @@ export default function AiRecommendedCanvas(props: Props) {
           </View>
         </View>
       )}
-    </>
+    </ScrollView>
   );
 }

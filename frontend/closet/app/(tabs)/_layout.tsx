@@ -1,7 +1,7 @@
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { Tabs, useRouter } from "expo-router";
 import React, { useRef, useState } from "react";
-import { Animated, Image, Modal, Pressable, Text, TouchableOpacity, View } from "react-native";
+import { Animated, Image, Pressable, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { styles } from "../../Styles/tabs_layout.styles";
 import { CalendarProvider } from "../../context/calendar-context";
@@ -28,7 +28,6 @@ function ExpandableFAB() {
   const router = useRouter();
   const { isDarkMode } = useAppTheme();
   const [open, setOpen] = useState(false);
-  const [showAddSheet, setShowAddSheet] = useState(false);
   const animation = useRef(new Animated.Value(0)).current;
 
   const toggleMenu = () => {
@@ -47,23 +46,7 @@ function ExpandableFAB() {
   };
 
   const handleAddItems = () => {
-    toggleMenu();
-    setTimeout(() => setShowAddSheet(true), 250);
-  };
-
-  const launchCamera = async () => {
-    setShowAddSheet(false);
-    setTimeout(() => router.push({ pathname: "/wardrobe/add-items" as any, params: { source: "camera" } }), 300);
-  };
-
-  const launchGallery = async () => {
-    setShowAddSheet(false);
-    setTimeout(() => router.push({ pathname: "/wardrobe/add-items" as any, params: { source: "gallery" } }), 300);
-  };
-
-  const launchSearchByName = async () => {
-    setShowAddSheet(false);
-    setTimeout(() => router.push('/wardrobe/search-garment-image' as any), 300);
+    navigateAndClose("/wardrobe/upload-items");
   };
 
   return (
@@ -86,10 +69,19 @@ function ExpandableFAB() {
         {open && (
           <>
             <Animated.View style={[styles.actionWrapper, createAnimation(250)]}>
-              <ActionButton label="Add items" icon="plus" onPress={handleAddItems} />
+              <ActionButton label="Upload items" icon="plus" onPress={handleAddItems} />
             </Animated.View>
             <Animated.View style={[styles.actionWrapper, createAnimation(190)]}>
-              <ActionButton label="Create outfit" icon="hanger" onPress={() => navigateAndClose("/wardrobe/outfit")} />
+              <ActionButton
+                label="Create outfit"
+                icon="hanger"
+                onPress={() => {
+                  toggleMenu();
+                  setTimeout(() => {
+                    router.push({ pathname: "/(tabs)/styling" as any, params: { mode: "create" } });
+                  }, 200);
+                }}
+              />
             </Animated.View>
             <Animated.View style={[styles.actionWrapper, createAnimation(130)]}>
               <ActionButton label="Create lookbook" icon="book" onPress={() => navigateAndClose("/wardrobe/lookbook")} />
@@ -107,37 +99,6 @@ function ExpandableFAB() {
           <Image source={require("../../assets/images/hanger.png")} style={styles.fabIcon} />
         </TouchableOpacity>
       </View>
-
-      <Modal transparent visible={showAddSheet} animationType="slide" onRequestClose={() => setShowAddSheet(false)}>
-        <View style={[styles.sheetOverlay, isDarkMode && { backgroundColor: "rgba(0,0,0,0.7)" }]}>
-          <TouchableOpacity style={styles.sheetDismiss} activeOpacity={1} onPress={() => setShowAddSheet(false)} />
-          <View style={[styles.sheet, isDarkMode && { backgroundColor: "#1B1B1B" }]}>
-            <View style={[styles.sheetHandle, isDarkMode && { backgroundColor: "#4A4A4A" }]} />
-            <Text style={[styles.sheetTitle, isDarkMode && { color: "#F1F1F1" }]}>Add Item</Text>
-            <TouchableOpacity style={[styles.sheetBtn, { backgroundColor: "#111111", borderColor: "#2A2A2A" }]} onPress={launchCamera}>
-              <View>
-                <Text style={[styles.sheetBtnLabel, { color: "#F1F1F1" }]}>Take a Photo</Text>
-                <Text style={[styles.sheetBtnSub, { color: "#A6A6A6" }]}>Use your camera</Text>
-              </View>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.sheetBtn, { backgroundColor: "#111111", borderColor: "#2A2A2A" }]} onPress={launchGallery}>
-              <View>
-                <Text style={[styles.sheetBtnLabel, { color: "#F1F1F1" }]}>Choose from Gallery</Text>
-                <Text style={[styles.sheetBtnSub, { color: "#A6A6A6" }]}>Pick an existing photo</Text>
-              </View>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.sheetBtn, { backgroundColor: "#111111", borderColor: "#2A2A2A" }]} onPress={launchSearchByName}>
-              <View>
-                <Text style={[styles.sheetBtnLabel, { color: "#F1F1F1" }]}>Search by Name</Text>
-                <Text style={[styles.sheetBtnSub, { color: "#A6A6A6" }]}>Find a garment image online</Text>
-              </View>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowAddSheet(false)}>
-              <Text style={[styles.cancelText, isDarkMode && { color: "#F17A95" }]}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
     </>
   );
 }

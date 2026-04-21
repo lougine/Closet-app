@@ -1,6 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { buildApiUrl, buildAuthHeaders } from '@/constants/api';
+import { uploadMultipartWithRetry } from '@/services/uploadRequest';
 
 export const COLORS = {
   white: '#FFFFFF',
@@ -134,7 +135,7 @@ type CalendarContextType = {
 
   setSelectedDate: (date: Date) => void;
   setCurrentMonth: (date: Date) => void;
-  saveOutfitForDate: (payload: { garmentIds: string[]; date: Date; name?: string }) => Promise<void>;
+  saveOutfitForDate: (payload: { garmentIds: string[]; date: Date; name?: string; previewImage?: string }) => Promise<void>;
   deleteOutfit: (id: string) => Promise<void>;
   refetch: () => Promise<void>;
 };
@@ -200,8 +201,8 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  async function saveOutfitForDate(payload: { garmentIds: string[]; date: Date; name?: string }) {
-    const { garmentIds, date, name } = payload;
+  async function saveOutfitForDate(payload: { garmentIds: string[]; date: Date; name?: string; previewImage?: string }) {
+    const { garmentIds, date, name, previewImage } = payload;
     const token = await SecureStore.getItemAsync('userToken');
     
     // Create a date at UTC midnight to avoid timezone shifting
@@ -209,6 +210,8 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
     const [year, month, day] = dateKey.split('-').map(Number);
     const normalizedDate = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0)).toISOString();
     
+    const previewImageIsLocal = Boolean(previewImage && /^(file|content|ph):/i.test(previewImage));
+
     const res = await fetch(buildApiUrl('/api/outfits'), {
       method: 'POST',
       headers: {
@@ -219,11 +222,33 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
         name: name || 'Outfit',
         garments: garmentIds,
         date: normalizedDate,
+        ...(previewImage && !previewImageIsLocal ? { previewImage } : {}),
       }),
     });
 
     if (!res.ok) {
       throw new Error('Could not save outfit');
+    }
+
+    const createdOutfit = await res.json();
+
+    if (previewImageIsLocal && createdOutfit?._id) {
+      const uploadFormData = new FormData();
+      uploadFormData.append('coverImage', {
+        uri: previewImage,
+        name: `calendar-outfit-${Date.now()}.png`,
+        type: 'image/png',
+      } as any);
+
+      await uploadMultipartWithRetry<any>({
+        endpoint: `/api/outfits/${createdOutfit._id}/cover`,
+        token,
+        formData: uploadFormData,
+        method: 'PUT',
+        timeoutMs: 30000,
+        retries: 1,
+        fallbackMessage: 'Could not upload outfit image.',
+      });
     }
 
     await fetchOutfits();

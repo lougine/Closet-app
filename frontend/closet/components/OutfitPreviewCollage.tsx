@@ -28,7 +28,7 @@ const buildTiles = (outfit?: OutfitPreviewSource | null) => {
     tiles.push({ key: key || uri || `tile-${tiles.length}`, uri });
   };
 
-  if (outfit?.isLookbook && outfit?.previewImage) {
+  if (outfit?.previewImage) {
     addTile(buildImageUrl(outfit.previewImage), 'preview');
     return tiles;
   }
@@ -39,10 +39,6 @@ const buildTiles = (outfit?: OutfitPreviewSource | null) => {
     });
   }
 
-  if (tiles.length === 0 && outfit?.previewImage) {
-    addTile(buildImageUrl(outfit.previewImage), 'preview');
-  }
-
   return tiles;
 };
 
@@ -51,7 +47,7 @@ const TileContent = ({ tile }: { tile: Tile }) => {
     return <View style={s.tileEmpty} />;
   }
 
-  return <AuthenticatedImage source={{ uri: tile.uri }} style={s.tileImage} resizeMode="cover" />;
+  return <AuthenticatedImage source={{ uri: tile.uri }} style={s.tileImage} resizeMode="contain" />;
 };
 
 export default function OutfitPreviewCollage({ outfit, style }: OutfitPreviewCollageProps) {
@@ -70,7 +66,7 @@ export default function OutfitPreviewCollage({ outfit, style }: OutfitPreviewCol
       <AuthenticatedImage
         source={{ uri: tiles[0].uri }}
         style={style as any}
-        resizeMode="cover"
+        resizeMode="contain"
       />
     );
   }

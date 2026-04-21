@@ -32,6 +32,21 @@ const CATEGORY_OPTIONS = [
   "Swimwear",
 ];
 
+const CATEGORY_TREE: Record<string, string[]> = {
+  Tops: ["T-Shirt", "Blouse", "Crop Top", "Tank Top", "Shirt", "Hoodie", "Sweater", "Cardigan"],
+  Bottoms: ["Jeans", "Skirt", "Shorts", "Trousers", "Leggings", "Cargo Pants", "Sweatpants"],
+  Dresses: ["Mini Dress", "Bodycon"],
+  Outerwear: ["Jacket", "Blazer", "Coat", "Trench Coat", "Puffer", "Leather Jacket", "Denim Jacket", "Vest"],
+  Footwear: ["Sneakers", "Heels", "Boots", "Sandals", "Platforms"],
+  Accessories: ["Bag", "Belt", "Hat", "Sunglasses", "Jewellery", "Scarf", "Watch"],
+  Bags: ["Handbag", "Tote", "Clutch", "Backpack", "Mini Bag", "Shoulder Bag"],
+  Swimwear: ["One-Piece", "Coverup", "Swim Shorts"],
+};
+
+const ALL_SUBCATEGORY_TAGS = new Set(
+  Object.values(CATEGORY_TREE).flat().map((subcategory) => subcategory.toLowerCase()),
+);
+
 const COLOR_OPTIONS = [
   { label: "Black", hex: "#111111" }, { label: "White", hex: "#FFFFFF" },
   { label: "Grey", hex: "#9E9E9E" }, { label: "Brown", hex: "#795548" },
@@ -136,6 +151,7 @@ export default function ItemDetailScreen() {
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [showTagInput, setShowTagInput] = useState(false);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
+  const [showSubcategoryOptions, setShowSubcategoryOptions] = useState(false);
   const [newTag, setNewTag] = useState("");
   const [editingSize, setEditingSize] = useState(false);
   const [editingBrand, setEditingBrand] = useState(false);
@@ -222,6 +238,35 @@ export default function ItemDetailScreen() {
 
   const update = (changes: Partial<ClothingItem>) =>
     setItem((prev) => ({ ...prev, ...changes }));
+
+  const selectedCategory = item.category?.[0] ?? "";
+  const selectedSubcategory = selectedCategory
+    ? (CATEGORY_TREE[selectedCategory] ?? []).find((subcategory) =>
+        (item.tags ?? []).some((tag) => tag.toLowerCase() === subcategory.toLowerCase()),
+      )
+    : undefined;
+
+  const setCategoryWithSubcategoryReset = (category: string) => {
+    update({
+      category: [category],
+      tags: (item.tags ?? []).filter((tag) => !ALL_SUBCATEGORY_TAGS.has(tag.toLowerCase())),
+    });
+    setShowCategoryPicker(false);
+    setShowSubcategoryOptions(true);
+  };
+
+  const toggleSubcategoryTag = (subcategory: string) => {
+    const currentTags = item.tags ?? [];
+    const normalizedSelected = currentTags.find((tag) => ALL_SUBCATEGORY_TAGS.has(tag.toLowerCase()))?.toLowerCase();
+    const cleanedTags = currentTags.filter((tag) => !ALL_SUBCATEGORY_TAGS.has(tag.toLowerCase()));
+    const deselecting = normalizedSelected === subcategory.toLowerCase();
+    const nextTags = deselecting
+      ? cleanedTags
+      : [...cleanedTags, subcategory];
+
+    update({ tags: nextTags });
+    setShowSubcategoryOptions(deselecting);
+  };
 
   const sanitizePriceInput = (value: string) => {
     const cleaned = value.replace(/[^0-9.]/g, "");
@@ -630,7 +675,9 @@ export default function ItemDetailScreen() {
               <Text style={[s.rowLabel, { color: theme.text }]}>Category</Text>
               <TouchableOpacity style={[s.categoryPill, { backgroundColor: theme.inputBg, borderColor: theme.border }]} onPress={() => setShowCategoryPicker((v) => !v)}>
                 <Text style={[s.categoryText, { color: theme.text }] }>
-                  {(item.category?.length ? item.category : ["UNCATEGORIZED"]).join(" > ")}
+                  {selectedCategory
+                    ? `${selectedCategory}${selectedSubcategory ? ` > ${selectedSubcategory}` : ""}`
+                    : "UNCATEGORIZED"}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -645,10 +692,7 @@ export default function ItemDetailScreen() {
                         s.addBtn,
                         selected && s.addBtnActive,
                       ]}
-                      onPress={() => {
-                        update({ category: [category] });
-                        setShowCategoryPicker(false);
-                      }}
+                      onPress={() => setCategoryWithSubcategoryReset(category)}
                     >
                       <Text style={[s.addBtnText, selected && s.addBtnTextActive]}>{category}</Text>
                     </TouchableOpacity>
@@ -656,6 +700,40 @@ export default function ItemDetailScreen() {
                 })}
               </View>
             )}
+            {selectedCategory ? (
+              <>
+                <View style={s.row}>
+                  <Text style={[s.rowLabel, { color: theme.text }]}>Subcategory</Text>
+                  <TouchableOpacity
+                    style={[s.categoryPill, { backgroundColor: theme.inputBg, borderColor: theme.border }]}
+                    onPress={() => setShowSubcategoryOptions((v) => !v)}
+                  >
+                    <Text style={[s.categoryText, { color: theme.text }]}>
+                      {selectedSubcategory ? `${selectedCategory} > ${selectedSubcategory}` : "Select type"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                {showSubcategoryOptions && (
+                  <View style={s.colorPicker}>
+                    {(CATEGORY_TREE[selectedCategory] ?? []).map((subcategory) => {
+                      const selected = selectedSubcategory === subcategory;
+                      return (
+                        <TouchableOpacity
+                          key={subcategory}
+                          style={[
+                            s.addBtn,
+                            selected && s.addBtnActive,
+                          ]}
+                          onPress={() => toggleSubcategoryTag(subcategory)}
+                        >
+                          <Text style={[s.addBtnText, selected && s.addBtnTextActive]}>{subcategory}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
+              </>
+            ) : null}
             <View style={[s.divider, { backgroundColor: theme.border }]} />
 
             <View>

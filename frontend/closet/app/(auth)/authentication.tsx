@@ -2,7 +2,7 @@ import { Inter_400Regular, useFonts } from "@expo-google-fonts/inter";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React from "react";
-import { Dimensions, Image, Text, TouchableOpacity, View } from "react-native";
+import { Dimensions, Image, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { styles } from "../../Styles/auth/authStyles";
 
 const { width, height } = Dimensions.get("window");
@@ -16,7 +16,11 @@ export default function Authenication() {
   const topImageHeight = 650;
 
   return (
-    <View style={styles.container}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.scrollContent}
+      showsVerticalScrollIndicator={false}
+    >
       <StatusBar style="light" translucent backgroundColor="transparent" />
       <Image
         source={require("@/assets/images/authy.png")}
@@ -71,6 +75,6 @@ export default function Authenication() {
           </Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </ScrollView>
   );
 }

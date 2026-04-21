@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 
 const CommunityComment = require('../models/communityComment');
 const CommunityPost = require('../models/communityPost');
+const Outfit = require('../models/outfit');
 
 const parseLimit = (value, fallback = 20, max = 50) => {
   const parsed = Number(value);
@@ -16,6 +17,67 @@ const parsePage = (value, fallback = 1) => {
 };
 
 const escapeRegex = (value) => String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const SELF_STYLED_BACKFILL_BATCH_SIZE = 500;
+let lastSelfStyledBackfillAt = 0;
+
+const buildOutfitCaption = (outfit) => {
+  const name = String(outfit?.name || '').trim();
+  return name ? `Styled ${name}` : 'Styled a fit';
+};
+
+const shouldRunSelfStyledBackfill = () => {
+  const now = Date.now();
+  // Keep feed fast: perform this safety backfill at most once every 60 seconds.
+  if (now - lastSelfStyledBackfillAt < 60000) return false;
+  lastSelfStyledBackfillAt = now;
+  return true;
+};
+
+const backfillMissingSelfStyledOutfitPosts = async () => {
+  if (!shouldRunSelfStyledBackfill()) return;
+
+  const outfits = await Outfit.find({
+    $or: [
+      { styledForUserId: null },
+      { $expr: { $eq: ['$styledForUserId', '$owner'] } },
+    ],
+    $expr: { $eq: ['$owner', '$createdBy'] },
+  })
+    .sort({ createdAt: -1, _id: -1 })
+    .limit(SELF_STYLED_BACKFILL_BATCH_SIZE)
+    .select('_id owner name previewImage')
+    .lean();
+
+  if (!outfits.length) return;
+
+  const outfitIds = outfits.map((outfit) => outfit._id);
+  const existing = await CommunityPost.find({
+    sourceOutfitId: { $in: outfitIds },
+  })
+    .select('sourceOutfitId')
+    .lean();
+
+  const existingIds = new Set(existing.map((entry) => String(entry.sourceOutfitId)));
+  const missingOutfits = outfits.filter((outfit) => !existingIds.has(String(outfit._id)));
+
+  if (!missingOutfits.length) return;
+
+  await CommunityPost.insertMany(
+    missingOutfits.map((outfit) => ({
+      author: outfit.owner,
+      type: 'post',
+      sourceType: 'outfit',
+      sourceOutfitId: outfit._id,
+      caption: buildOutfitCaption(outfit),
+      imageUrl: outfit.previewImage || null,
+      tags: ['fit', 'styled-fit'],
+      poll: { question: null, options: [], endsAt: null },
+    })),
+    { ordered: false }
+  ).catch(() => {
+    // Ignore duplicate races from parallel requests; unique index enforces consistency.
+  });
+};
 
 const serializePost = (postDoc, userId) => {
   const post = postDoc.toObject();
@@ -56,6 +118,8 @@ const serializePost = (postDoc, userId) => {
 
 exports.getFeed = async (req, res) => {
   try {
+    await backfillMissingSelfStyledOutfitPosts();
+
     const userId = req.user.userId;
     const filter = String(req.query.filter || 'for-you').toLowerCase();
     const search = String(req.query.search || '').trim().slice(0, 80);
