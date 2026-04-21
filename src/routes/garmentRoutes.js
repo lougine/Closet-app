@@ -24,6 +24,8 @@ router.post(
 router.get("/:id", garmentController.getGarmentById);
 router.patch('/:id/preferences', garmentController.updateGarmentPreferences);
 router.put('/:id/preferences', garmentController.updateGarmentPreferences);
+router.patch('/:id/subcategory', garmentController.updateGarmentSubcategory);
+router.patch('/:id/tags', garmentController.updateGarmentTags);
 router.put(
 	"/:id",
 	garmentController.uploadImage,

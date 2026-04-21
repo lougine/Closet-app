@@ -36,6 +36,16 @@ const garmentSchema = new mongoose.Schema({
     type: String
   },
 
+  subcategory: {
+    type: String,
+    default: null,
+  },
+
+  tags: {
+    type: [String],
+    default: [],
+  },
+
   purchasePrice: {
     type: Number,
     min: 0
