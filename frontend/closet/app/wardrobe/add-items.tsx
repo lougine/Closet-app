@@ -1,11 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
+import * as ImageManipulator from "expo-image-manipulator";
 import * as FileSystem from "expo-file-system/legacy";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator, Alert, Image, KeyboardAvoidingView,
-  Platform, ScrollView, StatusBar, Text, TextInput, TouchableOpacity, View,
+  Platform, ScrollView, StatusBar, Text, TextInput, TouchableOpacity, View, Dimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as SecureStore from "expo-secure-store";
@@ -16,7 +17,7 @@ import {
 } from "../../constants/imageUpload";
 import { getAppTheme } from "../../constants/appTheme";
 import { buildApiUrl, buildImageUrl } from "../../constants/api";
-import { getUploadErrorMessage, uploadMultipartWithRetry } from "../../services/uploadRequest";
+import { getUploadErrorMessage, UploadRequestError, uploadMultipartWithRetry } from "../../services/uploadRequest";
 import { removeBackgroundFromImageUri } from "../../services/removeBackground";
 import { useAppTheme } from "../../context/themeContext";
 import { useWardrobe } from "../../context/wardrobeContext";
@@ -26,6 +27,21 @@ const CATEGORIES = [
   "Tops", "Bottoms", "Dresses", "Outerwear",
   "Footwear", "Accessories", "Bags", "Swimwear",
 ];
+
+const CATEGORY_TREE: Record<string, string[]> = {
+  Tops: ["T-Shirt", "Blouse", "Crop Top", "Tank Top", "Shirt", "Hoodie", "Sweater", "Cardigan"],
+  Bottoms: ["Jeans", "Skirt", "Shorts", "Trousers", "Leggings", "Cargo Pants", "Sweatpants"],
+  Dresses: ["Mini Dress", "Bodycon"],
+  Outerwear: ["Jacket", "Blazer", "Coat", "Trench Coat", "Puffer", "Leather Jacket", "Denim Jacket", "Vest"],
+  Footwear: ["Sneakers", "Heels", "Boots", "Sandals", "Platforms"],
+  Accessories: ["Bag", "Belt", "Hat", "Sunglasses", "Jewellery", "Scarf", "Watch"],
+  Bags: ["Handbag", "Tote", "Clutch", "Backpack", "Mini Bag", "Shoulder Bag"],
+  Swimwear: ["One-Piece", "Coverup", "Swim Shorts"],
+};
+
+const ALL_SUBCATEGORY_TAGS = new Set(
+  Object.values(CATEGORY_TREE).flat().map((subcategory) => subcategory.toLowerCase()),
+);
 
 const COLOR_OPTIONS = [
   { label: "Black", hex: "#111111" }, { label: "White", hex: "#FFFFFF" },
@@ -49,6 +65,24 @@ interface ItemForm {
   size: string; tags: string[]; cost: string; datePurchased: string;
 }
 
+interface QueuedImage {
+  id: string;
+  uri: string;
+  fileSize?: number | null;
+}
+
+const createInitialForm = (): ItemForm => ({
+  category: "",
+  colors: [],
+  brand: "",
+  size: "",
+  tags: [],
+  cost: "",
+  datePurchased: "",
+});
+
+const TILE_WIDTH = Dimensions.get("window").width - 32;
+
 const getAutoItemName = (category: string) => {
   const base = category?.trim() || "Item";
   const stamp = new Date().toISOString().slice(0, 10);
@@ -69,11 +103,47 @@ const getUploadImageMeta = (uri: string) => {
   return { extension: "jpg", mimeType: "image/jpeg" };
 };
 
+const optimizeImageForUpload = async (
+  uri: string,
+  options?: { width?: number; compress?: number },
+) => {
+  const width = options?.width ?? 1280;
+  const compress = options?.compress ?? 0.68;
+  const cleanedUri = uri.split("?")[0]?.toLowerCase() ?? "";
+  const extension = cleanedUri.split(".").pop();
+  const preserveTransparency = extension === "png" || extension === "webp";
+
+  const optimized = await ImageManipulator.manipulateAsync(
+    uri,
+    [{ resize: { width } }],
+    {
+      compress,
+      format: preserveTransparency
+        ? ImageManipulator.SaveFormat.PNG
+        : ImageManipulator.SaveFormat.JPEG,
+    },
+  );
+
+  const info = await FileSystem.getInfoAsync(optimized.uri);
+  return {
+    uri: optimized.uri,
+    fileSize: info.exists ? (info as any).size ?? null : null,
+  };
+};
+
+const isTimeoutOrNetworkError = (error: unknown) => {
+  if (error instanceof UploadRequestError) {
+    return error.code === "timeout" || error.code === "network";
+  }
+  return false;
+};
+
 export default function AddItemsScreen() {
   const router = useRouter();
   const { isDarkMode } = useAppTheme();
   const { addItem } = useWardrobe();
-  const { image: imageParam, source } = useLocalSearchParams<{ image: string; source: string }>();
+  const { image: imageParam, images: imagesParam, source, launchKey } = useLocalSearchParams<{ image?: string; images?: string; source?: string | string[]; launchKey?: string }>();
+  const previewScrollRef = useRef<ScrollView | null>(null);
 
   const baseTheme = getAppTheme(isDarkMode, {
     light: {
@@ -85,59 +155,234 @@ export default function AddItemsScreen() {
   });
   const theme = { ...baseTheme, panel: baseTheme.card, softPanel: baseTheme.softCard };
 
-  const [image, setImage] = useState<string | null>(imageParam ?? null);
+  const decodeImagesParam = (raw?: string) => {
+    if (!raw) return [] as string[];
+    try {
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return [];
+      return parsed.filter((value) => typeof value === "string" && value.length > 0);
+    } catch {
+      return [];
+    }
+  };
+
+  const createQueuedImage = (uri: string, fileSize?: number | null, seed = "item"): QueuedImage => ({
+    id: `${seed}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+    uri,
+    fileSize: fileSize ?? null,
+  });
+
+  const paramUris = decodeImagesParam(imagesParam);
+  if (imageParam && !paramUris.includes(imageParam)) {
+    paramUris.unshift(imageParam);
+  }
+
+  const initialQueue: QueuedImage[] = paramUris.map((uri, index) => createQueuedImage(uri, null, `initial-${index}`));
+  const initialImage = imageParam ?? paramUris[0] ?? null;
+
+  const [image, setImage] = useState<string | null>(initialImage);
   const [imageFileSize, setImageFileSize] = useState<number | null>(null);
-  const [form, setForm] = useState<ItemForm>({
-    category: "", colors: [], brand: "",
-    size: "", tags: [], cost: "", datePurchased: "",
+  const [imageQueue, setImageQueue] = useState<QueuedImage[]>(initialQueue);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [itemDrafts, setItemDrafts] = useState<Record<string, ItemForm>>(() => {
+    const drafts: Record<string, ItemForm> = {};
+    initialQueue.forEach((asset) => {
+      drafts[asset.id] = createInitialForm();
+    });
+    return drafts;
+  });
+  const [form, setForm] = useState<ItemForm>(() => {
+    const firstItem = initialQueue[0];
+    if (!firstItem) return createInitialForm();
+    return createInitialForm();
   });
   const [tagInput, setTagInput] = useState("");
   const [saving, setSaving] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   const [processingBackground, setProcessingBackground] = useState(false);
+  const [lastLaunchKeyHandled, setLastLaunchKeyHandled] = useState<string | null>(null);
+  const [hasAutoProcessedInitialQueue, setHasAutoProcessedInitialQueue] = useState(false);
+
+  const applyPickedAsset = (asset: QueuedImage) => {
+    setImage(asset.uri);
+    setImageFileSize(asset.fileSize ?? null);
+  };
+
+  const getDraftForItem = (asset?: QueuedImage | null) => {
+    if (!asset) return createInitialForm();
+    return itemDrafts[asset.id] ?? createInitialForm();
+  };
+
+  const processPickedAssetBackground = async (asset: QueuedImage): Promise<QueuedImage> => {
+    try {
+      const processedUri = await removeBackgroundFromImageUri(asset.uri);
+      const processedInfo = await FileSystem.getInfoAsync(processedUri);
+      return {
+        id: asset.id,
+        uri: processedUri,
+        fileSize: processedInfo.exists ? (processedInfo as any).size ?? asset.fileSize ?? null : asset.fileSize ?? null,
+      };
+    } catch (error) {
+      console.warn("Background auto-removal failed for picked image:", error);
+      return asset;
+    }
+  };
+
+  const applyPickedAssets = async (assets: QueuedImage[]) => {
+    if (!assets.length) return;
+
+    try {
+      setProcessingBackground(true);
+      setUploadStatus("Removing background...");
+
+      const processedAssets: QueuedImage[] = [];
+      for (const asset of assets) {
+        const processedAsset = await processPickedAssetBackground(asset);
+        processedAssets.push(processedAsset);
+      }
+
+      const nextDrafts = { ...itemDrafts };
+      processedAssets.forEach((asset) => {
+        if (!nextDrafts[asset.id]) {
+          nextDrafts[asset.id] = createInitialForm();
+        }
+      });
+
+      setImageQueue(processedAssets);
+      setItemDrafts(nextDrafts);
+      setCurrentImageIndex(0);
+      applyPickedAsset(processedAssets[0]);
+      setForm(nextDrafts[processedAssets[0].id] ?? createInitialForm());
+    } finally {
+      setUploadStatus(null);
+      setProcessingBackground(false);
+    }
+  };
 
   useEffect(() => {
-    if (!source) return;
-    const timer = setTimeout(async () => {
-      if (source === "camera") {
-        const { status } = await ImagePicker.requestCameraPermissionsAsync();
-        if (status !== "granted") { Alert.alert("Permission denied", "Camera permission is required."); return; }
-        const result = await ImagePicker.launchCameraAsync({
-          allowsEditing: true,
-          aspect: IMAGE_UPLOAD_ASPECT.garment,
-          quality: IMAGE_UPLOAD_QUALITY.garment,
-        });
-        if (!result.canceled) {
-          setImage(result.assets[0].uri);
-          setImageFileSize(result.assets[0].fileSize ?? null);
-        }
-      } else if (source === "gallery") {
-        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (status !== "granted") { Alert.alert("Permission denied", "Gallery permission is required."); return; }
-        const result = await ImagePicker.launchImageLibraryAsync({
-          allowsEditing: true,
-          aspect: IMAGE_UPLOAD_ASPECT.garment,
-          quality: IMAGE_UPLOAD_QUALITY.garment,
-        });
-        if (!result.canceled) {
-          setImage(result.assets[0].uri);
-          setImageFileSize(result.assets[0].fileSize ?? null);
-        }
+    if (hasAutoProcessedInitialQueue) return;
+    if (!initialQueue.length) return;
+
+    setHasAutoProcessedInitialQueue(true);
+    applyPickedAssets(initialQueue);
+  }, [hasAutoProcessedInitialQueue, initialQueue]);
+
+  const requestPickerPermission = async (pickerSource: "camera" | "gallery") => {
+    if (pickerSource === "camera") {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permission denied", "Camera permission is required.");
+        return false;
       }
-    }, 400);
+      return true;
+    }
+
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permission denied", "Gallery permission is required.");
+      return false;
+    }
+    return true;
+  };
+
+  const launchPicker = async (
+    pickerSource: "camera" | "gallery",
+    allowEditing: boolean,
+    allowMultipleSelection = false,
+  ) => {
+    const hasPermission = await requestPickerPermission(pickerSource);
+    if (!hasPermission) return [] as QueuedImage[];
+
+    const pickerOptions: ImagePicker.ImagePickerOptions = {
+      allowsEditing: allowEditing,
+      quality: IMAGE_UPLOAD_QUALITY.garment,
+      ...(allowEditing ? { aspect: IMAGE_UPLOAD_ASPECT.garment } : {}),
+      ...(pickerSource === "gallery" && !allowEditing
+        ? {
+            allowsMultipleSelection: allowMultipleSelection,
+            selectionLimit: allowMultipleSelection ? 0 : 1,
+          }
+        : {}),
+    };
+
+    const result = pickerSource === "camera"
+      ? await ImagePicker.launchCameraAsync(pickerOptions)
+      : await ImagePicker.launchImageLibraryAsync(pickerOptions);
+
+    if (result.canceled || !result.assets[0]) return [];
+    return result.assets.map((asset, index) => createQueuedImage(asset.uri, asset.fileSize ?? null, `${pickerSource}-${index}`));
+  };
+
+  useEffect(() => {
+    const sourceValue = Array.isArray(source) ? source[0] : source;
+    if (!sourceValue || sourceValue === "search" || imageParam || imagesParam) return;
+
+    if (launchKey && lastLaunchKeyHandled === launchKey) return;
+
+    const timer = setTimeout(async () => {
+      if (sourceValue !== "camera" && sourceValue !== "gallery") return;
+
+      const pickedAssets = await launchPicker(sourceValue, false, sourceValue === "gallery");
+      if (!pickedAssets.length) return;
+
+      await applyPickedAssets(pickedAssets);
+    }, 80);
+
+    if (launchKey) {
+      setLastLaunchKeyHandled(launchKey);
+    }
+
     return () => clearTimeout(timer);
-  }, [source]);
+  }, [source, imageParam, imagesParam, launchKey, lastLaunchKeyHandled]);
+
+  const updateCurrentItemForm = (updater: (prev: ItemForm) => ItemForm) => {
+    const currentAsset = imageQueue[currentImageIndex];
+    setForm((prev) => {
+      const nextForm = updater(prev);
+      if (currentAsset) {
+        setItemDrafts((prevDrafts) => ({
+          ...prevDrafts,
+          [currentAsset.id]: nextForm,
+        }));
+      }
+      return nextForm;
+    });
+  };
 
   const update = (key: keyof ItemForm, val: any) =>
-    setForm((prev) => ({ ...prev, [key]: val }));
+    updateCurrentItemForm((prev) => ({ ...prev, [key]: val }));
 
   const toggleColor = (label: string) =>
-    setForm((prev) => ({
+    updateCurrentItemForm((prev) => ({
       ...prev,
       colors: prev.colors.includes(label)
         ? prev.colors.filter((c) => c !== label)
         : [...prev.colors, label],
     }));
+
+  const setCategoryWithSubcategoryReset = (category: string) =>
+    updateCurrentItemForm((prev) => ({
+      ...prev,
+      category,
+      tags: prev.tags.filter((tag) => !ALL_SUBCATEGORY_TAGS.has(tag.toLowerCase())),
+    }));
+
+  const toggleSubcategoryTag = (subcategory: string) =>
+    updateCurrentItemForm((prev) => {
+      const normalizedSelected = (prev.tags ?? [])
+        .find((tag) => ALL_SUBCATEGORY_TAGS.has(tag.toLowerCase()))
+        ?.toLowerCase();
+      const cleanedTags = (prev.tags ?? []).filter(
+        (tag) => !ALL_SUBCATEGORY_TAGS.has(tag.toLowerCase()),
+      );
+
+      return {
+        ...prev,
+        tags: normalizedSelected === subcategory.toLowerCase()
+          ? cleanedTags
+          : [...cleanedTags, subcategory],
+      };
+    });
 
   const addTag = () => {
     const t = tagInput.trim().toLowerCase();
@@ -169,8 +414,15 @@ export default function AddItemsScreen() {
     }
   };
 
-  const parsePurchasePrice = () => {
-    const trimmed = form.cost.trim();
+  const handleCameraRoll = async () => {
+    if (processingBackground || saving) return;
+    const pickedAssets = await launchPicker("gallery", false, true);
+    if (!pickedAssets.length) return;
+    await applyPickedAssets(pickedAssets);
+  };
+
+  const parsePurchasePrice = (itemForm: ItemForm) => {
+    const trimmed = itemForm.cost.trim();
     if (!trimmed) return null;
 
     const parsed = Number.parseFloat(trimmed);
@@ -179,114 +431,169 @@ export default function AddItemsScreen() {
     return parsed;
   };
 
-  const handleSave = async () => {
-    if (!form.category) { Alert.alert("Missing category", "Please select a category."); return; }
-
-    const sizeError = validateImageFileSize(imageFileSize, "garment");
-    if (image && sizeError) {
-      Alert.alert(sizeError.title, sizeError.body);
-      return;
+  const saveGarment = async (target: {
+    uri?: string | null;
+    fileSize?: number | null;
+    form: ItemForm;
+  }) => {
+    const token = await SecureStore.getItemAsync('userToken');
+    if (!token) {
+      Alert.alert("Authentication Error", "Please log in again.");
+      router.replace('/(auth)/login');
+      return null;
     }
 
-    try {
-      setSaving(true);
+    const purchasePrice = parsePurchasePrice(target.form);
+    const autoName = getAutoItemName(target.form.category);
 
-      // Get auth token
-      const token = await SecureStore.getItemAsync('userToken');
-      if (!token) {
-        Alert.alert("Authentication Error", "Please log in again.");
-        router.replace('/(auth)/login');
-        return;
-      }
-
-      let res;
-      const purchasePrice = parsePurchasePrice();
-      const autoName = getAutoItemName(form.category);
-
-      if (image) {
-        setUploadStatus("Uploading image...");
-        // If there's an image, send as FormData
+    if (target.uri) {
+      setUploadStatus("Optimizing image...");
+      const optimizedImage = await optimizeImageForUpload(target.uri);
+      const uploadWithUri = async (uri: string, timeoutMs: number, retries: number) => {
         const formData = new FormData();
-        const imageMeta = getUploadImageMeta(image);
+        const imageMeta = getUploadImageMeta(uri);
 
-        // For React Native/Expo, append the image URI directly
         formData.append('image', {
-          uri: image,
+          uri,
           name: `image-${Date.now()}.${imageMeta.extension}`,
           type: imageMeta.mimeType,
         } as any);
 
-        // Add form data
         formData.append('name', autoName);
-        formData.append('category', form.category);
-        if (form.colors.length > 0) {
-          formData.append('color', form.colors[0]);
+        formData.append('category', target.form.category);
+        if (target.form.colors.length > 0) {
+          formData.append('color', target.form.colors[0]);
         }
         if (purchasePrice !== null) {
           formData.append('purchasePrice', String(purchasePrice));
         }
 
-        const payload = await uploadMultipartWithRetry<any>({
+        return uploadMultipartWithRetry<any>({
           endpoint: '/api/garments',
           method: 'POST',
           token,
           formData,
-          timeoutMs: 25000,
-          retries: 1,
+          timeoutMs,
+          retries,
           fallbackMessage: 'Unable to upload image.',
         });
+      };
 
-        res = {
-          ok: true,
-          json: async () => payload,
-        } as any;
-      } else {
-        setUploadStatus(null);
-        // No image, send as JSON
-        const garmentData = {
-          name: autoName,
-          category: form.category,
-          color: form.colors.length > 0 ? form.colors[0] : undefined,
-          purchasePrice: purchasePrice ?? undefined,
-        };
+      let payload;
+      try {
+        setUploadStatus("Uploading image...");
+        payload = await uploadWithUri(optimizedImage.uri, 120000, 3);
+      } catch (primaryUploadError) {
+        if (!isTimeoutOrNetworkError(primaryUploadError)) {
+          throw primaryUploadError;
+        }
 
-        res = await fetch(buildApiUrl('/api/garments'), {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(garmentData),
-        });
+        setUploadStatus("Slow network detected. Retrying...");
+        const fallbackOptimizedImage = await optimizeImageForUpload(target.uri, { width: 768, compress: 0.42 });
+        payload = await uploadWithUri(fallbackOptimizedImage.uri, 180000, 4);
       }
 
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({ message: 'Failed to save item' }));
-        Alert.alert("Save Failed", errorData.message || 'Unable to save item');
+      return payload;
+    }
+
+    setUploadStatus("Saving...");
+    const garmentData = {
+      name: autoName,
+      category: target.form.category,
+      color: target.form.colors.length > 0 ? target.form.colors[0] : undefined,
+      purchasePrice: purchasePrice ?? undefined,
+    };
+
+    const res = await fetch(buildApiUrl('/api/garments'), {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(garmentData),
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({ message: 'Failed to save item' }));
+      throw new Error(errorData.message || 'Unable to save item');
+    }
+
+    return res.json();
+  };
+
+  const saveCurrentItem = async () => {
+    const currentAsset = imageQueue[currentImageIndex];
+    const activeForm = currentAsset ? (itemDrafts[currentAsset.id] ?? form) : form;
+    const activeImage = currentAsset?.uri ?? image;
+    const activeImageFileSize = currentAsset?.fileSize ?? imageFileSize;
+
+    if (!activeForm.category?.trim()) {
+      Alert.alert("Missing category", "Please select a category.");
+      return;
+    }
+
+    if (activeImage) {
+      const sizeError = validateImageFileSize(activeImageFileSize, "garment");
+      if (sizeError) {
+        Alert.alert(sizeError.title, sizeError.body);
         return;
       }
+    }
 
-      const savedGarment = await res.json();
+    try {
+      setSaving(true);
 
-      // Update local state with the saved garment
-      addItem({
-        id: savedGarment._id, // MongoDB _id is a string
-        image: savedGarment.imageUrl ? buildImageUrl(savedGarment.imageUrl) : null,
-        label: savedGarment.name || autoName,
-        bg: CATEGORY_BG[form.category] ?? "#fce4ec",
-        category: [form.category],
-        colors: form.colors,
-        brand: form.brand,
-        size: form.size,
-        tags: form.tags,
-        totalCost: Number(savedGarment.purchasePrice ?? purchasePrice ?? 0),
-        timesWorn: 0,
-        dateAdded: form.datePurchased || new Date().toLocaleDateString("en-US", { month: "short", year: "numeric" }),
+      const savedGarment = await saveGarment({
+        uri: activeImage,
+        fileSize: activeImageFileSize,
+        form: activeForm,
       });
 
-      Alert.alert("Success", "Item saved successfully!");
-      router.back();
+      if (!savedGarment) return;
 
+      const purchasePrice = parsePurchasePrice(activeForm);
+      const autoName = getAutoItemName(activeForm.category);
+
+      addItem({
+        id: savedGarment._id,
+        image: savedGarment.imageUrl ? buildImageUrl(savedGarment.imageUrl) : null,
+        label: savedGarment.name || autoName,
+        bg: CATEGORY_BG[activeForm.category] ?? "#fce4ec",
+        category: [activeForm.category],
+        colors: activeForm.colors,
+        brand: activeForm.brand,
+        size: activeForm.size,
+        tags: activeForm.tags,
+        totalCost: Number(savedGarment.purchasePrice ?? purchasePrice ?? 0),
+        timesWorn: 0,
+        dateAdded: activeForm.datePurchased || new Date().toLocaleDateString("en-US", { month: "short", year: "numeric" }),
+      });
+
+      if (currentAsset && imageQueue.length > 0) {
+        const remainingQueue = imageQueue.filter((_, index) => index !== currentImageIndex);
+
+        if (remainingQueue.length > 0) {
+          const nextIndex = Math.min(currentImageIndex, remainingQueue.length - 1);
+          const nextAsset = remainingQueue[nextIndex];
+          const nextDrafts = { ...itemDrafts };
+          delete nextDrafts[currentAsset.id];
+
+          setImageQueue(remainingQueue);
+          setItemDrafts(nextDrafts);
+          setCurrentImageIndex(nextIndex);
+          applyPickedAsset(nextAsset);
+          setForm(nextDrafts[nextAsset.id] ?? createInitialForm());
+          setTagInput("");
+          setUploadStatus(null);
+
+          requestAnimationFrame(() => {
+            previewScrollRef.current?.scrollTo({ x: TILE_WIDTH * nextIndex, animated: false });
+          });
+          return;
+        }
+      }
+
+      router.replace('/(tabs)');
     } catch (error) {
       console.error('Save error:', error);
       Alert.alert("Save Failed", getUploadErrorMessage(error, "Unable to save item. Please try again."));
@@ -296,6 +603,105 @@ export default function AddItemsScreen() {
     }
   };
 
+  const saveAllItems = async () => {
+    const draftsSnapshot = { ...itemDrafts };
+    const activeAsset = imageQueue[currentImageIndex];
+    if (activeAsset) {
+      draftsSnapshot[activeAsset.id] = form;
+    }
+
+    const targets = imageQueue.length > 0
+      ? imageQueue.map((asset) => ({
+          asset,
+          form: draftsSnapshot[asset.id] ?? createInitialForm(),
+        }))
+      : [{
+          asset: null as QueuedImage | null,
+          form,
+        }];
+
+    const missingCategoryIndex = targets.findIndex(({ form: targetForm }) => !targetForm.category?.trim());
+    if (missingCategoryIndex !== -1) {
+      const missingAsset = targets[missingCategoryIndex].asset;
+      if (missingAsset) {
+        setCurrentImageIndex(missingCategoryIndex);
+        applyPickedAsset(missingAsset);
+        setForm(draftsSnapshot[missingAsset.id] ?? createInitialForm());
+        setTagInput("");
+        requestAnimationFrame(() => {
+          previewScrollRef.current?.scrollTo({ x: TILE_WIDTH * missingCategoryIndex, animated: true });
+        });
+      }
+      Alert.alert("Missing category", "Please select a category for every item before saving all.");
+      return;
+    }
+
+    const invalidSize = targets.find(({ asset }) => {
+      if (!asset?.uri) return false;
+      return Boolean(validateImageFileSize(asset.fileSize ?? null, "garment"));
+    });
+    if (invalidSize?.asset) {
+      const sizeError = validateImageFileSize(invalidSize.asset.fileSize ?? null, "garment");
+      if (sizeError) {
+        Alert.alert(sizeError.title, sizeError.body);
+      }
+      return;
+    }
+
+    try {
+      setSaving(true);
+
+      const token = await SecureStore.getItemAsync('userToken');
+      if (!token) {
+        Alert.alert("Authentication Error", "Please log in again.");
+        router.replace('/(auth)/login');
+        return;
+      }
+
+      for (let index = 0; index < targets.length; index += 1) {
+        const target = targets[index];
+        setUploadStatus(target.asset ? `Saving ${index + 1}/${targets.length}...` : `Saving ${index + 1}/${targets.length}...`);
+        const savedGarment = await saveGarment({
+          uri: target.asset?.uri ?? null,
+          fileSize: target.asset?.fileSize ?? null,
+          form: target.form,
+        });
+
+        const purchasePrice = parsePurchasePrice(target.form);
+        const autoName = getAutoItemName(target.form.category);
+
+        addItem({
+          id: savedGarment._id,
+          image: savedGarment.imageUrl ? buildImageUrl(savedGarment.imageUrl) : null,
+          label: savedGarment.name || autoName,
+          bg: CATEGORY_BG[target.form.category] ?? "#fce4ec",
+          category: [target.form.category],
+          colors: target.form.colors,
+          brand: target.form.brand,
+          size: target.form.size,
+          tags: target.form.tags,
+          totalCost: Number(savedGarment.purchasePrice ?? purchasePrice ?? 0),
+          timesWorn: 0,
+          dateAdded: target.form.datePurchased || new Date().toLocaleDateString("en-US", { month: "short", year: "numeric" }),
+        });
+      }
+
+      router.replace('/(tabs)');
+    } catch (error) {
+      console.error('Save all error:', error);
+      Alert.alert("Save Failed", getUploadErrorMessage(error, "Unable to save items. Please try again."));
+    } finally {
+      setUploadStatus(null);
+      setSaving(false);
+    }
+  };
+
+  const selectedSubcategory = form.category
+    ? (
+      CATEGORY_TREE[form.category] ?? []
+    ).find((subcategory) => (form.tags ?? []).some((tag) => tag.toLowerCase() === subcategory.toLowerCase()))
+    : undefined;
+
   return (
     <SafeAreaView style={[s.root, { backgroundColor: theme.screen }]}>
       <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} />
@@ -304,9 +710,15 @@ export default function AddItemsScreen() {
         <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={22} color={theme.text} />
         </TouchableOpacity>
-        <Text style={[s.headerTitle, { color: theme.text }]}>Add Item</Text>
-        <TouchableOpacity style={[s.saveBtn, saving && s.saveBtnDisabled]} onPress={handleSave} disabled={saving}>
-          {saving ? <ActivityIndicator size="small" color="#fff" /> : <Text style={s.saveBtnText}>Save</Text>}
+        <Text style={[s.headerTitle, { color: theme.text }]}>Upload items</Text>
+        <TouchableOpacity style={[s.saveBtn, saving && s.saveBtnDisabled]} onPress={saveCurrentItem} disabled={saving}>
+          {saving ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Text style={s.saveBtnText}>
+              {imageQueue.length > 1 ? `Save ${currentImageIndex + 1}/${imageQueue.length}` : "Save"}
+            </Text>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -316,39 +728,103 @@ export default function AddItemsScreen() {
         <ScrollView style={s.scroll} contentContainerStyle={s.scrollContent}
           showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
-          <View style={[s.photoCard, { backgroundColor: theme.softPanel }]}>
-            {image ? (
-              <Image source={{ uri: image }} style={s.photo} resizeMode="contain" />
-            ) : (
-              <View style={s.photoPlaceholder}>
-                <Ionicons name="image-outline" size={48} color={theme.subText} />
-                <Text style={[s.photoPlaceholderText, { color: theme.subText }]}>No photo</Text>
-              </View>
-            )}
+          <View style={s.mediaRow}>
+            <View
+              style={[s.photoCard, { backgroundColor: theme.softPanel }]}
+            >
+              {imageQueue.length > 1 ? (
+                <ScrollView
+                  ref={previewScrollRef}
+                  horizontal
+                  pagingEnabled
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={s.multiPreviewContent}
+                  onMomentumScrollEnd={(event) => {
+                    const nextIndex = Math.round(event.nativeEvent.contentOffset.x / TILE_WIDTH);
+                    if (nextIndex < 0 || nextIndex >= imageQueue.length) return;
+                    const nextAsset = imageQueue[nextIndex];
+                    setCurrentImageIndex(nextIndex);
+                    applyPickedAsset(nextAsset);
+                    setForm(getDraftForItem(nextAsset));
+                  }}
+                >
+                  {imageQueue.map((asset, index) => (
+                    <View
+                      key={asset.id}
+                      style={{ width: TILE_WIDTH, height: "100%" }}
+                    >
+                      <Image source={{ uri: asset.uri }} style={s.photo} resizeMode="contain" />
+                    </View>
+                  ))}
+                </ScrollView>
+              ) : image ? (
+                <Image source={{ uri: image }} style={s.photo} resizeMode="contain" />
+              ) : (
+                <View style={s.photoPlaceholder}>
+                  <Ionicons name="images-outline" size={48} color={theme.subText} />
+                  <Text style={[s.photoPlaceholderText, { color: theme.subText }]}>Camera roll</Text>
+                </View>
+              )}
+            </View>
           </View>
+          {imageQueue.length > 1 ? (
+            <Text style={[s.multiPreviewCounter, { color: theme.subText }]}>{currentImageIndex + 1}/{imageQueue.length}</Text>
+          ) : null}
 
           {image ? (
-            <TouchableOpacity
-              style={[s.removeBgBtn, (processingBackground || saving) && s.removeBgBtnDisabled]}
-              onPress={handleRemoveBackground}
-              disabled={processingBackground || saving}
-            >
-              <Ionicons name="cut-outline" size={16} color="#fff" />
-              <Text style={s.removeBgBtnText}>
-                {processingBackground ? "Removing Background..." : "Remove Background"}
-              </Text>
-            </TouchableOpacity>
+            <View style={s.photoActionsRow}>
+              <TouchableOpacity
+                style={[s.photoActionBtn, s.removeBgBtn, (processingBackground || saving) && s.removeBgBtnDisabled]}
+                onPress={handleRemoveBackground}
+                disabled={processingBackground || saving}
+              >
+                <Ionicons name="cut-outline" size={16} color="#fff" />
+                <Text style={s.removeBgBtnText}>
+                  {processingBackground ? "Removing Background..." : "Remove Background"}
+                </Text>
+              </TouchableOpacity>
+            </View>
           ) : null}
 
           <Section title="Category" required isDarkMode={isDarkMode}>
             <View style={s.chipRow}>
               {CATEGORIES.map((cat) => (
                 <TouchableOpacity key={cat} style={[s.chip, { backgroundColor: isDarkMode ? "#2A2A2A" : "#fafafa", borderColor: theme.border }, form.category === cat && s.chipActive]}
-                  onPress={() => update("category", cat)}>
+                  onPress={() => setCategoryWithSubcategoryReset(cat)}>
                   <Text style={[s.chipText, { color: isDarkMode ? "#C8C8C8" : "#555" }, form.category === cat && s.chipTextActive]}>{cat}</Text>
                 </TouchableOpacity>
               ))}
             </View>
+            {form.category ? (
+              <>
+                <Text style={[s.sectionTitle, { marginTop: 14, marginBottom: 10 }]}>
+                  {form.category} Type
+                </Text>
+              <View style={s.chipRow}>
+                {(CATEGORY_TREE[form.category] ?? []).map((subcategory) => (
+                  <TouchableOpacity
+                    key={subcategory}
+                    style={[
+                      s.chip,
+                      { backgroundColor: isDarkMode ? "#2A2A2A" : "#fafafa", borderColor: theme.border },
+                      selectedSubcategory === subcategory && s.chipActive,
+                    ]}
+                    onPress={() => toggleSubcategoryTag(subcategory)}
+                  >
+                    <Text
+                      style={[
+                        s.chipText,
+                        { color: isDarkMode ? "#C8C8C8" : "#555" },
+                        selectedSubcategory === subcategory && s.chipTextActive,
+                      ]}
+                    >
+                      {subcategory}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              </>
+            ) : null}
           </Section>
 
           <Section title="Colors" isDarkMode={isDarkMode}>
@@ -420,6 +896,22 @@ export default function AddItemsScreen() {
           <View style={s.bottomSpacer} />
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {imageQueue.length > 1 ? (
+        <View style={[s.saveAllFloatingWrap, { bottom: 20 }]}>
+          <TouchableOpacity
+            style={[s.saveAllFloatingBtn, saving && s.saveAllFloatingBtnDisabled]}
+            onPress={saveAllItems}
+            disabled={saving}
+          >
+            {saving ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Text style={s.saveAllFloatingBtnText}>Save all</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      ) : null}
     </SafeAreaView>
   );
 }

@@ -92,7 +92,8 @@ export const s = StyleSheet.create({
     position: "absolute",
     left: 80,
     fontSize: 12,
-    color: "#888",
+    color: "#FB92BD",
+    fontWeight: "500",
   },
   profileActionsRow: {
     flexDirection: "row",
@@ -425,10 +426,27 @@ export const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  outfitGridItem: {
+    padding: 0,
+  },
+  outfitPreviewImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 8,
+    backgroundColor: "#fff",
+  },
   gridImg: {
     width: "100%",
     height: "88%",
     borderRadius: 8,
+  },
+  styledPreviewCanvas: {
+    backgroundColor: "#f4f4f4",
+    overflow: "hidden",
+    position: "relative",
+  },
+  styledPreviewImage: {
+    position: "absolute",
   },
   previewTileEmpty: {
     width: "100%",

@@ -688,6 +688,9 @@ export const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  panelItemSpacer: {
+    opacity: 0,
+  },
   panelItemSelected:{ 
     borderWidth: 2.5, 
     borderColor: COLORS.pink 

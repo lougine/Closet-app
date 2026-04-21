@@ -49,6 +49,23 @@ const outfitSchema = new mongoose.Schema({
     default: false,
   },
 
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    default: null,
+  },
+
+  styledForUserId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    default: null,
+  },
+
+  styledLayout: {
+    type: mongoose.Schema.Types.Mixed,
+    default: null,
+  },
+
   owner: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",

@@ -57,15 +57,63 @@ export const s = StyleSheet.create({
   scrollContent: { 
     padding: 16 
 },
+  searchWebBtn: {
+    width: "100%",
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "#fff",
+    marginBottom: 10,
+  },
+  searchWebBtnText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#1f1f1f",
+  },
+  mediaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 8,
+  },
+  cameraTile: {
+    flex: 1,
+    height: 210,
+    borderRadius: 20,
+    backgroundColor: "#FB92BD",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+  },
+  cameraTileText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "700",
+  },
   photoCard: { 
+    flex: 1,
     borderRadius: 20, 
     overflow: "hidden", 
     backgroundColor: "#f0eeea", 
-    height: 260, 
-    marginBottom: 16, 
+    height: 210,
     alignItems: "center", 
     justifyContent: "center" 
 },
+  multiPreviewContent: {
+    flexDirection: "row",
+  },
+  multiPreviewCounter: {
+    textAlign: "center",
+    marginTop: 0,
+    marginBottom: 14,
+    fontSize: 12,
+    fontWeight: "600",
+  },
   photo: { 
     width: "100%", 
     height: "100%" 
@@ -79,9 +127,13 @@ export const s = StyleSheet.create({
     fontSize: 13, 
     color: "#bbb" 
 },
-  removeBgBtn: {
+  photoActionsRow: {
+    flexDirection: "row",
+    gap: 10,
     marginBottom: 14,
-    backgroundColor: PINK,
+  },
+  photoActionBtn: {
+    flex: 1,
     borderRadius: 12,
     paddingVertical: 12,
     paddingHorizontal: 14,
@@ -89,6 +141,19 @@ export const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
+  },
+  cropBtn: {
+    backgroundColor: "#FFE7EE",
+    borderWidth: 1,
+    borderColor: "#FFC4D4",
+  },
+  cropBtnText: {
+    color: "#B33C5A",
+    fontWeight: "600",
+    fontSize: 14,
+  },
+  removeBgBtn: {
+    backgroundColor: PINK,
   },
   removeBgBtnDisabled: {
     opacity: 0.65,
@@ -262,6 +327,38 @@ export const s = StyleSheet.create({
     lineHeight: 19 
 },
   bottomSpacer: {
-    height: 60,
+    height: 120,
+  },
+  saveAllFloatingWrap: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  saveAllFloatingBtn: {
+    width: "100%",
+    maxWidth: 560,
+    borderRadius: 18,
+    paddingVertical: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: PINK,
+    shadowColor: "#000",
+    shadowOpacity: 0.18,
+    shadowRadius: 14,
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+    elevation: 5,
+  },
+  saveAllFloatingBtnDisabled: {
+    opacity: 0.7,
+  },
+  saveAllFloatingBtnText: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "700",
   },
 });

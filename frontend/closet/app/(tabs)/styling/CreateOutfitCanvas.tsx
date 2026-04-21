@@ -251,7 +251,10 @@ export function useCreateOutfitLogic({ mode, selected, setSelected, selectedItem
 
   return {
     orderedSelectedItems,
+    canvasSize,
     dragPositions,
+    itemScales,
+    itemOrder,
     activeDragId,
     selectedCanvasItemId,
     setSelectedCanvasItemId,
@@ -284,6 +287,8 @@ export function useCreateOutfitLogic({ mode, selected, setSelected, selectedItem
 }
 
 type Props = {
+  canvasCaptureRef?: React.RefObject<View | null>;
+  hideCanvasControls?: boolean;
   orderedSelectedItems: any[];
   dragPositions: Record<string, { x: number; y: number }>;
   activeDragId: string | null;
@@ -315,6 +320,8 @@ type Props = {
 
 export default function CreateOutfitCanvas(props: Props) {
   const {
+    canvasCaptureRef,
+    hideCanvasControls = false,
     orderedSelectedItems,
     dragPositions,
     activeDragId,
@@ -351,10 +358,15 @@ export default function CreateOutfitCanvas(props: Props) {
       onTouchMove={onCanvasTouchMove}
       onTouchEnd={onCanvasTouchEnd}
     >
-      <TouchableWithoutFeedback onPress={() => setSelectedCanvasItemId(null)}>
-        <View style={s.dragBlankTapArea} />
-      </TouchableWithoutFeedback>
-      {orderedSelectedItems.map((item, renderIndex) => {
+        <View
+          ref={canvasCaptureRef}
+          style={{ flex: 1, backgroundColor: hideCanvasControls ? "transparent" : undefined }}
+          collapsable={false}
+        >
+          <TouchableWithoutFeedback onPress={() => setSelectedCanvasItemId(null)}>
+            <View style={s.dragBlankTapArea} />
+          </TouchableWithoutFeedback>
+          {orderedSelectedItems.map((item, renderIndex) => {
         const itemId = String(item.id);
         const initialPos = dragPositions[itemId] || { x: dragMargin, y: dragMargin };
         let gestureStart = initialPos;
@@ -437,7 +449,7 @@ export default function CreateOutfitCanvas(props: Props) {
                 zIndex: renderIndex + 1,
               },
               activeDragId === itemId && s.draggableItemActive,
-              selectedCanvasItemId === itemId && s.draggableItemSelected,
+              !hideCanvasControls && selectedCanvasItemId === itemId && s.draggableItemSelected,
             ]}
           >
             <View {...panResponder.panHandlers} style={s.draggableItemMediaWrap}>
@@ -446,7 +458,7 @@ export default function CreateOutfitCanvas(props: Props) {
                 : <Text style={s.selectedItemEmoji}>👗</Text>
               }
             </View>
-            {selectedCanvasItemId === itemId && (
+            {!hideCanvasControls && selectedCanvasItemId === itemId && (
               <>
                 <TouchableOpacity
                   style={s.canvasDeleteBtn}
@@ -473,23 +485,26 @@ export default function CreateOutfitCanvas(props: Props) {
             )}
           </View>
         );
-      })}
-      <View style={s.canvasHistoryRow}>
-        <TouchableOpacity
-          style={[s.canvasHistoryBtn, undoStack.length === 0 && s.canvasHistoryBtnDisabled]}
-          onPress={handleUndo}
-          disabled={undoStack.length === 0}
-        >
-          <Ionicons name="arrow-undo" size={16} color="#fff" />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[s.canvasHistoryBtn, redoStack.length === 0 && s.canvasHistoryBtnDisabled]}
-          onPress={handleRedo}
-          disabled={redoStack.length === 0}
-        >
-          <Ionicons name="arrow-redo" size={16} color="#fff" />
-        </TouchableOpacity>
-      </View>
+          })}
+        </View>
+        {!hideCanvasControls && (
+        <View style={s.canvasHistoryRow}>
+          <TouchableOpacity
+            style={[s.canvasHistoryBtn, undoStack.length === 0 && s.canvasHistoryBtnDisabled]}
+            onPress={handleUndo}
+            disabled={undoStack.length === 0}
+          >
+            <Ionicons name="arrow-undo" size={16} color="#fff" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[s.canvasHistoryBtn, redoStack.length === 0 && s.canvasHistoryBtnDisabled]}
+            onPress={handleRedo}
+            disabled={redoStack.length === 0}
+          >
+            <Ionicons name="arrow-redo" size={16} color="#fff" />
+          </TouchableOpacity>
+        </View>
+        )}
     </View>
   );
 }

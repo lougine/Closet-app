@@ -4,18 +4,23 @@ import * as SecureStore from "expo-secure-store";
 import React, { useMemo, useState } from "react";
 import {
   Alert,
+  Dimensions,
   FlatList,
   Modal,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
+  Share,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AuthenticatedImage from "../../components/AuthenticatedImage";
 import { buildApiUrl, buildAuthHeaders, buildImageUrl } from "../../constants/api";
 import { useWardrobe } from "../../context/wardrobeContext";
+
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const LANDSCAPE_CARD_WIDTH = SCREEN_WIDTH - 32;
+const LANDSCAPE_CARD_HEIGHT = 180;
 
 type OutfitSummary = {
   _id: string;
@@ -46,10 +51,7 @@ const formatCategory = (category: unknown) => {
 export default function OutfitDetailScreen() {
   const router = useRouter();
   const { outfitJson } = useLocalSearchParams<{ outfitJson: string }>();
-  const { items, refreshItems } = useWardrobe();
-  const [editingName, setEditingName] = useState(false);
-  const [nameValue, setNameValue] = useState("");
-  const [saving, setSaving] = useState(false);
+  const { items, refreshItems, decrementOutfitCount } = useWardrobe();
   const [deleting, setDeleting] = useState(false);
   const [editingItems, setEditingItems] = useState(false);
   const [draftGarmentIds, setDraftGarmentIds] = useState<string[]>([]);
@@ -93,11 +95,6 @@ export default function OutfitDetailScreen() {
   const displayItems = payloadOutfitItems.length > 0 ? payloadOutfitItems : outfitItems;
   const displayCount = displayItems.length > 0 ? displayItems.length : garmentIds.length;
   const currentGarmentIds = garmentIds.length > 0 ? garmentIds : displayItems.map((item) => item.id);
-
-  const title = outfit?.name || "Outfit";
-  const dateLabel = outfit?.date
-    ? new Date(outfit.date).toLocaleDateString()
-    : "No date";
 
   const openItemsEditor = () => {
     const initialIds = garmentIds.length > 0
@@ -190,48 +187,6 @@ export default function OutfitDetailScreen() {
     }
   };
 
-  const saveName = async () => {
-    if (!outfit?._id || saving) return;
-    const trimmed = nameValue.trim();
-    if (!trimmed) {
-      Alert.alert("Missing name", "Please enter a name for this outfit.");
-      return;
-    }
-
-    try {
-      setSaving(true);
-      const token = await SecureStore.getItemAsync("userToken");
-      if (!token) {
-        Alert.alert("Session expired", "Please log in again.");
-        return;
-      }
-
-      const response = await fetch(buildApiUrl(`/api/outfits/${outfit._id}`), {
-        method: "PUT",
-        headers: {
-          ...buildAuthHeaders(token),
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ name: trimmed }),
-      });
-
-      if (!response.ok) {
-        const errorPayload = await response.json().catch(() => ({}));
-        throw new Error(errorPayload?.message || "Unable to update outfit name.");
-      }
-
-      await refreshItems();
-      setEditingName(false);
-      router.setParams({
-        outfitJson: JSON.stringify({ ...outfit, name: trimmed }),
-      });
-    } catch (error: any) {
-      Alert.alert("Save failed", error?.message || "Unable to update outfit name.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const confirmDelete = () => {
     if (!outfit?._id || deleting) return;
     Alert.alert("Delete Outfit", "This outfit will be permanently removed.", [
@@ -258,6 +213,7 @@ export default function OutfitDetailScreen() {
               throw new Error(errorPayload?.message || "Unable to delete outfit.");
             }
 
+            decrementOutfitCount();
             await refreshItems();
             router.back();
           } catch (error: any) {
@@ -276,57 +232,24 @@ export default function OutfitDetailScreen() {
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={22} color="#1a1a1a" />
         </TouchableOpacity>
-        {editingName ? (
-          <TextInput
-            style={styles.nameInput}
-            value={nameValue}
-            onChangeText={setNameValue}
-            placeholder="Outfit name"
-            placeholderTextColor="#aaa"
-            autoFocus
-          />
-        ) : (
-          <Text style={styles.headerTitle} numberOfLines={1}>{title}</Text>
-        )}
-        {editingName ? (
+        <View style={styles.headerActions}>
           <TouchableOpacity
-            style={[styles.actionBtn, saving && { opacity: 0.6 }]}
-            onPress={saveName}
-            disabled={saving}
+            style={styles.actionBtn}
+            onPress={() => Share.share({ message: `Check out my ${outfit?.name || "outfit"}!` })}
           >
-            <Ionicons name="checkmark" size={18} color="#1a1a1a" />
+            <Ionicons name="share-outline" size={18} color="#1a1a1a" />
           </TouchableOpacity>
-        ) : (
-          <View style={styles.headerActions}>
-            <TouchableOpacity
-              style={styles.actionBtn}
-              onPress={openItemsEditor}
-            >
-              <Ionicons name="shirt-outline" size={18} color="#1a1a1a" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.actionBtn}
-              onPress={() => {
-                setNameValue(title);
-                setEditingName(true);
-              }}
-            >
-              <Ionicons name="create-outline" size={18} color="#1a1a1a" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.actionBtn, deleting && { opacity: 0.6 }]}
-              onPress={confirmDelete}
-              disabled={deleting}
-            >
-              <Ionicons name="trash-outline" size={18} color="#1a1a1a" />
-            </TouchableOpacity>
-          </View>
-        )}
-      </View>
-
-      <View style={styles.metaCard}>
-        <Text style={styles.metaText}>Date: {dateLabel}</Text>
-        <Text style={styles.metaText}>Items: {displayCount}</Text>
+          <TouchableOpacity style={styles.actionBtn} onPress={openItemsEditor}>
+            <Ionicons name="shirt-outline" size={18} color="#1a1a1a" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.actionBtn, deleting && { opacity: 0.6 }]}
+            onPress={confirmDelete}
+            disabled={deleting}
+          >
+            <Ionicons name="trash-outline" size={18} color="#1a1a1a" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {displayItems.length === 0 ? (
@@ -337,37 +260,53 @@ export default function OutfitDetailScreen() {
           </Text>
         </View>
       ) : (
-        <FlatList
-          data={displayItems}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContent}
-          renderItem={({ item }) => (
-            <View style={styles.itemRow}>
-              {item.image ? (
-                <AuthenticatedImage
-                  source={{ uri: item.image }}
-                  style={styles.itemImage}
-                  resizeMode="cover"
-                />
-              ) : (
-                <View style={[styles.itemImage, { backgroundColor: item.bg || "#f1f1f1" }]} />
-              )}
-              <View style={styles.itemTextWrap}>
-                <Text style={styles.itemTitle} numberOfLines={1}>{item.label}</Text>
-                <Text style={styles.itemSubtitle} numberOfLines={1}>
-                  {formatCategory(item.category) || "Uncategorized"}
-                </Text>
+        <View style={styles.carouselSection}>
+          <View style={styles.carouselHeader}>
+            <Text style={styles.carouselTitle}>Swipe through items</Text>
+            <Text style={styles.carouselSubtitle}>
+              {displayCount} item{displayCount === 1 ? "" : "s"}
+            </Text>
+          </View>
+          <FlatList
+            data={displayItems}
+            keyExtractor={(item) => `carousel-${item.id}`}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            snapToInterval={LANDSCAPE_CARD_WIDTH + 12}
+            decelerationRate="fast"
+            contentContainerStyle={styles.carouselListContent}
+            renderItem={({ item, index }) => (
+              <View style={[styles.landscapeCard, { width: LANDSCAPE_CARD_WIDTH, height: LANDSCAPE_CARD_HEIGHT }]}>
+                {item.image ? (
+                  <AuthenticatedImage
+                    source={{ uri: item.image }}
+                    style={styles.landscapeImage}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <View style={[styles.landscapeImage, { backgroundColor: item.bg || "#f1f1f1" }]} />
+                )}
+                <View style={styles.landscapeTextWrap}>
+                  <Text style={styles.landscapeIndex}>Item {index + 1}</Text>
+                  <Text style={styles.landscapeTitle} numberOfLines={1}>
+                    {item.label}
+                  </Text>
+                  <Text style={styles.landscapeSubtitle} numberOfLines={2}>
+                    {formatCategory(item.category) || "Uncategorized"}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={[styles.landscapeRemoveBtn, savingItems && { opacity: 0.6 }]}
+                  onPress={() => removeOutfitItem(item.id)}
+                  disabled={savingItems}
+                >
+                  <Ionicons name="remove-circle-outline" size={20} color="#E91E63" />
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity
-                style={[styles.removeItemBtn, savingItems && { opacity: 0.6 }]}
-                onPress={() => removeOutfitItem(item.id)}
-                disabled={savingItems}
-              >
-                <Ionicons name="remove-circle-outline" size={20} color="#E91E63" />
-              </TouchableOpacity>
-            </View>
-          )}
-        />
+            )}
+          />
+        </View>
       )}
 
       <Modal
@@ -463,7 +402,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   headerActions: {
-    width: 112,
+    width: 144,
     flexDirection: "row",
     justifyContent: "flex-end",
     gap: 8,
@@ -476,71 +415,78 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  nameInput: {
-    flex: 1,
-    marginHorizontal: 10,
-    backgroundColor: "#fff",
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    height: 36,
-    fontSize: 15,
-    fontWeight: "600",
+  carouselSection: {
+    paddingTop: 6,
+  },
+  carouselHeader: {
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+  },
+  carouselTitle: {
+    fontSize: 17,
+    fontWeight: "700",
     color: "#1a1a1a",
   },
-  metaCard: {
-    marginHorizontal: 16,
-    marginBottom: 10,
+  carouselSubtitle: {
+    marginTop: 3,
+    fontSize: 12,
+    color: "#777",
+    fontWeight: "600",
+  },
+  carouselListContent: {
+    paddingHorizontal: 16,
+    gap: 12,
+  },
+  landscapeCard: {
+    borderRadius: 18,
+    overflow: "hidden",
     backgroundColor: "#fff",
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
     flexDirection: "row",
+    alignItems: "stretch",
+  },
+  landscapeImage: {
+    width: "58%",
+    height: "100%",
+    backgroundColor: "#f1f1f1",
+  },
+  landscapeTextWrap: {
+    flex: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
     justifyContent: "space-between",
   },
-  metaText: {
-    color: "#666",
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  listContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 20,
-    gap: 10,
-  },
-  itemRow: {
-    backgroundColor: "#fff",
-    borderRadius: 14,
-    padding: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  itemImage: {
-    width: 58,
-    height: 78,
-    borderRadius: 10,
-    backgroundColor: "#efefef",
-  },
-  itemTextWrap: {
-    flex: 1,
-  },
-  itemTitle: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#1a1a1a",
-  },
-  itemSubtitle: {
-    marginTop: 2,
-    fontSize: 12,
-    color: "#888",
-  },
-  removeItemBtn: {
+  landscapeRemoveBtn: {
+    position: "absolute",
+    right: 12,
+    bottom: 12,
     width: 28,
     height: 28,
     borderRadius: 14,
+    backgroundColor: "#fff",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#fff0f5",
+  },
+  landscapeIndex: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#E91E63",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+  },
+  landscapeTitle: {
+    marginTop: 6,
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#1a1a1a",
+  },
+  landscapeSubtitle: {
+    marginTop: 6,
+    fontSize: 13,
+    lineHeight: 18,
+    color: "#666",
+  },
+  listContent: {
+    paddingBottom: 20,
   },
   emptyState: {
     flex: 1,

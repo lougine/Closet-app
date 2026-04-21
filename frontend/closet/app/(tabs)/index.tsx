@@ -113,6 +113,11 @@ interface FilterState {
   sizes: string[];
 }
 
+interface OutfitFilterState {
+  preview: "all" | "with" | "without";
+  layout: "all" | "canvas" | "basic";
+}
+
 type OutfitSummary = {
   _id: string;
   name?: string;
@@ -124,11 +129,26 @@ type OutfitSummary = {
     _id?: string;
     imageUrl?: string | null;
   }[];
+  styledLayout?: {
+    dragPositions?: Record<string, { x: number; y: number }>;
+    itemScales?: Record<string, number>;
+    itemOrder?: string[];
+    canvasSize?: { width?: number; height?: number };
+  } | null;
 };
 
 type PreviewTile = {
   key: string;
   uri?: string | null;
+};
+
+type StyledPreviewItem = {
+  key: string;
+  uri: string;
+  leftPct: number;
+  topPct: number;
+  widthPct: number;
+  heightPct: number;
 };
 
 const getOutfitItemCount = (outfit: OutfitSummary) => {
@@ -151,7 +171,7 @@ function buildPreviewTiles(
     tiles.push({ key, uri });
   };
 
-  if (outfit.isLookbook && outfit.previewImage) {
+  if (outfit.previewImage) {
     addTile(buildImageUrl(outfit.previewImage), 'cover');
     return tiles;
   }
@@ -170,52 +190,167 @@ function buildPreviewTiles(
     }
   }
 
-  if (tiles.length === 0 && outfit.previewImage) {
-    addTile(buildImageUrl(outfit.previewImage), 'cover');
-  }
-
   return tiles.slice(0, maxTiles);
 }
 
-function PreviewTileContent({ tile }: { tile: PreviewTile }) {
+function buildStyledPreviewItems(
+  outfit: OutfitSummary,
+  items: { id: string; image?: string | null }[],
+): StyledPreviewItem[] {
+  const layout = outfit.styledLayout;
+  if (!layout || !layout.dragPositions || !layout.itemScales) {
+    return [];
+  }
+
+  const sourceWidth = Math.max(Number(layout.canvasSize?.width || 0), 1);
+  const sourceHeight = Math.max(Number(layout.canvasSize?.height || 0), 1);
+  const baseCardWidth = 118;
+  const baseCardHeight = 148;
+
+  const garmentImageMap = new Map<string, string>();
+  if (Array.isArray(outfit.garments)) {
+    outfit.garments.forEach((garment) => {
+      const id = toIdString(garment?._id);
+      if (!id) return;
+      const image = garment?.imageUrl ? buildImageUrl(garment.imageUrl) : null;
+      if (image) garmentImageMap.set(id, image);
+    });
+  }
+
+  const fallbackIds = Array.isArray(outfit.garmentIds) ? outfit.garmentIds.map(String) : [];
+  const order = Array.isArray(layout.itemOrder) && layout.itemOrder.length > 0
+    ? layout.itemOrder.map(String)
+    : fallbackIds;
+
+  const usedIds = new Set<string>();
+  const orderedIds = [
+    ...order,
+    ...fallbackIds.filter((id) => !order.includes(id)),
+  ].filter((id) => {
+    if (usedIds.has(id)) return false;
+    usedIds.add(id);
+    return true;
+  });
+
+  const previewItems: StyledPreviewItem[] = [];
+  orderedIds.forEach((id) => {
+    const point = layout.dragPositions?.[id];
+    const scale = Number(layout.itemScales?.[id] ?? 1);
+    if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) {
+      return;
+    }
+
+    const fromGarments = garmentImageMap.get(id) || null;
+    const fromItems = items.find((item) => String(item.id) === id)?.image || null;
+    const uri = fromGarments || fromItems;
+    if (!uri) return;
+
+    const normalizedScale = Math.max(0.1, Math.min(10, Number.isFinite(scale) ? scale : 1));
+    const widthPct = (baseCardWidth * normalizedScale / sourceWidth) * 100;
+    const heightPct = (baseCardHeight * normalizedScale / sourceHeight) * 100;
+    const leftPct = (point.x / sourceWidth) * 100;
+    const topPct = (point.y / sourceHeight) * 100;
+
+    previewItems.push({
+      key: id,
+      uri,
+      leftPct,
+      topPct,
+      widthPct,
+      heightPct,
+    });
+  });
+
+  return previewItems;
+}
+
+function PreviewTileContent({
+  tile,
+  emptyBackgroundColor,
+}: {
+  tile: PreviewTile;
+  emptyBackgroundColor: string;
+}) {
   if (!tile.uri) {
-    return <View style={s.previewTileEmpty} />;
+    return <View style={[s.previewTileEmpty, { backgroundColor: emptyBackgroundColor }]} />;
   }
 
   return (
     <AuthenticatedImage
       source={{ uri: tile.uri }}
       style={s.previewTileImage}
-      resizeMode="cover"
+      resizeMode="contain"
     />
   );
 }
 
-function OutfitPreviewTile({ tiles }: { tiles: PreviewTile[] }) {
+function OutfitPreviewTile({
+  tiles,
+  styledItems,
+  previewBackgroundColor,
+  emptyBackgroundColor,
+}: {
+  tiles: PreviewTile[];
+  styledItems?: StyledPreviewItem[];
+  previewBackgroundColor: string;
+  emptyBackgroundColor: string;
+}) {
+  if (Array.isArray(styledItems) && styledItems.length > 0) {
+    return (
+      <View
+        style={[
+          s.outfitPreviewImage,
+          {
+            backgroundColor: previewBackgroundColor,
+            overflow: "hidden",
+            position: "relative",
+          },
+        ]}
+      >
+        {styledItems.map((item) => (
+          <AuthenticatedImage
+            key={item.key}
+            source={{ uri: item.uri }}
+            style={[
+              { position: "absolute" as const },
+              {
+                left: `${item.leftPct}%`,
+                top: `${item.topPct}%`,
+                width: `${item.widthPct}%`,
+                height: `${item.heightPct}%`,
+              },
+            ]}
+            resizeMode="contain"
+          />
+        ))}
+      </View>
+    );
+  }
+
   if (tiles.length === 0) {
-    return <View style={s.gridEmpty} />;
+    return <View style={[s.gridEmpty, { backgroundColor: emptyBackgroundColor }]} />;
   }
 
   if (tiles.length === 1) {
     if (!tiles[0].uri) {
-      return <View style={s.gridEmpty} />;
+      return <View style={[s.gridEmpty, { backgroundColor: emptyBackgroundColor }]} />;
     }
 
     return (
       <AuthenticatedImage
         source={{ uri: tiles[0].uri }}
-        style={s.gridImg}
-        resizeMode="cover"
+        style={[s.outfitPreviewImage, { backgroundColor: previewBackgroundColor }]}
+        resizeMode="contain"
       />
     );
   }
 
   if (tiles.length === 2) {
     return (
-      <View style={[s.gridImg, s.previewSplitContainer]}>
+      <View style={[s.outfitPreviewImage, s.previewSplitContainer, { backgroundColor: previewBackgroundColor }]}>
         {tiles.map((tile) => (
           <View key={tile.key} style={s.previewSplitHalf}>
-            <PreviewTileContent tile={tile} />
+            <PreviewTileContent tile={tile} emptyBackgroundColor={emptyBackgroundColor} />
           </View>
         ))}
       </View>
@@ -224,16 +359,16 @@ function OutfitPreviewTile({ tiles }: { tiles: PreviewTile[] }) {
 
   if (tiles.length === 3) {
     return (
-      <View style={[s.gridImg, s.previewSplitContainer]}>
+      <View style={[s.outfitPreviewImage, s.previewSplitContainer, { backgroundColor: previewBackgroundColor }]}>
         <View style={s.previewSplitHalf}>
-          <PreviewTileContent tile={tiles[0]} />
+          <PreviewTileContent tile={tiles[0]} emptyBackgroundColor={emptyBackgroundColor} />
         </View>
         <View style={s.previewSplitRight}>
           <View style={s.previewSplitQuarter}>
-            <PreviewTileContent tile={tiles[1]} />
+            <PreviewTileContent tile={tiles[1]} emptyBackgroundColor={emptyBackgroundColor} />
           </View>
           <View style={s.previewSplitQuarter}>
-            <PreviewTileContent tile={tiles[2]} />
+            <PreviewTileContent tile={tiles[2]} emptyBackgroundColor={emptyBackgroundColor} />
           </View>
         </View>
       </View>
@@ -241,10 +376,10 @@ function OutfitPreviewTile({ tiles }: { tiles: PreviewTile[] }) {
   }
 
   return (
-    <View style={[s.gridImg, s.previewQuadContainer]}>
+    <View style={[s.outfitPreviewImage, s.previewQuadContainer, { backgroundColor: previewBackgroundColor }]}>
       {tiles.slice(0, 4).map((tile) => (
         <View key={tile.key} style={s.previewQuadTile}>
-          <PreviewTileContent tile={tile} />
+          <PreviewTileContent tile={tile} emptyBackgroundColor={emptyBackgroundColor} />
         </View>
       ))}
     </View>
@@ -283,7 +418,25 @@ const normalizeOutfit = (raw: any, localLookbookIds: Set<string>): OutfitSummary
     previewImage: raw?.previewImage || derivedPreviewImage || undefined,
     garmentIds,
     garments,
+    styledLayout: raw?.styledLayout || null,
   };
+};
+
+const isOwnedOutfit = (raw: any, userId: string) => {
+  if (!userId) return false;
+
+  const ownerId = toIdString(raw?.owner ?? raw?.userId ?? raw?.createdBy ?? raw?.author);
+  const audienceId = toIdString(raw?.styledForUserId ?? raw?.recipientUserId ?? raw?.targetUserId ?? raw?.forUserId);
+
+  if (!ownerId || ownerId !== userId) {
+    return false;
+  }
+
+  if (audienceId && audienceId !== userId) {
+    return false;
+  }
+
+  return true;
 };
 
 const parseStoredLookbookIds = (rawValue: string | null) => {
@@ -304,6 +457,11 @@ const EMPTY_FILTERS: FilterState = {
   sizes: [],
 };
 
+const EMPTY_OUTFIT_FILTERS: OutfitFilterState = {
+  preview: "all",
+  layout: "all",
+};
+
 const Wave = ({ fillColor }: { fillColor: string }) => (
   <Svg
     width={W}
@@ -319,9 +477,30 @@ const Wave = ({ fillColor }: { fillColor: string }) => (
   </Svg>
 );
 
-const Chip = ({ label, active, onPress, }: { label: string; active: boolean;onPress: () => void;}) => (
-  <TouchableOpacity style={[fc.chip, active && fc.chipOn]} onPress={onPress}>
-    <Text style={[fc.chipTxt, active && fc.chipTxtOn]}>{label}</Text>
+const Chip = ({
+  label,
+  active,
+  onPress,
+  chipBgColor,
+  chipBorderColor,
+  chipTextColor,
+}: {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+  chipBgColor: string;
+  chipBorderColor: string;
+  chipTextColor: string;
+}) => (
+  <TouchableOpacity
+    style={[
+      fc.chip,
+      { backgroundColor: chipBgColor, borderColor: chipBorderColor },
+      active && fc.chipOn,
+    ]}
+    onPress={onPress}
+  >
+    <Text style={[fc.chipTxt, { color: chipTextColor }, active && fc.chipTxtOn]}>{label}</Text>
   </TouchableOpacity>
 );
 
@@ -348,6 +527,7 @@ export default function WardrobeScreen() {
 
   const [profilePic, setProfilePic] = useState<string | null>(null);
   const [bgImage, setBgImage] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string>("");
   const [username, setUsername] = useState("wizliz");
   const [followerCount, setFollowerCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
@@ -368,6 +548,14 @@ export default function WardrobeScreen() {
   const [loadingOutfits, setLoadingOutfits] = useState(false);
   const [savingCalendarOutfitId, setSavingCalendarOutfitId] = useState<string | null>(null);
   const [pullRefreshing, setPullRefreshing] = useState(false);
+  const [outfitSearchQuery, setOutfitSearchQuery] = useState("");
+  const [outfitQuickFilter, setOutfitQuickFilter] = useState<"all" | "favorites" | "hidden">("all");
+  const [favoriteOutfitIds, setFavoriteOutfitIds] = useState<string[]>([]);
+  const [hiddenOutfitIds, setHiddenOutfitIds] = useState<string[]>([]);
+  const [showOutfitFilter, setShowOutfitFilter] = useState(false);
+  const [outfitFilters, setOutfitFilters] = useState<OutfitFilterState>(EMPTY_OUTFIT_FILTERS);
+  const outfitPreviewBackground = isDarkMode ? "#1c1c1c" : "#f4f4f4";
+  const outfitPreviewEmptyBackground = isDarkMode ? "#2b2b2b" : "#ececec";
 
   const selectingForCalendar = params.pickForCalendar === "1";
 
@@ -427,6 +615,7 @@ export default function WardrobeScreen() {
   const fetchUserHeaderImages = useCallback(async () => {
     try {
       const profile = await fetchCurrentUserProfile();
+      setCurrentUserId(String(profile._id || ""));
       setUsername(profile.username || profile.name || "wizliz");
       setProfilePic(profile.profilePicture ?? null);
       setBgImage(profile.bannerImage ?? null);
@@ -442,6 +631,11 @@ export default function WardrobeScreen() {
       setLoadingOutfits(true);
       const token = await SecureStore.getItemAsync("userToken");
       if (!token) {
+        setOutfits([]);
+        return;
+      }
+
+      if (!currentUserId) {
         setOutfits([]);
         return;
       }
@@ -463,7 +657,9 @@ export default function WardrobeScreen() {
       const payload = await response.json();
       setOutfits(
         Array.isArray(payload)
-          ? payload.map((entry) => normalizeOutfit(entry, localLookbookIds))
+          ? payload
+              .filter((entry) => isOwnedOutfit(entry, currentUserId))
+              .map((entry) => normalizeOutfit(entry, localLookbookIds))
           : [],
       );
     } catch {
@@ -471,13 +667,17 @@ export default function WardrobeScreen() {
     } finally {
       setLoadingOutfits(false);
     }
-  }, []);
+  }, [currentUserId]);
 
   useEffect(() => {
     refreshItems();
     fetchUserHeaderImages();
+  }, [fetchUserHeaderImages, refreshItems]);
+
+  useEffect(() => {
+    if (!currentUserId) return;
     fetchOutfits();
-  }, [fetchOutfits, fetchUserHeaderImages, refreshItems]);
+  }, [currentUserId, fetchOutfits]);
 
   useEffect(() => {
     if (params.tab === "outfits") {
@@ -503,6 +703,7 @@ export default function WardrobeScreen() {
 
       refreshAfterRandomizeSave();
       fetchUserHeaderImages();
+      fetchOutfits();
 
       return () => {
         cancelled = true;
@@ -532,6 +733,62 @@ export default function WardrobeScreen() {
 
   const savedOutfits = outfits.filter((outfit) => !outfit.isLookbook);
   const savedLookbooks = outfits.filter((outfit) => outfit.isLookbook);
+  const favoriteOutfitCount = favoriteOutfitIds.length;
+  const activeOutfitFilterCount =
+    (outfitFilters.preview !== "all" ? 1 : 0) +
+    (outfitFilters.layout !== "all" ? 1 : 0);
+
+  const toggleFavoriteOutfit = (outfitId: string) => {
+    setFavoriteOutfitIds((prev) => (
+      prev.includes(outfitId)
+        ? prev.filter((id) => id !== outfitId)
+        : [...prev, outfitId]
+    ));
+  };
+
+  const toggleHiddenOutfit = (outfitId: string) => {
+    setHiddenOutfitIds((prev) => (
+      prev.includes(outfitId)
+        ? prev.filter((id) => id !== outfitId)
+        : [...prev, outfitId]
+    ));
+  };
+
+  const clearOutfitFilters = () => {
+    setOutfitQuickFilter("all");
+    setOutfitSearchQuery("");
+    setOutfitFilters(EMPTY_OUTFIT_FILTERS);
+  };
+
+  const filteredOutfits = useMemo(() => (
+    savedOutfits.filter((outfit) => {
+      const id = String(outfit._id);
+      const outfitName = String(outfit.name || "").toLowerCase();
+      const query = outfitSearchQuery.trim().toLowerCase();
+      const hasPreview = Boolean(outfit.previewImage);
+      const hasLayout = Boolean(outfit.styledLayout);
+      const isFavorite = favoriteOutfitIds.includes(id);
+      const isHidden = hiddenOutfitIds.includes(id);
+
+      if (query && !outfitName.includes(query)) return false;
+      if (outfitQuickFilter === "favorites" && !isFavorite) return false;
+      if (outfitQuickFilter === "hidden" && !isHidden) return false;
+      if (outfitFilters.preview === "with" && !hasPreview) return false;
+      if (outfitFilters.preview === "without" && hasPreview) return false;
+      if (outfitFilters.layout === "canvas" && !hasLayout) return false;
+      if (outfitFilters.layout === "basic" && hasLayout) return false;
+
+      return true;
+    })
+  ), [
+    favoriteOutfitIds,
+    hiddenOutfitIds,
+    outfitFilters.layout,
+    outfitFilters.preview,
+    outfitQuickFilter,
+    outfitSearchQuery,
+    savedOutfits,
+  ]);
 
   const switchTab = (idx: number) => {
     setActiveTopTab(idx);
@@ -670,6 +927,9 @@ export default function WardrobeScreen() {
     filters.colors.length +
     filters.seasons.length +
     filters.sizes.length;
+  const filterChipBgColor = isDarkMode ? "#2A2A2A" : "#FAFAFA";
+  const filterChipBorderColor = theme.border;
+  const filterChipTextColor = theme.subText;
 
   const pickImage = async (source: "library" | "camera") => {
     try {
@@ -827,7 +1087,7 @@ export default function WardrobeScreen() {
             <TouchableOpacity
               onPress={() => router.push("/features/analytics" as any)}
             >
-              <Text style={[s.analyticsLink, { color: isDarkMode ? "#FF83A7" : undefined }]}>Style Analytics ›</Text>
+              <Text style={[s.analyticsLink, { color: "#FB92BD" }]}>Style Analytics ›</Text>
             </TouchableOpacity>
           </View>
           <View style={s.profileActionsRow}>
@@ -995,7 +1255,13 @@ export default function WardrobeScreen() {
                 >
                   {filters.category !== "" && (
                     <TouchableOpacity
-                      style={s.activePill}
+                      style={[
+                        s.activePill,
+                        isDarkMode && {
+                          backgroundColor: "#2B1F26",
+                          borderColor: "#7A3A55",
+                        },
+                      ]}
                       onPress={() => setCategory(filters.category)}
                     >
                       <Text style={s.activePillTxt}>{filters.category} ×</Text>
@@ -1009,7 +1275,13 @@ export default function WardrobeScreen() {
                   ].map((v) => (
                     <TouchableOpacity
                       key={v}
-                      style={s.activePill}
+                      style={[
+                        s.activePill,
+                        isDarkMode && {
+                          backgroundColor: "#2B1F26",
+                          borderColor: "#7A3A55",
+                        },
+                      ]}
                       onPress={() => {
                         if (filters.subcategories.includes(v))
                           toggleMulti("subcategories", v);
@@ -1023,8 +1295,14 @@ export default function WardrobeScreen() {
                       <Text style={s.activePillTxt}>{v} ×</Text>
                     </TouchableOpacity>
                   ))}
-                  <TouchableOpacity style={s.clearPill} onPress={clearFilters}>
-                    <Text style={s.clearPillTxt}>Clear all</Text>
+                  <TouchableOpacity
+                    style={[
+                      s.clearPill,
+                      isDarkMode && { backgroundColor: "#2A2A2A", borderWidth: 1, borderColor: theme.border },
+                    ]}
+                    onPress={clearFilters}
+                  >
+                    <Text style={[s.clearPillTxt, isDarkMode && { color: theme.subText }]}>Clear all</Text>
                   </TouchableOpacity>
                 </ScrollView>
               )}
@@ -1094,22 +1372,100 @@ export default function WardrobeScreen() {
                 </TouchableOpacity>
               </View>
             ) : (
-              <View style={s.gridContent}>
-                {savedOutfits.map((outfit) => {
+              <>
+                <View style={[s.controlDivider, { backgroundColor: theme.border }]} />
+                <View style={s.searchSection}>
+                  <View style={s.searchRow}>
+                    <View style={[s.searchBar, { backgroundColor: theme.inputBg, borderColor: theme.border, borderWidth: 1 }] }>
+                      <Ionicons name="search" size={14} color={theme.subText} />
+                      <TextInput
+                        placeholder="Search outfits"
+                        value={outfitSearchQuery}
+                        onChangeText={setOutfitSearchQuery}
+                        style={[s.searchInput, { color: theme.text }]}
+                        placeholderTextColor={theme.subText}
+                      />
+                    </View>
+                  </View>
+                  <TouchableOpacity
+                    style={[
+                      s.iconBtn,
+                      { backgroundColor: isDarkMode ? "#242424" : "#fff", borderWidth: 1, borderColor: theme.border },
+                      outfitQuickFilter === "hidden" && s.iconBtnActive,
+                    ]}
+                    onPress={() =>
+                      setOutfitQuickFilter((prev) => (prev === "hidden" ? "all" : "hidden"))
+                    }
+                  >
+                    <Ionicons
+                      name={outfitQuickFilter === "hidden" ? "eye-off" : "eye-off-outline"}
+                      size={19}
+                      color={outfitQuickFilter === "hidden" ? "#fff" : theme.iconInactive}
+                    />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      s.iconBtn,
+                      { backgroundColor: isDarkMode ? "#242424" : "#fff", borderWidth: 1, borderColor: theme.border },
+                      outfitQuickFilter === "favorites" && s.iconBtnActive,
+                    ]}
+                    onPress={() =>
+                      setOutfitQuickFilter((prev) => (prev === "favorites" ? "all" : "favorites"))
+                    }
+                  >
+                    <Ionicons
+                      name={outfitQuickFilter === "favorites" ? "star" : "star-outline"}
+                      size={18}
+                      color={outfitQuickFilter === "favorites" ? "#fff" : theme.iconInactive}
+                    />
+                    {favoriteOutfitCount > 0 && (
+                      <View style={s.badge}>
+                        <Text style={s.badgeTxt}>{favoriteOutfitCount}</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      s.iconBtn,
+                      { backgroundColor: isDarkMode ? "#242424" : "#fff", borderWidth: 1, borderColor: theme.border },
+                      activeOutfitFilterCount > 0 && s.iconBtnActive,
+                    ]}
+                    onPress={() => setShowOutfitFilter(true)}
+                  >
+                    <Feather
+                      name="sliders"
+                      size={18}
+                      color={activeOutfitFilterCount > 0 ? "#fff" : theme.iconInactive}
+                    />
+                    {activeOutfitFilterCount > 0 && (
+                      <View style={s.badge}>
+                        <Text style={s.badgeTxt}>{activeOutfitFilterCount}</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                </View>
+                {filteredOutfits.length === 0 ? (
+                  <View style={s.emptyState}>
+                    <Text style={[s.emptyTitle, { color: theme.text }]}>No outfits match</Text>
+                    <TouchableOpacity style={s.clearBtn} onPress={clearOutfitFilters}>
+                      <Text style={s.clearBtnTxt}>Clear Filters</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                <View style={s.gridContent}>
+                {filteredOutfits.map((outfit) => {
                   const itemCount = getOutfitItemCount(outfit);
+                  const styledPreviewItems = outfit.previewImage ? [] : buildStyledPreviewItems(outfit, items);
                   const previewTiles = buildPreviewTiles(
                     outfit,
                     items,
                     itemCount > 0 ? Math.min(4, itemCount) : 4,
                   );
-                  const dateLabel = outfit.date
-                    ? new Date(outfit.date).toLocaleDateString()
-                    : "No date";
 
                   return (
                     <TouchableOpacity
                       key={outfit._id}
-                      style={[s.gridItem, { backgroundColor: theme.itemCard }]}
+                      style={[s.gridItem, s.outfitGridItem, { backgroundColor: theme.itemCard }]}
                       onPress={() => {
                         if (selectingForCalendar) {
                           handleSelectOutfitForCalendar(outfit);
@@ -1123,17 +1479,47 @@ export default function WardrobeScreen() {
                       }}
                       disabled={savingCalendarOutfitId === outfit._id}
                     >
-                      <OutfitPreviewTile tiles={previewTiles} />
-                      <Text style={[s.gridLabel, { color: theme.text }]} numberOfLines={1}>
-                        {outfit.name || `Outfit • ${itemCount} items`}
-                      </Text>
-                      <Text style={[s.outfitDateText, { color: theme.subText }]}>
-                        {dateLabel}
-                      </Text>
+                      <OutfitPreviewTile
+                        tiles={previewTiles}
+                        styledItems={styledPreviewItems}
+                        previewBackgroundColor={outfitPreviewBackground}
+                        emptyBackgroundColor={outfitPreviewEmptyBackground}
+                      />
+                      {hiddenOutfitIds.includes(String(outfit._id)) && (
+                        <View style={[s.gridHiddenOverlay, { backgroundColor: isDarkMode ? "rgba(0,0,0,0.5)" : "rgba(255,255,255,0.7)" }]} />
+                      )}
+                      <TouchableOpacity
+                        style={s.gridEyeBtn}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          toggleHiddenOutfit(String(outfit._id));
+                        }}
+                      >
+                        <Ionicons
+                          name={hiddenOutfitIds.includes(String(outfit._id)) ? "eye-off" : "eye"}
+                          size={13}
+                          color={theme.iconInactive}
+                        />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={s.gridStarBtn}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          toggleFavoriteOutfit(String(outfit._id));
+                        }}
+                      >
+                        <Ionicons
+                          name={favoriteOutfitIds.includes(String(outfit._id)) ? "star" : "star-outline"}
+                          size={13}
+                          color={favoriteOutfitIds.includes(String(outfit._id)) ? "#F0507B" : theme.iconInactive}
+                        />
+                      </TouchableOpacity>
                     </TouchableOpacity>
                   );
                 })}
               </View>
+                )}
+              </>
             )
           )}
 
@@ -1181,7 +1567,11 @@ export default function WardrobeScreen() {
                         })
                       }
                     >
-                      <OutfitPreviewTile tiles={previewTiles} />
+                      <OutfitPreviewTile
+                        tiles={previewTiles}
+                        previewBackgroundColor={outfitPreviewBackground}
+                        emptyBackgroundColor={outfitPreviewEmptyBackground}
+                      />
                       <Text
                         style={[s.lookbookName, { color: theme.text }]}
                         numberOfLines={1}
@@ -1220,7 +1610,7 @@ export default function WardrobeScreen() {
           <View style={[s.filterSheet, { backgroundColor: theme.card }] }>
             <View style={s.filterHeader}>
               <TouchableOpacity onPress={clearFilters}>
-                <Text style={s.filterClearTxt}>Clear all</Text>
+                <Text style={[s.filterClearTxt, { color: "#F0507B" }]}>Clear all</Text>
               </TouchableOpacity>
               <Text style={[s.filterTitle, { color: theme.text }]}>Filter</Text>
               <TouchableOpacity onPress={() => setShowFilter(false)}>
@@ -1231,7 +1621,7 @@ export default function WardrobeScreen() {
               showsVerticalScrollIndicator={false}
               contentContainerStyle={s.filterScrollContent}
             >
-              <Text style={s.filterSection}>CATEGORY</Text>
+              <Text style={[s.filterSection, { color: theme.subText }]}>CATEGORY</Text>
               <View style={fc.row}>
                 {Object.keys(CATEGORY_TREE).map((cat) => (
                   <Chip
@@ -1239,12 +1629,15 @@ export default function WardrobeScreen() {
                     label={cat}
                     active={filters.category === cat}
                     onPress={() => setCategory(cat)}
+                    chipBgColor={filterChipBgColor}
+                    chipBorderColor={filterChipBorderColor}
+                    chipTextColor={filterChipTextColor}
                   />
                 ))}
               </View>
               {filters.category !== "" && (
                 <>
-                  <Text style={s.filterSection}>
+                  <Text style={[s.filterSection, { color: theme.subText }]}>
                     {filters.category.toUpperCase()} TYPE
                   </Text>
                   <View style={fc.row}>
@@ -1254,12 +1647,15 @@ export default function WardrobeScreen() {
                         label={sub}
                         active={filters.subcategories.includes(sub)}
                         onPress={() => toggleMulti("subcategories", sub)}
+                        chipBgColor={filterChipBgColor}
+                        chipBorderColor={filterChipBorderColor}
+                        chipTextColor={filterChipTextColor}
                       />
                     ))}
                   </View>
                 </>
               )}
-              <Text style={s.filterSection}>COLOR</Text>
+              <Text style={[s.filterSection, { color: theme.subText }]}>COLOR</Text>
               <View style={fc.colorRow}>
                 {FILTER_COLORS.map((c) => {
                   const hex = COLOR_HEX[c];
@@ -1293,12 +1689,12 @@ export default function WardrobeScreen() {
                           />
                         )}
                       </View>
-                      <Text style={fc.swatchLabel}>{c}</Text>
+                      <Text style={[fc.swatchLabel, { color: theme.subText }]}>{c}</Text>
                     </TouchableOpacity>
                   );
                 })}
               </View>
-              <Text style={s.filterSection}>SEASON</Text>
+              <Text style={[s.filterSection, { color: theme.subText }]}>SEASON</Text>
               <View style={fc.row}>
                 {FILTER_SEASONS.map((season) => (
                   <Chip
@@ -1306,10 +1702,13 @@ export default function WardrobeScreen() {
                     label={season}
                     active={filters.seasons.includes(season)}
                     onPress={() => toggleMulti("seasons", season)}
+                    chipBgColor={filterChipBgColor}
+                    chipBorderColor={filterChipBorderColor}
+                    chipTextColor={filterChipTextColor}
                   />
                 ))}
               </View>
-              <Text style={s.filterSection}>SIZE</Text>
+              <Text style={[s.filterSection, { color: theme.subText }]}>SIZE</Text>
               <View style={fc.row}>
                 {FILTER_SIZES.map((sz) => (
                   <Chip
@@ -1317,6 +1716,9 @@ export default function WardrobeScreen() {
                     label={sz}
                     active={filters.sizes.includes(sz)}
                     onPress={() => toggleMulti("sizes", sz)}
+                    chipBgColor={filterChipBgColor}
+                    chipBorderColor={filterChipBorderColor}
+                    chipTextColor={filterChipTextColor}
                   />
                 ))}
               </View>
@@ -1336,6 +1738,101 @@ export default function WardrobeScreen() {
       </Modal>
 
       {/* ── Image picker ── */}
+      <Modal
+        transparent
+        visible={showOutfitFilter}
+        animationType="slide"
+        onRequestClose={() => setShowOutfitFilter(false)}
+      >
+        <View style={s.filterOverlay}>
+          <TouchableOpacity
+            style={s.filterDismiss}
+            activeOpacity={1}
+            onPress={() => setShowOutfitFilter(false)}
+          />
+          <View style={[s.filterSheet, { backgroundColor: theme.card }] }>
+            <View style={s.filterHeader}>
+              <TouchableOpacity onPress={() => setOutfitFilters(EMPTY_OUTFIT_FILTERS)}>
+                <Text style={[s.filterClearTxt, { color: "#F0507B" }]}>Clear all</Text>
+              </TouchableOpacity>
+              <Text style={[s.filterTitle, { color: theme.text }]}>Outfit Filter</Text>
+              <TouchableOpacity onPress={() => setShowOutfitFilter(false)}>
+                <Ionicons name="close" size={22} color={theme.text} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={s.filterScrollContent}
+            >
+              <Text style={[s.filterSection, { color: theme.subText }]}>PREVIEW</Text>
+              <View style={fc.row}>
+                <Chip
+                  label="All"
+                  active={outfitFilters.preview === "all"}
+                  onPress={() => setOutfitFilters((prev) => ({ ...prev, preview: "all" }))}
+                  chipBgColor={filterChipBgColor}
+                  chipBorderColor={filterChipBorderColor}
+                  chipTextColor={filterChipTextColor}
+                />
+                <Chip
+                  label="With Image"
+                  active={outfitFilters.preview === "with"}
+                  onPress={() => setOutfitFilters((prev) => ({ ...prev, preview: "with" }))}
+                  chipBgColor={filterChipBgColor}
+                  chipBorderColor={filterChipBorderColor}
+                  chipTextColor={filterChipTextColor}
+                />
+                <Chip
+                  label="No Image"
+                  active={outfitFilters.preview === "without"}
+                  onPress={() => setOutfitFilters((prev) => ({ ...prev, preview: "without" }))}
+                  chipBgColor={filterChipBgColor}
+                  chipBorderColor={filterChipBorderColor}
+                  chipTextColor={filterChipTextColor}
+                />
+              </View>
+              <Text style={[s.filterSection, { color: theme.subText }]}>TYPE</Text>
+              <View style={fc.row}>
+                <Chip
+                  label="All"
+                  active={outfitFilters.layout === "all"}
+                  onPress={() => setOutfitFilters((prev) => ({ ...prev, layout: "all" }))}
+                  chipBgColor={filterChipBgColor}
+                  chipBorderColor={filterChipBorderColor}
+                  chipTextColor={filterChipTextColor}
+                />
+                <Chip
+                  label="Canvas"
+                  active={outfitFilters.layout === "canvas"}
+                  onPress={() => setOutfitFilters((prev) => ({ ...prev, layout: "canvas" }))}
+                  chipBgColor={filterChipBgColor}
+                  chipBorderColor={filterChipBorderColor}
+                  chipTextColor={filterChipTextColor}
+                />
+                <Chip
+                  label="Basic"
+                  active={outfitFilters.layout === "basic"}
+                  onPress={() => setOutfitFilters((prev) => ({ ...prev, layout: "basic" }))}
+                  chipBgColor={filterChipBgColor}
+                  chipBorderColor={filterChipBorderColor}
+                  chipTextColor={filterChipTextColor}
+                />
+              </View>
+            </ScrollView>
+            <TouchableOpacity
+              style={s.applyBtn}
+              onPress={() => setShowOutfitFilter(false)}
+            >
+              <Text style={s.applyBtnTxt}>
+                {filteredOutfits.length === savedOutfits.length
+                  ? `Show All Outfits · ${savedOutfits.length}`
+                  : `Show Results · ${filteredOutfits.length}`}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       <Modal
         transparent
         visible={!!imageMenuFor}

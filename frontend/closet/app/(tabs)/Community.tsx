@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, FlatList, Image, RefreshControl, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, FlatList, RefreshControl, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AuthenticatedImage from "../../components/AuthenticatedImage";
 import { buildApiUrl, buildAuthHeaders, buildImageUrl } from "../../constants/api";
@@ -10,11 +10,11 @@ import { searchUsers, toggleFollow, type SocialUser } from "@/services/socialSer
 import createCommunityStyles from "../../Styles/communityStyles";
 import { useAppTheme } from "../../context/themeContext";
 
-type CommunityFilter = "for-you" | "friends" | "polls" | "recent";
+type CommunityFilter = "for-you" | "friends" | "outfits" | "styled-for";
 
 type CommunityPost = {
   _id: string;
-  type: "post" | "poll";
+  type: "post";
   caption: string;
   imageUrl: string | null;
   tags: string[];
@@ -27,16 +27,6 @@ type CommunityPost = {
   likeCount: number;
   likedByMe: boolean;
   commentsCount: number;
-  poll: {
-    question: string;
-    endsAt: string | null;
-    options: Array<{
-      index: number;
-      text: string;
-      votes: number;
-      votedByMe: boolean;
-    }>;
-  } | null;
 };
 
 type CommunityComment = {
@@ -62,12 +52,6 @@ const CommunityScreen: React.FC = () => {
   const styles = useMemo(() => createCommunityStyles(isDarkMode), [isDarkMode]);
   const iconColor = isDarkMode ? "#D8D8D8" : "#333";
 
-  const closetItems = [
-    require("../../assets/images/favicon.png"),
-    require("../../assets/images/favicon.png"),
-    require("../../assets/images/favicon.png"),
-  ];
-
   const [feed, setFeed] = useState<CommunityPost[]>([]);
   const [activeFilter, setActiveFilter] = useState<CommunityFilter>("for-you");
   const [searchQuery, setSearchQuery] = useState("");
@@ -89,8 +73,8 @@ const CommunityScreen: React.FC = () => {
     () => [
       { key: "for-you" as const, label: "For You" },
       { key: "friends" as const, label: "Friends" },
-      { key: "polls" as const, label: "Polls" },
-      { key: "recent" as const, label: "Recent" },
+      { key: "outfits" as const, label: "Outfits" },
+      { key: "styled-for" as const, label: "Styled For" },
     ],
     []
   );
@@ -162,6 +146,26 @@ const CommunityScreen: React.FC = () => {
       setRefreshing(false);
     }
   }, [activeFilter]);
+
+  // --- Partition and renderStyledForCard logic: place just before return ---
+  const selfUserId = "me"; // TODO: wire to real user context
+  const outfitsForSelf = feed.filter(post => post.author._id === selfUserId);
+  const fitsForOthers = feed.filter(post => post.author._id !== selfUserId);
+
+  function renderStyledForCard(post: any) {
+    return (
+      <View key={post._id}>
+        <View style={{ flexDirection: "row", gap: 8, marginTop: 8 }}>
+          <TouchableOpacity onPress={() => Alert.alert("Edit", "Edit fit for others") } style={{ padding: 6 }}>
+            <Ionicons name="pencil" size={18} color="#ff4d73" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => Alert.alert("Delete", "Delete fit for others") } style={{ padding: 6 }}>
+            <Ionicons name="trash" size={18} color="#ff4d73" />
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 
   useFocusEffect(
     useCallback(() => {
@@ -390,26 +394,6 @@ const CommunityScreen: React.FC = () => {
         />
       )}
 
-      {post.poll && (
-        <View style={styles.pollCard}>
-          <Text style={styles.pollQuestion}>{post.poll.question}</Text>
-          {post.poll.options.map((option) => (
-            <TouchableOpacity
-              key={option.index}
-              style={[styles.pollOption, option.votedByMe && styles.pollOptionActive]}
-              onPress={() => voteOnPoll(post._id, option.index)}
-            >
-              <Text style={[styles.pollOptionText, option.votedByMe && styles.pollOptionTextActive]}>
-                {option.text}
-              </Text>
-              <Text style={[styles.pollVotes, option.votedByMe && styles.pollOptionTextActive]}>
-                {option.votes}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
-
       <View style={styles.feedActions}>
         <TouchableOpacity style={styles.actionButton} onPress={() => toggleLike(post._id)}>
           <Ionicons
@@ -466,46 +450,21 @@ const CommunityScreen: React.FC = () => {
   );
 
   const listHeader = (
-    <>
-      <ScrollView
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-      >
-        {closetItems.map((item, index) => (
-          <View key={index} style={styles.carouselContainer}>
-            <Image
-              source={item}
-              style={styles.carouselImage}
-              resizeMode="cover"
-            />
-
-            <View style={styles.overlay}>
-              <Text style={styles.overlayTitle}>Style This Item You Own</Text>
-              <Text style={styles.overlaySub}>
-                Get outfit inspiration from your closet
-              </Text>
-            </View>
-          </View>
-        ))}
-      </ScrollView>
-
-      <View style={styles.chipRow}>
-        {filterChips.map((chip) => {
-          const active = activeFilter === chip.key;
-          return (
-            <TouchableOpacity
-              key={chip.key}
-              style={[styles.chip, active && styles.activeChip]}
-              onPress={() => setActiveFilter(chip.key)}
-              activeOpacity={0.85}
-            >
-              <Text style={active ? styles.activeChipText : styles.chipText}>{chip.label}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-    </>
+    <View style={styles.chipRow}>
+      {filterChips.map((chip) => {
+        const active = activeFilter === chip.key;
+        return (
+          <TouchableOpacity
+            key={chip.key}
+            style={[styles.chip, active && styles.activeChip]}
+            onPress={() => setActiveFilter(chip.key)}
+            activeOpacity={0.85}
+          >
+            <Text style={active ? styles.activeChipText : styles.chipText}>{chip.label}</Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
   );
 
   const listFooter = (
@@ -587,7 +546,7 @@ const CommunityScreen: React.FC = () => {
                   )}
                   <View style={styles.userMetaWrap}>
                     <Text style={styles.userNameText}>@{user.username || user.name}</Text>
-                    <Text style={styles.userCountsText}>{user.followerCount} followers � {user.followingCount} following</Text>
+                    <Text style={styles.userCountsText}>{user.followerCount} followers ? {user.followingCount} following</Text>
                   </View>
                 </TouchableOpacity>
 

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import * as SecureStore from "expo-secure-store";
 import { buildApiUrl, buildImageUrl } from "../constants/api";
+import { fetchCurrentUserProfile } from "@/services/userProfileService";
 
 const LOOKBOOK_IDS_KEY = "lookbookIds";
 const GARMENTS_PAGE_SIZE = 100;
@@ -20,6 +21,23 @@ const parseStoredLookbookIds = (rawValue: string | null) => {
   } catch {
     return [] as string[];
   }
+};
+
+const isOwnedOutfit = (entry: any, userId: string) => {
+  if (!userId) return false;
+
+  const ownerId = toIdString(entry?.owner ?? entry?.userId ?? entry?.createdBy ?? entry?.author);
+  const audienceId = toIdString(entry?.styledForUserId ?? entry?.recipientUserId ?? entry?.targetUserId ?? entry?.forUserId);
+
+  if (!ownerId || ownerId !== userId) {
+    return false;
+  }
+
+  if (audienceId && audienceId !== userId) {
+    return false;
+  }
+
+  return true;
 };
 
 export interface ClothingItem {
@@ -45,6 +63,8 @@ interface WardrobeContextType {
   counts: { items: number; outfits: number; lookbooks: number };
   addItem: (item: ClothingItem) => void;
   updateItem: (item: ClothingItem) => void;
+  incrementOutfitCount: () => void;
+  decrementOutfitCount: () => void;
   refreshItems: () => Promise<void>;
   loading: boolean;
 }
@@ -96,6 +116,9 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
+      const profile = await fetchCurrentUserProfile();
+      const currentUserId = String(profile._id || '');
+
       const [garmentsResult, outfitsResponse] = await Promise.all([
         fetchAllGarments(token),
         fetch(buildApiUrl('/api/outfits'), {
@@ -130,7 +153,8 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
         }));
 
         const outfitList = Array.isArray(outfits) ? outfits : [];
-        const lookbookCount = outfitList.filter((entry: any) => {
+        const ownedOutfits = outfitList.filter((entry: any) => isOwnedOutfit(entry, currentUserId));
+        const lookbookCount = ownedOutfits.filter((entry: any) => {
           const rawFlag = entry?.isLookbook;
           const entryId = toIdString(entry?._id);
           return (
@@ -140,7 +164,7 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
             storedLookbookIds.has(entryId)
           );
         }).length;
-        const outfitCount = outfitList.length - lookbookCount;
+        const outfitCount = ownedOutfits.length;
 
         setItems(formattedItems);
         setCounts(prev => ({
@@ -186,6 +210,17 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
     setItems((prev) => prev.map((i) => (i.id === updated.id ? updated : i)));
   }, []);
 
+  const incrementOutfitCount = useCallback(() => {
+    setCounts((prev) => ({ ...prev, outfits: prev.outfits + 1 }));
+  }, []);
+
+  const decrementOutfitCount = useCallback(() => {
+    setCounts((prev) => ({
+      ...prev,
+      outfits: Math.max(0, prev.outfits - 1),
+    }));
+  }, []);
+
   const refreshItems = useCallback(async () => {
     setLoading(true);
     await fetchItems();
@@ -196,7 +231,7 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
   }, [fetchItems]);
 
   return (
-    <WardrobeContext.Provider value={{ items, counts, addItem, updateItem, refreshItems, loading }}>
+    <WardrobeContext.Provider value={{ items, counts, addItem, updateItem, incrementOutfitCount, decrementOutfitCount, refreshItems, loading }}>
       {children}
     </WardrobeContext.Provider>
   );

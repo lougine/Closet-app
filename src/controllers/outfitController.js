@@ -1,7 +1,9 @@
+const mongoose = require("mongoose");
 const Outfit = require("../models/outfit");
 const Garment = require('../models/garment');
 const User = require('../models/user');
 const Usage = require('../models/usage');
+const CommunityPost = require('../models/communityPost');
 const { createImageUpload } = require('../middleware/imageUploadMiddleware');
 const { deleteImageByUrl } = require('../utils/imageFileUtils');
 const { buildImageMetadata } = require('../utils/imageMetadata');
@@ -16,6 +18,114 @@ const toObjectIdString = (value) => {
   if (typeof value === 'string') return value;
   if (value._id) return String(value._id);
   return String(value);
+};
+
+const getOutfitAudienceUserId = (source) => toObjectIdString(
+  source?.styledForUserId ?? source?.recipientUserId ?? source?.targetUserId ?? source?.forUserId,
+);
+
+const isSelfStyledOutfit = (source) => {
+  const ownerId = toObjectIdString(source?.owner);
+  const creatorId = toObjectIdString(source?.createdBy);
+  const audienceUserId = getOutfitAudienceUserId(source);
+  if (!ownerId || !creatorId || ownerId !== creatorId) return false;
+  if (!audienceUserId) return true;
+  return audienceUserId === ownerId;
+};
+
+const buildOutfitCommunityCaption = (source) => {
+  const outfitName = String(source?.name || '').trim();
+  return outfitName ? `Styled ${outfitName}` : 'Styled a fit';
+};
+
+const upsertSelfStyledOutfitCommunityPost = async (source) => {
+  if (!isSelfStyledOutfit(source)) return;
+
+  const outfitId = source?._id;
+  const authorId = source?.owner;
+  if (!outfitId || !authorId) return;
+
+  await CommunityPost.findOneAndUpdate(
+    { sourceOutfitId: outfitId },
+    {
+      $set: {
+        author: authorId,
+        type: 'post',
+        sourceType: 'outfit',
+        sourceOutfitId: outfitId,
+        caption: buildOutfitCommunityCaption(source),
+        imageUrl: source?.previewImage || null,
+        poll: { question: null, options: [], endsAt: null },
+      },
+      $setOnInsert: {
+        tags: ['fit', 'styled-fit'],
+      },
+    },
+    { upsert: true, new: true },
+  );
+};
+
+const isVisibleToUser = (source, userId) => {
+  const audienceUserId = getOutfitAudienceUserId(source);
+  if (!audienceUserId) return true;
+  return audienceUserId === String(userId);
+};
+
+const toFiniteNumber = (value, fallback = 0) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const sanitizeStyledLayout = (rawLayout) => {
+  if (!rawLayout || typeof rawLayout !== 'object') return null;
+
+  const rawPositions = rawLayout.dragPositions && typeof rawLayout.dragPositions === 'object'
+    ? rawLayout.dragPositions
+    : {};
+  const rawScales = rawLayout.itemScales && typeof rawLayout.itemScales === 'object'
+    ? rawLayout.itemScales
+    : {};
+  const rawOrder = Array.isArray(rawLayout.itemOrder) ? rawLayout.itemOrder : [];
+  const rawCanvasSize = rawLayout.canvasSize && typeof rawLayout.canvasSize === 'object'
+    ? rawLayout.canvasSize
+    : {};
+
+  const dragPositions = Object.fromEntries(
+    Object.entries(rawPositions)
+      .filter(([id]) => Boolean(String(id || '').trim()))
+      .map(([id, point]) => {
+        const normalizedId = String(id).trim();
+        const x = toFiniteNumber(point?.x, 0);
+        const y = toFiniteNumber(point?.y, 0);
+        return [normalizedId, { x, y }];
+      }),
+  );
+
+  const itemScales = Object.fromEntries(
+    Object.entries(rawScales)
+      .filter(([id]) => Boolean(String(id || '').trim()))
+      .map(([id, scale]) => {
+        const normalizedId = String(id).trim();
+        const normalizedScale = Math.max(0.1, Math.min(10, toFiniteNumber(scale, 1)));
+        return [normalizedId, normalizedScale];
+      }),
+  );
+
+  const itemOrder = rawOrder
+    .map((id) => String(id || '').trim())
+    .filter(Boolean);
+
+  const canvasSize = {
+    width: Math.max(1, toFiniteNumber(rawCanvasSize?.width, 1)),
+    height: Math.max(1, toFiniteNumber(rawCanvasSize?.height, 1)),
+  };
+
+  return {
+    dragPositions,
+    itemScales,
+    itemOrder,
+    canvasSize,
+  };
 };
 
 const toUtcDayRange = (dateValue) => {
@@ -187,17 +297,56 @@ const cleanupReplacedPreviewImage = async (owner, previousPreviewImage, nextPrev
 
 exports.createOutfit = async (req, res) => {
   try {
-    const owner = req.user.userId;
+    const creatorId = req.user.userId;
+    const styledForUserId = String(req.body.styledForUserId || req.body.recipientUserId || req.body.targetUserId || req.body.forUserId || '').trim();
+    const styledLayout = sanitizeStyledLayout(req.body.styledLayout);
     const garments = Array.isArray(req.body.garments) ? req.body.garments : [];
     let defaultPreviewImage = '';
 
+    let owner = creatorId;
+    if (styledForUserId && styledForUserId !== creatorId) {
+      const styledForUser = await User.findById(styledForUserId).select('_id');
+      if (!styledForUser) {
+        return res.status(400).json({ message: 'Styled-for user not found' });
+      }
+
+      owner = styledForUserId;
+    }
+
+    let validOwner = creatorId;
+    try {
+      validOwner = new mongoose.Types.ObjectId(creatorId);
+    } catch (e) {
+      return res.status(500).json({ message: 'Invalid user ID' });
+    }
+
+    const garmentIds = garments.filter((g) => {
+      try {
+        new mongoose.Types.ObjectId(g);
+        return true;
+      } catch (e) {
+        return false;
+      }
+    });
+
+    let ownerObj;
+    try {
+      ownerObj = new mongoose.Types.ObjectId(owner);
+    } catch (e) {
+      ownerObj = validOwner;
+    }
+
     if (garments.length > 0) {
+      if (garmentIds.length !== garments.length) {
+        return res.status(400).json({ message: 'One or more garment IDs are invalid' });
+      }
+
       const ownedGarments = await Garment.find({
-        _id: { $in: garments },
-        owner,
+        _id: { $in: garmentIds },
+        owner: ownerObj,
       }).select('_id imageUrl');
 
-      if (ownedGarments.length !== garments.length) {
+      if (ownedGarments.length !== garmentIds.length) {
         return res.status(400).json({ message: 'One or more garments are invalid for this user' });
       }
 
@@ -207,10 +356,14 @@ exports.createOutfit = async (req, res) => {
     const outfit = new Outfit({
       ...req.body,
       previewImage: req.body.previewImage || defaultPreviewImage,
-      owner
+      owner: ownerObj,
+      createdBy: validOwner,
+      styledForUserId: styledForUserId || null,
+      styledLayout,
     });
 
     await outfit.save();
+    await upsertSelfStyledOutfitCommunityPost(outfit);
 
     res.status(201).json(outfit);
 
@@ -233,7 +386,9 @@ exports.getOutfits = async (req, res) => {
       .limit(limit)
       .lean();
 
-    res.json(outfits.map(mapOutfitForCalendar));
+    res.json(outfits
+      .filter((outfit) => isVisibleToUser(outfit, req.user.userId))
+      .map(mapOutfitForCalendar));
 
   } catch (error) {
     res.status(500).json({ message: 'Internal server error' });
@@ -260,7 +415,9 @@ exports.getOutfitsByDate = async (req, res) => {
       .limit(limit)
       .lean();
 
-    res.json(outfits.map(mapOutfitForCalendar));
+    res.json(outfits
+      .filter((outfit) => isVisibleToUser(outfit, req.user.userId))
+      .map(mapOutfitForCalendar));
 
   } catch (error) {
     res.status(500).json({ message: 'Internal server error' });
@@ -314,6 +471,7 @@ exports.updateOutfit = async (req, res) => {
       outfit.previewImageMetadata = null;
     }
     await outfit.save();
+    await upsertSelfStyledOutfitCommunityPost(outfit);
 
     if (req.file) {
       await cleanupReplacedPreviewImage(owner, oldPreviewImage, outfit.previewImage, { excludeOutfitId: outfit._id });
@@ -360,6 +518,7 @@ exports.updateOutfitCover = async (req, res) => {
     }
 
     await outfit.save();
+    await upsertSelfStyledOutfitCommunityPost(outfit);
 
     if (req.file) {
       await cleanupReplacedPreviewImage(owner, previousPreviewImage, outfit.previewImage, { excludeOutfitId: outfit._id });
@@ -390,6 +549,10 @@ exports.deleteOutfit = async (req, res) => {
     await Usage.deleteMany({
       user: req.user.userId,
       outfit: req.params.id,
+    });
+
+    await CommunityPost.deleteMany({
+      sourceOutfitId: deletedOutfit._id,
     });
 
     if (deletedOutfit.previewImage) {

@@ -10,7 +10,7 @@ import { getAppTheme } from '../../../constants/appTheme';
 
 export default function MonthScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ garmentIds?: string; outfitName?: string }>();
+  const params = useLocalSearchParams<{ garmentIds?: string; outfitName?: string; previewImageUri?: string }>();
   const [savingOutfit, setSavingOutfit] = useState(false);
   const [showOnlyLogged, setShowOnlyLogged] = useState(false);
   const { isDarkMode } = useAppTheme();
@@ -115,6 +115,7 @@ export default function MonthScreen() {
         garmentIds,
         date,
         name: params.outfitName || 'Outfit',
+        previewImage: params.previewImageUri || undefined,
       });
       router.back();
     } catch (error: any) {

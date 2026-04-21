@@ -2,6 +2,7 @@ import { Feather, Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import * as SecureStore from "expo-secure-store";
+import { captureRef } from "react-native-view-shot";
 import { Alert, Animated, Dimensions, FlatList, Image, Modal, ScrollView, StatusBar, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from "react-native";
 import AuthenticatedImage from "../../../components/AuthenticatedImage";
 import AiRecommendedCanvas, { useAiRecommendedLogic } from "./AiRecommendedCanvas";
@@ -11,6 +12,7 @@ import { buildApiUrl, buildAuthHeaders } from "../../../constants/api";
 import { useWardrobe } from "../../../context/wardrobeContext";
 import { useAppTheme } from "../../../context/themeContext";
 import { PANEL_W, PINK, s } from "../../../Styles/styling.styles";
+import { UploadRequestError, getUploadErrorMessage, uploadMultipartWithRetry } from "../../../services/uploadRequest";
 
 const { width: W } = Dimensions.get("window");
 const MODES    = ["Create outfit", "Randomize", "AI recommended"] as const;
@@ -310,6 +312,17 @@ function WardrobePanel({
     (a, b) => getItemAddedTimestamp(b) - getItemAddedTimestamp(a),
   );
 
+  const gridData = React.useMemo(() => {
+    if (filteredSorted.length % 2 === 0) return filteredSorted;
+    return [
+      ...filteredSorted,
+      {
+        id: "__panel_spacer__",
+        __isSpacer: true,
+      },
+    ];
+  }, [filteredSorted]);
+
   React.useEffect(() => {
     Animated.spring(slideAnim, {
       toValue: visible ? 0 : PANEL_W,
@@ -389,7 +402,15 @@ function WardrobePanel({
             />
           </View>
           <TouchableOpacity
-            style={[s.panelIconBtn, quickFilter === "hidden" && s.panelIconBtnActive]}
+            style={[
+              s.panelIconBtn,
+              {
+                backgroundColor: panelTheme.panelCard,
+                borderColor: panelTheme.panelBorder,
+                borderWidth: 1,
+              },
+              quickFilter === "hidden" && s.panelIconBtnActive,
+            ]}
             onPress={() => cycleQuickFilter("hidden")}
           >
             <Ionicons
@@ -399,7 +420,15 @@ function WardrobePanel({
             />
           </TouchableOpacity>
           <TouchableOpacity
-            style={[s.panelIconBtn, quickFilter === "favorites" && s.panelIconBtnActive]}
+            style={[
+              s.panelIconBtn,
+              {
+                backgroundColor: panelTheme.panelCard,
+                borderColor: panelTheme.panelBorder,
+                borderWidth: 1,
+              },
+              quickFilter === "favorites" && s.panelIconBtnActive,
+            ]}
             onPress={() => cycleQuickFilter("favorites")}
           >
             <Ionicons
@@ -411,6 +440,11 @@ function WardrobePanel({
           <TouchableOpacity
             style={[
               s.panelIconBtn,
+              {
+                backgroundColor: panelTheme.panelCard,
+                borderColor: panelTheme.panelBorder,
+                borderWidth: 1,
+              },
               activeFilterCount > 0 && s.panelIconBtnActive,
             ]}
             onPress={() => setShowFilter(true)}
@@ -430,14 +464,19 @@ function WardrobePanel({
 
         {/* Grid */}
         <FlatList
-          data={filteredSorted}
+          data={gridData}
           numColumns={2}
           keyExtractor={i => String(i.id)}
           contentContainerStyle={s.panelGrid}
           columnWrapperStyle={s.panelRow}
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => {
-            const itemId = String(item.id);
+            if ((item as any).__isSpacer) {
+              return <View style={[s.panelItem, s.panelItemSpacer]} />;
+            }
+
+            const itemData = item as any;
+            const itemId = String(itemData.id);
             const isSelected = selected.includes(itemId);
             const isHidden = hiddenItemIds.includes(itemId);
             const isFavorite = favoriteItemIds.includes(itemId);
@@ -452,8 +491,8 @@ function WardrobePanel({
                 onPress={() => onSelect(itemId)}
                 activeOpacity={0.8}
               >
-                {item.image
-                  ? <AuthenticatedImage source={{ uri: item.image }} style={s.panelImg} resizeMode="contain" />
+                {itemData.image
+                  ? <AuthenticatedImage source={{ uri: itemData.image }} style={s.panelImg} resizeMode="contain" />
                   : <View style={[s.panelEmpty, { backgroundColor: isDarkMode ? "#2D2D2D" : "#F5F5F5" }]} />
                 }
                 {isHidden && <View style={s.panelItemHiddenOverlay} />}
@@ -688,7 +727,9 @@ export default function StylingScreen() {
   const [inputText, setInputText] = useState("");
   const [temperatureC] = useState(23);
   const [savingOutfit, setSavingOutfit] = useState(false);
-  const { items } = useWardrobe();
+  const [capturingCreatePreview, setCapturingCreatePreview] = useState(false);
+  const { items, incrementOutfitCount } = useWardrobe();
+  const createOutfitCanvasRef = useRef<View>(null);
 
   const getToken = async () => {
     const token = await SecureStore.getItemAsync("userToken");
@@ -698,6 +739,43 @@ export default function StylingScreen() {
     }
     return token;
   };
+
+  const captureCreateOutfitPreview = useCallback(async () => {
+    const canvasNode = createOutfitCanvasRef.current;
+    if (!canvasNode) {
+      throw new Error("Outfit canvas is not ready yet.");
+    }
+
+    return captureRef(canvasNode as any, {
+      format: "png",
+      quality: 1,
+      result: "tmpfile",
+    });
+  }, []);
+
+  const uploadOutfitPreview = useCallback(async (outfitId: string, previewUri: string) => {
+    const token = await getToken();
+    if (!token) {
+      throw new Error("Please log in again.");
+    }
+
+    const formData = new FormData();
+    formData.append("coverImage", {
+      uri: previewUri,
+      name: `outfit-preview-${Date.now()}.png`,
+      type: "image/png",
+    } as any);
+
+    return uploadMultipartWithRetry<any>({
+      endpoint: `/api/outfits/${outfitId}/cover`,
+      method: "PUT",
+      token,
+      formData,
+      timeoutMs: 30000,
+      retries: 1,
+      fallbackMessage: "Unable to upload outfit preview.",
+    });
+  }, [getToken]);
 
   const selectedItems = items.filter((i: any) => (
     selected.includes(String(i.id)) || selected.includes(String(i._id))
@@ -790,6 +868,14 @@ export default function StylingScreen() {
           body: JSON.stringify({
             name: selectedRecommendation?.name || `${mode} Outfit`,
             garments: selected,
+            styledLayout: mode === "Create outfit"
+              ? {
+                  dragPositions: createOutfit.dragPositions,
+                  itemScales: createOutfit.itemScales,
+                  itemOrder: createOutfit.itemOrder,
+                  canvasSize: createOutfit.canvasSize,
+                }
+              : undefined,
           }),
         }),
         15000,
@@ -801,12 +887,38 @@ export default function StylingScreen() {
         throw new Error(errorPayload?.message || "Could not save outfit");
       }
 
-      if (mode === "Randomize") {
-        await SecureStore.setItemAsync(INDEX_REFRESH_AFTER_RANDOMIZE_SAVE_KEY, "1");
+      const savedOutfit = await response.json().catch(() => null);
+      if (!savedOutfit?._id) {
+        throw new Error("Outfit was saved but no valid ID was returned.");
       }
 
+      if (mode === "Create outfit") {
+        try {
+          setCapturingCreatePreview(true);
+          createOutfit.setSelectedCanvasItemId(null);
+          await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+          await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+          const previewUri = await captureCreateOutfitPreview();
+          await uploadOutfitPreview(savedOutfit._id, previewUri);
+        } catch (previewError: any) {
+          if (previewError instanceof UploadRequestError) {
+            console.warn(getUploadErrorMessage(previewError, "Unable to upload outfit preview."));
+          } else {
+            console.warn(previewError?.message || "Unable to upload outfit preview.");
+          }
+        } finally {
+          setCapturingCreatePreview(false);
+        }
+      }
+
+      incrementOutfitCount();
+      await SecureStore.setItemAsync(INDEX_REFRESH_AFTER_RANDOMIZE_SAVE_KEY, "1");
+
       setMainOutfitSaved(true);
-      Alert.alert("Saved", "Outfit has been saved.");
+      router.replace({
+        pathname: "/(tabs)" as any,
+        params: { tab: "outfits" },
+      });
     } catch (error: any) {
       Alert.alert("Save failed", error?.message || "Could not save this outfit.");
     } finally {
@@ -879,9 +991,12 @@ export default function StylingScreen() {
     });
   };
 
+  const shouldScrollActionArea = mode === "Create outfit" || mode === "Randomize";
+
   return (
     <View style={[s.root, { backgroundColor: theme.screen }]}>
       <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} translucent backgroundColor="transparent" />
+      <>
 
       {/* Header image */}
       <Image
@@ -965,6 +1080,8 @@ export default function StylingScreen() {
           </View>
         ) : (
           <CreateOutfitCanvas
+            canvasCaptureRef={createOutfitCanvasRef}
+            hideCanvasControls={capturingCreatePreview}
             orderedSelectedItems={createOutfit.orderedSelectedItems}
             dragPositions={createOutfit.dragPositions}
             activeDragId={createOutfit.activeDragId}
@@ -1003,45 +1120,87 @@ export default function StylingScreen() {
         )}
       </View>
 
-      {mode === "Randomize" && (
-        <RandomizeControls
-          presets={RANDOMIZE_PRESETS}
-          randomizeOption={randomizeOption}
-          setRandomizeOption={setRandomizeOption}
-          loadRandomizedOutfit={loadRandomizedOutfit}
-          disabled={loadingRandomize || loadingAi || savingOutfit}
-        />
+      {shouldScrollActionArea ? (
+        <ScrollView
+          style={{ maxHeight: 156 }}
+          contentContainerStyle={{ paddingBottom: 24 }}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {mode === "Randomize" && (
+            <RandomizeControls
+              presets={RANDOMIZE_PRESETS}
+              randomizeOption={randomizeOption}
+              setRandomizeOption={setRandomizeOption}
+              loadRandomizedOutfit={loadRandomizedOutfit}
+              disabled={loadingRandomize || loadingAi || savingOutfit}
+            />
+          )}
+
+          <View style={{ flexDirection: "row", gap: 8, marginHorizontal: 16, marginTop: 12 }}>
+            <TouchableOpacity
+              style={[
+                s.saveOutfitBtn,
+                { flex: 1, marginHorizontal: 0, marginTop: 0 },
+                (selected.length === 0 || savingOutfit || loadingAi || loadingRandomize || mainOutfitSaved) && s.saveOutfitBtnDisabled,
+              ]}
+              onPress={persistCurrentOutfit}
+              disabled={selected.length === 0 || savingOutfit || loadingAi || loadingRandomize || mainOutfitSaved}
+            >
+              <Text style={s.saveOutfitBtnTxt}>
+                {savingOutfit ? "Saving outfit..." : mainOutfitSaved ? "Saved" : "Save outfit"}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                s.saveOutfitBtn,
+                { flex: 1, marginHorizontal: 0, marginTop: 0 },
+                (selected.length === 0 || loadingAi || loadingRandomize || lastSavedOutfitId === JSON.stringify(selected)) && s.saveOutfitBtnDisabled,
+              ]}
+              onPress={saveOutfitToCalendar}
+              disabled={selected.length === 0 || loadingAi || loadingRandomize || lastSavedOutfitId === JSON.stringify(selected)}
+            >
+              <Text style={s.saveOutfitBtnTxt}>
+                {lastSavedOutfitId === JSON.stringify(selected) ? "Saved" : "Save to Calendar"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      ) : (
+        <View>
+          <View style={{ flexDirection: "row", gap: 8, marginHorizontal: 16, marginTop: 12 }}>
+            <TouchableOpacity
+              style={[
+                s.saveOutfitBtn,
+                { flex: 1, marginHorizontal: 0, marginTop: 0 },
+                (selected.length === 0 || savingOutfit || loadingAi || loadingRandomize || mainOutfitSaved) && s.saveOutfitBtnDisabled,
+              ]}
+              onPress={persistCurrentOutfit}
+              disabled={selected.length === 0 || savingOutfit || loadingAi || loadingRandomize || mainOutfitSaved}
+            >
+              <Text style={s.saveOutfitBtnTxt}>
+                {savingOutfit ? "Saving outfit..." : mainOutfitSaved ? "Saved" : "Save outfit"}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                s.saveOutfitBtn,
+                { flex: 1, marginHorizontal: 0, marginTop: 0 },
+                (selected.length === 0 || loadingAi || loadingRandomize || lastSavedOutfitId === JSON.stringify(selected)) && s.saveOutfitBtnDisabled,
+              ]}
+              onPress={saveOutfitToCalendar}
+              disabled={selected.length === 0 || loadingAi || loadingRandomize || lastSavedOutfitId === JSON.stringify(selected)}
+            >
+              <Text style={s.saveOutfitBtnTxt}>
+                {lastSavedOutfitId === JSON.stringify(selected) ? "Saved" : "Save to Calendar"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       )}
-
-      <View style={{ flexDirection: "row", gap: 8, marginHorizontal: 16, marginTop: 12 }}>
-        <TouchableOpacity
-          style={[
-            s.saveOutfitBtn,
-            { flex: 1, marginHorizontal: 0, marginTop: 0 },
-            (selected.length === 0 || savingOutfit || loadingAi || loadingRandomize || mainOutfitSaved) && s.saveOutfitBtnDisabled,
-          ]}
-          onPress={persistCurrentOutfit}
-          disabled={selected.length === 0 || savingOutfit || loadingAi || loadingRandomize || mainOutfitSaved}
-        >
-          <Text style={s.saveOutfitBtnTxt}>
-            {savingOutfit ? "Saving outfit..." : mainOutfitSaved ? "Saved" : "Save outfit"}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[
-            s.saveOutfitBtn,
-            { flex: 1, marginHorizontal: 0, marginTop: 0 },
-            (selected.length === 0 || loadingAi || loadingRandomize || lastSavedOutfitId === JSON.stringify(selected)) && s.saveOutfitBtnDisabled,
-          ]}
-          onPress={saveOutfitToCalendar}
-          disabled={selected.length === 0 || loadingAi || loadingRandomize || lastSavedOutfitId === JSON.stringify(selected)}
-        >
-          <Text style={s.saveOutfitBtnTxt}>
-            {lastSavedOutfitId === JSON.stringify(selected) ? "Saved" : "Save to Calendar"}
-          </Text>
-        </TouchableOpacity>
-      </View>
+      </>
 
       {/* Wardrobe side panel (Create outfit only) */}
       {mode === "Create outfit" && (

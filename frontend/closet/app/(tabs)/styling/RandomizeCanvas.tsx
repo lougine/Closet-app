@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, ScrollView, TouchableOpacity, View } from "react-native";
 import AuthenticatedImage from "../../../components/AuthenticatedImage";
 import { s } from "../../../Styles/styling.styles";
+import { useAppTheme } from "../../../context/themeContext";
 
 export type RandomizeOption = 2 | 3 | 4;
 export type RandomizeCategory = "dress" | "outerwear" | "top" | "bottom" | "footwear";
@@ -148,10 +149,6 @@ export function useRandomizeModeLogic({
 
       const missing = requiredCategories.filter((category) => randomizePools[category].length === 0);
       if (missing.length > 0) {
-        Alert.alert(
-          "Not enough items",
-          `Add at least one ${missing.join(", ")} item to use this randomize option.`
-        );
         return;
       }
 
@@ -263,6 +260,7 @@ export function useRandomizeModeLogic({
 }
 
 export default function RandomizeCanvas(props: Props) {
+  const { isDarkMode } = useAppTheme();
   const {
     randomizeRequiredCategories,
     randomizePools,
@@ -277,8 +275,13 @@ export default function RandomizeCanvas(props: Props) {
   } = props;
 
   return (
-    <View style={s.randomizeSlotsBoard}>
-      {randomizeRequiredCategories.map((category) => {
+    <ScrollView
+      contentContainerStyle={{ flexGrow: 1 }}
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+    >
+      <View style={s.randomizeSlotsBoard}>
+        {randomizeRequiredCategories.map((category) => {
         const categoryItems = randomizePools[category] || [];
         const selectedItem = selectedByRandomizeCategory[category];
         const selectedIndex = selectedItem
@@ -341,8 +344,19 @@ export default function RandomizeCanvas(props: Props) {
         if (categoryItems.length === 0) {
           return (
             <View key={category} style={s.randomizeSlotRow}>
-              <View style={[s.randomizeCenterSlot, s.randomizeSlotEmpty, { width: randomizeRowCardWidth, alignSelf: "center" }]}>
-                <Ionicons name="shirt-outline" size={20} color="#bbb" />
+              <View
+                style={[
+                  s.randomizeCenterSlot,
+                  s.randomizeSlotEmpty,
+                  {
+                    width: randomizeRowCardWidth,
+                    alignSelf: "center",
+                    backgroundColor: isDarkMode ? "#1F1F1F" : "#FAFAFA",
+                    borderColor: isDarkMode ? "#3A3A3A" : "#DDDDDD",
+                  },
+                ]}
+              >
+                <Ionicons name="shirt-outline" size={20} color={isDarkMode ? "#6A6A6A" : "#BBB"} />
               </View>
             </View>
           );
@@ -419,12 +433,14 @@ export default function RandomizeCanvas(props: Props) {
             </ScrollView>
           </View>
         );
-      })}
-    </View>
+        })}
+      </View>
+    </ScrollView>
   );
 }
 
 export function RandomizeControls(props: RandomizeControlsProps) {
+  const { isDarkMode } = useAppTheme();
   const {
     presets,
     randomizeOption,
@@ -440,6 +456,10 @@ export function RandomizeControls(props: RandomizeControlsProps) {
           key={option}
           style={[
             s.randomizeOptionPill,
+            {
+              backgroundColor: isDarkMode ? "#2B2B2B" : "#fff",
+              borderColor: isDarkMode ? "#3A3A3A" : "#f0f0f0",
+            },
             randomizeOption === option && s.randomizeOptionPillActive,
           ]}
           onPress={() => {
@@ -454,6 +474,7 @@ export function RandomizeControls(props: RandomizeControlsProps) {
                 key={`${option}-${idx}`}
                 style={[
                   s.randomizeStackDash,
+                  { backgroundColor: isDarkMode ? "#D0D0D0" : "#555" },
                   randomizeOption === option && s.randomizeStackDashActive,
                 ]}
               />

@@ -14,7 +14,8 @@
     "storage:restore": "node scripts/restore-storage-references.js",
     "storage:migrate-legacy-urls": "node scripts/migrate-legacy-upload-urls.js",
     "storage:import-images": "node scripts/import-images-to-cloudinary.js",
-    "storage:export-image-template": "node scripts/export-image-import-template.js"
+    "storage:export-image-template": "node scripts/export-image-import-template.js",
+    "community:backfill-self-fits": "node scripts/backfill-self-styled-community-posts.js"
   },
   "keywords": [],
   "author": "",

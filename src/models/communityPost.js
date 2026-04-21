@@ -32,6 +32,18 @@ const communityPostSchema = new mongoose.Schema(
       default: 'post',
       index: true,
     },
+    sourceType: {
+      type: String,
+      enum: ['manual', 'outfit'],
+      default: 'manual',
+      index: true,
+    },
+    sourceOutfitId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Outfit',
+      default: null,
+      index: true,
+    },
     caption: {
       type: String,
       trim: true,
@@ -79,5 +91,9 @@ const communityPostSchema = new mongoose.Schema(
 
 communityPostSchema.index({ createdAt: -1 });
 communityPostSchema.index({ author: 1, createdAt: -1 });
+communityPostSchema.index(
+  { sourceOutfitId: 1 },
+  { unique: true, partialFilterExpression: { sourceOutfitId: { $type: 'objectId' } } }
+);
 
 module.exports = mongoose.model('CommunityPost', communityPostSchema);

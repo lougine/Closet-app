@@ -182,24 +182,42 @@ export default function UserProfileScreen() {
             </View>
 
             {!profile.isMe && (
-              <TouchableOpacity
-                onPress={onToggleFollow}
-                disabled={updatingFollow}
-                style={{
-                  marginTop: 14,
-                  alignSelf: 'flex-start',
-                  backgroundColor: profile.isFollowing ? palette.muted : '#F0507B',
-                  borderColor: profile.isFollowing ? palette.border : '#F0507B',
-                  borderWidth: 1,
-                  borderRadius: 999,
-                  paddingHorizontal: 16,
-                  paddingVertical: 8,
-                }}
-              >
-                <Text style={{ color: profile.isFollowing ? palette.text : '#FFFFFF', fontWeight: '700', fontSize: 12 }}>
-                  {updatingFollow ? 'Please wait...' : profile.isFollowing ? 'Following' : 'Follow'}
-                </Text>
-              </TouchableOpacity>
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
+                <TouchableOpacity
+                  onPress={onToggleFollow}
+                  disabled={updatingFollow}
+                  style={{
+                    alignSelf: 'flex-start',
+                    backgroundColor: profile.isFollowing ? palette.muted : '#F0507B',
+                    borderColor: profile.isFollowing ? palette.border : '#F0507B',
+                    borderWidth: 1,
+                    borderRadius: 999,
+                    paddingHorizontal: 16,
+                    paddingVertical: 8,
+                  }}
+                >
+                  <Text style={{ color: profile.isFollowing ? palette.text : '#FFFFFF', fontWeight: '700', fontSize: 12 }}>
+                    {updatingFollow ? 'Please wait...' : profile.isFollowing ? 'Following' : 'Follow'}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => router.push({ pathname: '/(tabs)/styling', params: { mode: 'create', userId: profile._id } })}
+                  style={{
+                    alignSelf: 'flex-start',
+                    backgroundColor: palette.card,
+                    borderColor: '#F0507B',
+                    borderWidth: 1,
+                    borderRadius: 999,
+                    paddingHorizontal: 16,
+                    paddingVertical: 8,
+                  }}
+                >
+                  <Text style={{ color: '#F0507B', fontWeight: '700', fontSize: 12 }}>
+                    Style
+                  </Text>
+                </TouchableOpacity>
+              </View>
             )}
           </View>
         </View>

@@ -159,6 +159,7 @@ export default function DayScreen() {
         garmentIds: outfit.garmentIds,
         date: targetDate,
         name: 'Duplicated outfit',
+        previewImage: outfit.previewImage,
       });
       setSelectedDate(targetDate);
       setCurrentMonth(new Date(targetDate.getFullYear(), targetDate.getMonth(), 1));
