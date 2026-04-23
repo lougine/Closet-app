@@ -38,6 +38,8 @@ export default function DayScreen() {
 
   const [menuVisible, setMenuVisible] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const outfitPreviewBackground = isDarkMode ? '#1c1c1c' : '#f4f4f4';
+  const outfitPreviewEmptyBackground = isDarkMode ? '#2b2b2b' : '#ececec';
 
   async function handlePullRefresh() {
     if (isRefreshing) return;
@@ -328,14 +330,21 @@ export default function DayScreen() {
           activeOpacity={0.9}
           onPress={() => openOutfitDetail(selectedOutfit!)}
         >
-          {selectedOutfit?.previewImage || selectedOutfit?.garments?.some((garment) => garment?.imageUrl) ? (
-            <OutfitPreviewCollage outfit={selectedOutfit} style={styles.outfitImage} />
-          ) : (
-            <View style={[styles.outfitImage, styles.outfitImagePlaceholder]}>
-              <Ionicons name="shirt-outline" size={48} color={COLORS.lightGray} />
-              <Text style={[styles.outfitSavedText, { color: theme.subText }]}>Outfit saved</Text>
-            </View>
-          )}
+          {selectedOutfit?.previewImage || selectedOutfit?.garments?.some((garment) => garment?.imageUrl)
+            ? (
+              <OutfitPreviewCollage
+                outfit={selectedOutfit}
+                style={styles.outfitImage}
+                previewBackgroundColor={outfitPreviewBackground}
+                emptyBackgroundColor={outfitPreviewEmptyBackground}
+              />
+            )
+            : (
+              <View style={[styles.outfitImage, styles.outfitImagePlaceholder]}>
+                <Ionicons name="shirt-outline" size={48} color={COLORS.lightGray} />
+                <Text style={[styles.outfitSavedText, { color: theme.subText }]}>Outfit saved</Text>
+              </View>
+            )}
         </TouchableOpacity>
 
         <View style={styles.outfitMetaRow}>
@@ -465,8 +474,8 @@ export default function DayScreen() {
               onPress={() => {
                 if (action === 'outfits') goToOutfitsIndex();
                 else if (action === 'create') goToStyling('create');
-                else if (action === 'randomize') goToStyling('randomize');
-                else goToStyling('ai-recommended');
+                else if (action === 'randomize') goToStyling('discover');
+                else if (action === 'ai-recommended') goToStyling('ai-recommended');
               }}
             >
               <View style={styles.optionTextWrap}>

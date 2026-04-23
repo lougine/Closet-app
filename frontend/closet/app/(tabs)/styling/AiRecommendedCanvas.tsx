@@ -1,6 +1,6 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useMemo, useState } from "react";
-import { FlatList, ScrollView, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from "react-native";
+import { ScrollView, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from "react-native";
 import AuthenticatedImage from "../../../components/AuthenticatedImage";
 import { s } from "../../../Styles/styling.styles";
 import { useAppTheme } from "../../../context/themeContext";
@@ -267,25 +267,46 @@ export default function AiRecommendedCanvas(props: Props) {
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
     >
-      <FlatList
-        data={selectedItems}
-        numColumns={selectedGridColumns}
-        key={`selected-grid-${selectedGridColumns}`}
-        keyExtractor={(i: any) => String(i.id)}
-        contentContainerStyle={s.selectedGridContent}
-        columnWrapperStyle={selectedItems.length > 1 ? s.selectedGridRow : undefined}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={[s.selectedItemCard, { backgroundColor: item.bg }]}
-            onPress={() => handleSelectedItemPress(item)}
-          >
-            {item.image
-              ? <AuthenticatedImage source={{ uri: item.image }} style={s.selectedItemImage} resizeMode="contain" />
-              : <Text style={s.selectedItemEmoji}>👗</Text>
-            }
-          </TouchableOpacity>
+      <View style={s.selectedGridContent}>
+        {selectedItems.length <= 1 ? (
+          selectedItems.map((item) => (
+            <TouchableOpacity
+              key={String(item.id)}
+              style={[s.selectedItemCard, { backgroundColor: item.bg }]}
+              onPress={() => handleSelectedItemPress(item)}
+            >
+              {item.image
+                ? <AuthenticatedImage source={{ uri: item.image }} style={s.selectedItemImage} resizeMode="contain" />
+                : <Text style={s.selectedItemEmoji}>👗</Text>
+              }
+            </TouchableOpacity>
+          ))
+        ) : (
+          Array.from({ length: Math.ceil(selectedItems.length / selectedGridColumns) }).map((_, rowIndex) => {
+            const rowItems = selectedItems.slice(
+              rowIndex * selectedGridColumns,
+              rowIndex * selectedGridColumns + selectedGridColumns,
+            );
+
+            return (
+              <View key={`ai-row-${rowIndex}`} style={s.selectedGridRow}>
+                {rowItems.map((item) => (
+                  <TouchableOpacity
+                    key={String(item.id)}
+                    style={[s.selectedItemCard, { backgroundColor: item.bg }]}
+                    onPress={() => handleSelectedItemPress(item)}
+                  >
+                    {item.image
+                      ? <AuthenticatedImage source={{ uri: item.image }} style={s.selectedItemImage} resizeMode="contain" />
+                      : <Text style={s.selectedItemEmoji}>👗</Text>
+                    }
+                  </TouchableOpacity>
+                ))}
+              </View>
+            );
+          })
         )}
-      />
+      </View>
 
       <View style={s.canvasActions}>
         <TouchableOpacity

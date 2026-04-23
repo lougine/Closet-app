@@ -164,4 +164,58 @@ export const s = StyleSheet.create({
     color: "#fff",
     fontWeight: "600",
   },
+  hiddenCaptureWrap: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    opacity: 0,
+    zIndex: -1,
+  },
+  captureCanvas: {
+    width: 900,
+    height: 1200,
+    backgroundColor: "#ffffff",
+    paddingHorizontal: 48,
+    paddingTop: 64,
+    paddingBottom: 48,
+  },
+  captureTitlePill: {
+    alignSelf: "center",
+    borderRadius: 999,
+    backgroundColor: "#fff0f6",
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    marginBottom: 28,
+  },
+  captureTitleText: {
+    fontSize: 28,
+    color: "#d93a73",
+    fontWeight: "700",
+    letterSpacing: 0.4,
+  },
+  captureGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    rowGap: 20,
+  },
+  captureTile: {
+    height: 250,
+    borderRadius: 20,
+    backgroundColor: "#f7f7f7",
+    borderWidth: 1,
+    borderColor: "#ececec",
+    overflow: "hidden",
+    padding: 14,
+  },
+  captureTileTwoCol: {
+    width: "48.5%",
+  },
+  captureTileThreeCol: {
+    width: "31.5%",
+  },
+  captureTileImage: {
+    width: "100%",
+    height: "100%",
+  },
 });

@@ -1,13 +1,15 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import * as SecureStore from "expo-secure-store";
 import { Alert, FlatList, StatusBar, Text, TouchableOpacity, View } from "react-native";
+import { captureRef } from "react-native-view-shot";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AuthenticatedImage from "../../components/AuthenticatedImage";
 import { buildApiUrl, buildAuthHeaders } from "../../constants/api";
 import { getAppTheme } from "../../constants/appTheme";
 import { useAppTheme } from "../../context/themeContext";
+import { uploadMultipartWithRetry } from "../../services/uploadRequest";
 import { useWardrobe } from "../../context/wardrobeContext";
 import { PINK, s } from "../../Styles/wardrobe/outfit.styles";
 
@@ -17,6 +19,7 @@ export default function OutfitScreen() {
   const { items, refreshItems } = useWardrobe();
   const [selected, setSelected] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  const previewCaptureRef = useRef<View>(null);
 
   const baseTheme = getAppTheme(isDarkMode, {
     light: {
@@ -33,6 +36,29 @@ export default function OutfitScreen() {
     );
 
   const selectedItems = items.filter((i) => selected.includes(i.id));
+  const previewItems = useMemo(() => (
+    selectedItems.filter((item) => Boolean(item.image)).slice(0, 8)
+  ), [selectedItems]);
+  const previewColumns = previewItems.length > 4 ? 3 : 2;
+
+  const uploadOutfitPreview = async (outfitId: string, previewUri: string, token: string) => {
+    const formData = new FormData();
+    formData.append("coverImage", {
+      uri: previewUri,
+      name: `outfit-preview-${Date.now()}.png`,
+      type: "image/png",
+    } as any);
+
+    await uploadMultipartWithRetry<any>({
+      endpoint: `/api/outfits/${outfitId}/cover`,
+      method: "PUT",
+      token,
+      formData,
+      timeoutMs: 30000,
+      retries: 1,
+      fallbackMessage: "Could not upload outfit preview.",
+    });
+  };
 
   const handleSave = async () => {
     if (selected.length < 2 || saving) return;
@@ -61,6 +87,25 @@ export default function OutfitScreen() {
       if (!response.ok) {
         const errorPayload = await response.json().catch(() => ({}));
         throw new Error(errorPayload?.message || "Could not save outfit");
+      }
+
+      const createdOutfit = await response.json().catch(() => null);
+
+      if (createdOutfit?._id && previewCaptureRef.current && previewItems.length > 0) {
+        try {
+          await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+          await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+
+          const previewUri = await captureRef(previewCaptureRef.current as any, {
+            format: "png",
+            quality: 1,
+            result: "tmpfile",
+          });
+
+          await uploadOutfitPreview(createdOutfit._id, previewUri, token);
+        } catch (previewError) {
+          console.warn("Outfit saved, but preview image upload failed.", previewError);
+        }
       }
 
       await refreshItems();
@@ -93,6 +138,31 @@ export default function OutfitScreen() {
         >
           <Text style={s.saveBtnText}>{saving ? "Saving..." : "Save"}</Text>
         </TouchableOpacity>
+      </View>
+
+      <View style={s.hiddenCaptureWrap} pointerEvents="none">
+        <View ref={previewCaptureRef} collapsable={false} style={s.captureCanvas}>
+          <View style={s.captureTitlePill}>
+            <Text style={s.captureTitleText}>Saved Outfit</Text>
+          </View>
+          <View style={s.captureGrid}>
+            {previewItems.map((item, index) => (
+              <View
+                key={`${item.id}-${index}`}
+                style={[
+                  s.captureTile,
+                  previewColumns === 3 ? s.captureTileThreeCol : s.captureTileTwoCol,
+                ]}
+              >
+                <AuthenticatedImage
+                  source={{ uri: item.image }}
+                  style={s.captureTileImage}
+                  resizeMode="contain"
+                />
+              </View>
+            ))}
+          </View>
+        </View>
       </View>
 
       {selectedItems.length > 0 && (

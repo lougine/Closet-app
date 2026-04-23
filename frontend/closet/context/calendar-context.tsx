@@ -27,6 +27,12 @@ export type OutfitEntry = {
   previewImage: string;
   isLookbook?: boolean;
   garments?: Array<{ imageUrl?: string | null }>;
+  styledLayout?: {
+    dragPositions?: Record<string, { x: number; y: number }>;
+    itemScales?: Record<string, number>;
+    itemOrder?: string[];
+    canvasSize?: { width?: number; height?: number };
+  } | null;
 };
 
 export type OutfitMap = Record<string, OutfitEntry>; 
@@ -135,7 +141,19 @@ type CalendarContextType = {
 
   setSelectedDate: (date: Date) => void;
   setCurrentMonth: (date: Date) => void;
-  saveOutfitForDate: (payload: { garmentIds: string[]; date: Date; name?: string; previewImage?: string }) => Promise<void>;
+  saveOutfitForDate: (payload: {
+    garmentIds: string[];
+    date: Date;
+    name?: string;
+    previewImage?: string;
+    styledLayout?: {
+      dragPositions?: Record<string, { x: number; y: number }>;
+      itemScales?: Record<string, number>;
+      itemOrder?: string[];
+      canvasSize?: { width?: number; height?: number };
+    } | null;
+  }) => Promise<void>;
+  assignOutfitToDate: (payload: { outfitId: string; date: Date }) => Promise<void>;
   deleteOutfit: (id: string) => Promise<void>;
   refetch: () => Promise<void>;
 };
@@ -167,6 +185,7 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
       previewImage: String(entry?.previewImage || derivedPreviewImage || ''),
       isLookbook: Boolean(entry?.isLookbook),
       garments,
+      styledLayout: entry?.styledLayout || null,
     };
   };
 
@@ -201,8 +220,19 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  async function saveOutfitForDate(payload: { garmentIds: string[]; date: Date; name?: string; previewImage?: string }) {
-    const { garmentIds, date, name, previewImage } = payload;
+  async function saveOutfitForDate(payload: {
+    garmentIds: string[];
+    date: Date;
+    name?: string;
+    previewImage?: string;
+    styledLayout?: {
+      dragPositions?: Record<string, { x: number; y: number }>;
+      itemScales?: Record<string, number>;
+      itemOrder?: string[];
+      canvasSize?: { width?: number; height?: number };
+    } | null;
+  }) {
+    const { garmentIds, date, name, previewImage, styledLayout } = payload;
     const token = await SecureStore.getItemAsync('userToken');
     if (!token) {
       throw new Error('Session expired. Please log in again.');
@@ -226,6 +256,7 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
         garments: garmentIds,
         date: normalizedDate,
         ...(previewImage && !previewImageIsLocal ? { previewImage } : {}),
+        ...(styledLayout ? { styledLayout } : {}),
       }),
     });
 
@@ -257,11 +288,41 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
     await fetchOutfits();
   }
 
+  async function assignOutfitToDate(payload: { outfitId: string; date: Date }) {
+    const { outfitId, date } = payload;
+    const token = await SecureStore.getItemAsync('userToken');
+    if (!token) {
+      throw new Error('Session expired. Please log in again.');
+    }
+
+    const dateKey = toDateKey(date);
+    const [year, month, day] = dateKey.split('-').map(Number);
+    const normalizedDate = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0)).toISOString();
+
+    const res = await fetch(buildApiUrl(`/api/outfits/${outfitId}`), {
+      method: 'PUT',
+      headers: {
+        ...buildAuthHeaders(token),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        date: normalizedDate,
+      }),
+    });
+
+    if (!res.ok) {
+      throw new Error('Could not assign outfit to selected day');
+    }
+
+    await fetchOutfits();
+  }
+
   return (
     <CalendarContext.Provider value={{
       selectedDate, currentMonth, outfits, outfitMap, loading,
       setSelectedDate, setCurrentMonth,
       saveOutfitForDate,
+      assignOutfitToDate,
       deleteOutfit, refetch: fetchOutfits,
     }}>
       {children}
