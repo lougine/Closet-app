@@ -492,6 +492,8 @@ export default function WardrobeScreen() {
 
   const savedOutfits = outfits.filter((outfit) => !outfit.isLookbook);
   const savedLookbooks = outfits.filter((outfit) => outfit.isLookbook);
+  const displayedOutfitCount = savedOutfits.length;
+  const displayedLookbookCount = savedLookbooks.length;
   const favoriteOutfitCount = favoriteOutfitIds.length;
   const activeOutfitFilterCount =
     (outfitFilters.preview !== "all" ? 1 : 0) +
@@ -890,14 +892,14 @@ export default function WardrobeScreen() {
             </TouchableOpacity>
             <View style={[s.statDivider, { backgroundColor: theme.border }]} />
             <TouchableOpacity style={s.statItem} onPress={() => switchTab(1)}>
-              <Text style={[s.statNum, { color: theme.text }]}>{counts.outfits}</Text>
+              <Text style={[s.statNum, { color: theme.text }]}>{displayedOutfitCount}</Text>
               <Text style={[s.statLabel, { color: theme.subText }, activeTopTab === 1 && s.statLabelPink]}>
                 Outfits
               </Text>
             </TouchableOpacity>
             <View style={[s.statDivider, { backgroundColor: theme.border }]} />
             <TouchableOpacity style={s.statItem} onPress={() => switchTab(2)}>
-              <Text style={[s.statNum, { color: theme.text }]}>{counts.lookbooks}</Text>
+              <Text style={[s.statNum, { color: theme.text }]}>{displayedLookbookCount}</Text>
               <Text style={[s.statLabel, { color: theme.subText }, activeTopTab === 2 && s.statLabelPink]}>
                 Lookbooks
               </Text>

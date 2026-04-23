@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import * as SecureStore from 'expo-secure-store';
 import React, { useMemo, useState, useEffect } from 'react';
 import { Alert, PanResponder, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import OutfitPreviewCollage from '../../../components/OutfitPreviewCollage';
@@ -7,10 +8,11 @@ import { styles, SW } from '../../../Styles/calendar/month.styles';
 import { COLORS, DAYS_SHORT, getMonthGrid, getMostWornThisMonth, getOutfitForDate, getStreak, isSameDay, MONTHS, toDateKey, useCalendar } from '../../../context/calendar-context';
 import { useAppTheme } from '../../../context/themeContext';
 import { getAppTheme } from '../../../constants/appTheme';
+import { uploadMultipartWithRetry } from '../../../services/uploadRequest';
 
 export default function MonthScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ garmentIds?: string; outfitName?: string; previewImageUri?: string }>();
+  const params = useLocalSearchParams<{ outfitId?: string; garmentIds?: string; outfitName?: string; previewImageUri?: string }>();
   const [savingOutfit, setSavingOutfit] = useState(false);
   const [showOnlyLogged, setShowOnlyLogged] = useState(false);
   const { isDarkMode } = useAppTheme();
@@ -28,7 +30,7 @@ export default function MonthScreen() {
     },
   });
 
-  const { currentMonth, setCurrentMonth, selectedDate, setSelectedDate, outfitMap, outfits, saveOutfitForDate } = useCalendar();
+  const { currentMonth, setCurrentMonth, selectedDate, setSelectedDate, outfitMap, outfits, saveOutfitForDate, assignOutfitToDate, refetch } = useCalendar();
 
   const year = currentMonth.getFullYear();
   const month = currentMonth.getMonth();
@@ -109,18 +111,56 @@ export default function MonthScreen() {
   }
 
   const handleSaveOutfitToDate = async (date: Date) => {
-    if (!params.garmentIds) return;
+    if (!params.outfitId && !params.garmentIds) return;
 
     setSavingOutfit(true);
     try {
-      const garmentIds = JSON.parse(params.garmentIds);
-      await saveOutfitForDate({
-        garmentIds,
-        date,
-        name: params.outfitName || 'Outfit',
-        previewImage: params.previewImageUri || undefined,
-      });
-      router.back();
+      if (params.outfitId) {
+        await assignOutfitToDate({
+          outfitId: String(params.outfitId),
+          date,
+        });
+
+        const localPreviewImage = params.previewImageUri;
+        if (localPreviewImage && /^(file|content|ph):/i.test(localPreviewImage)) {
+          try {
+            const token = await SecureStore.getItemAsync('userToken');
+            if (token) {
+              const uploadFormData = new FormData();
+              uploadFormData.append('coverImage', {
+                uri: localPreviewImage,
+                name: `calendar-outfit-${Date.now()}.png`,
+                type: 'image/png',
+              } as any);
+
+              await uploadMultipartWithRetry<any>({
+                endpoint: `/api/outfits/${String(params.outfitId)}/cover`,
+                token,
+                formData: uploadFormData,
+                method: 'PUT',
+                timeoutMs: 30000,
+                retries: 1,
+                fallbackMessage: 'Could not upload outfit image.',
+              });
+            }
+          } catch (previewError) {
+            console.warn('Calendar month: failed to upload fallback preview image.', previewError);
+          }
+        }
+      } else if (params.garmentIds) {
+        const garmentIds = JSON.parse(params.garmentIds);
+        await saveOutfitForDate({
+          garmentIds,
+          date,
+          name: params.outfitName || 'Outfit',
+          previewImage: params.previewImageUri || undefined,
+        });
+      }
+
+      await refetch();
+      setSelectedDate(date);
+      setCurrentMonth(new Date(date.getFullYear(), date.getMonth(), 1));
+      router.replace('/(tabs)/calendar' as any);
     } catch (error: any) {
       Alert.alert('Error', error?.message || 'Could not save outfit to calendar');
     } finally {
@@ -248,7 +288,7 @@ export default function MonthScreen() {
                     setSelectedDate(day);
                     
                     // If saving outfit, do that instead
-                    if (params.garmentIds) {
+                    if (params.outfitId || params.garmentIds) {
                       handleSaveOutfitToDate(day);
                       return;
                     }

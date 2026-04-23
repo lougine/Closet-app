@@ -955,27 +955,94 @@ export default function StylingScreen() {
   };
 
   const saveOutfitToCalendar = async () => {
+    if (savingOutfit) return;
+
     if (selected.length === 0) {
       Alert.alert("No outfit selected", "Generate or select an outfit first.");
       return;
     }
 
-    const selectedRecommendation = recommendations[activeRecommendation];
-    const outfitName = selectedRecommendation?.name || `${mode} Outfit`;
+    const token = await getToken();
+    if (!token) return;
 
-    setLastSavedOutfitId(JSON.stringify(selected));
+    setSavingOutfit(true);
+    try {
+      const selectedRecommendation = recommendations[activeRecommendation];
+      const outfitName = selectedRecommendation?.name || `${mode} Outfit`;
+      let previewImageUri: string | undefined;
 
-    if (mode === "Randomize") {
+      const response = await withTimeout(
+        fetch(buildApiUrl("/api/outfits"), {
+          method: "POST",
+          headers: {
+            ...buildAuthHeaders(token),
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: outfitName,
+            garments: selected,
+            styledLayout: mode === "Create outfit"
+              ? {
+                  dragPositions: createOutfit.dragPositions,
+                  itemScales: createOutfit.itemScales,
+                  itemOrder: createOutfit.itemOrder,
+                  canvasSize: createOutfit.canvasSize,
+                }
+              : undefined,
+          }),
+        }),
+        15000,
+        "Save request timed out. Please check your connection and try again.",
+      );
+
+      if (!response.ok) {
+        const errorPayload = await response.json().catch(() => ({}));
+        throw new Error(errorPayload?.message || "Could not save outfit");
+      }
+
+      const savedOutfit = await response.json().catch(() => null);
+      if (!savedOutfit?._id) {
+        throw new Error("Outfit was saved but no valid ID was returned.");
+      }
+
+      if (mode === "Create outfit") {
+        try {
+          setCapturingCreatePreview(true);
+          createOutfit.setSelectedCanvasItemId(null);
+          await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+          await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+          const previewUri = await captureCreateOutfitPreview();
+          previewImageUri = previewUri;
+          await uploadOutfitPreview(savedOutfit._id, previewUri);
+        } catch (previewError: any) {
+          if (previewError instanceof UploadRequestError) {
+            console.warn(getUploadErrorMessage(previewError, "Unable to upload outfit preview."));
+          } else {
+            console.warn(previewError?.message || "Unable to upload outfit preview.");
+          }
+        } finally {
+          setCapturingCreatePreview(false);
+        }
+      }
+
+      incrementOutfitCount();
       await SecureStore.setItemAsync(INDEX_REFRESH_AFTER_RANDOMIZE_SAVE_KEY, "1");
-    }
 
-    router.push({
-      pathname: "/(tabs)/calendar/month",
-      params: {
-        garmentIds: JSON.stringify(selected),
-        outfitName,
-      },
-    });
+      setLastSavedOutfitId(JSON.stringify(selected));
+      setMainOutfitSaved(true);
+      router.push({
+        pathname: "/(tabs)/calendar/month",
+        params: {
+          outfitId: String(savedOutfit._id),
+          outfitName,
+          ...(previewImageUri ? { previewImageUri } : {}),
+        },
+      });
+    } catch (error: any) {
+      Alert.alert("Save failed", error?.message || "Could not save this outfit.");
+    } finally {
+      setSavingOutfit(false);
+    }
   };
 
   useEffect(() => {
@@ -1192,13 +1259,17 @@ export default function StylingScreen() {
               style={[
                 s.saveOutfitBtn,
                 { flex: 1, marginHorizontal: 0, marginTop: 0 },
-                (selected.length === 0 || loadingAi || loadingRandomize || lastSavedOutfitId === JSON.stringify(selected)) && s.saveOutfitBtnDisabled,
+                (selected.length === 0 || loadingAi || loadingRandomize || savingOutfit || lastSavedOutfitId === JSON.stringify(selected)) && s.saveOutfitBtnDisabled,
               ]}
               onPress={saveOutfitToCalendar}
-              disabled={selected.length === 0 || loadingAi || loadingRandomize || lastSavedOutfitId === JSON.stringify(selected)}
+              disabled={selected.length === 0 || loadingAi || loadingRandomize || savingOutfit || lastSavedOutfitId === JSON.stringify(selected)}
             >
               <Text style={s.saveOutfitBtnTxt}>
-                {lastSavedOutfitId === JSON.stringify(selected) ? "Saved" : "Save to Calendar"}
+                {savingOutfit
+                  ? "Saving outfit..."
+                  : lastSavedOutfitId === JSON.stringify(selected)
+                    ? "Saved"
+                    : "Save to Calendar"}
               </Text>
             </TouchableOpacity>
           </View>
@@ -1224,13 +1295,17 @@ export default function StylingScreen() {
               style={[
                 s.saveOutfitBtn,
                 { flex: 1, marginHorizontal: 0, marginTop: 0 },
-                (selected.length === 0 || loadingAi || loadingRandomize || lastSavedOutfitId === JSON.stringify(selected)) && s.saveOutfitBtnDisabled,
+                (selected.length === 0 || loadingAi || loadingRandomize || savingOutfit || lastSavedOutfitId === JSON.stringify(selected)) && s.saveOutfitBtnDisabled,
               ]}
               onPress={saveOutfitToCalendar}
-              disabled={selected.length === 0 || loadingAi || loadingRandomize || lastSavedOutfitId === JSON.stringify(selected)}
+              disabled={selected.length === 0 || loadingAi || loadingRandomize || savingOutfit || lastSavedOutfitId === JSON.stringify(selected)}
             >
               <Text style={s.saveOutfitBtnTxt}>
-                {lastSavedOutfitId === JSON.stringify(selected) ? "Saved" : "Save to Calendar"}
+                {savingOutfit
+                  ? "Saving outfit..."
+                  : lastSavedOutfitId === JSON.stringify(selected)
+                    ? "Saved"
+                    : "Save to Calendar"}
               </Text>
             </TouchableOpacity>
           </View>
