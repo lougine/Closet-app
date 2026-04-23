@@ -272,13 +272,45 @@ exports.getOverview = async (req, res) => {
           },
         },
         {
+          $lookup: {
+            from: 'outfits',
+            let: {
+              usageOutfitId: '$outfit',
+              ownerId: ownerObjectId,
+            },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $and: [
+                      { $eq: ['$_id', '$$usageOutfitId'] },
+                      { $eq: ['$owner', '$$ownerId'] },
+                    ],
+                  },
+                },
+              },
+              { $project: { _id: 1 } },
+            ],
+            as: 'matchedOutfit',
+          },
+        },
+        {
           $group: {
             _id: null,
             totalWearEvents: { $sum: 1 },
             uniqueGarments: { $addToSet: '$garment' },
             uniqueOutfits: {
               $addToSet: {
-                $cond: [{ $ne: ['$outfit', null] }, '$outfit', null],
+                $cond: [
+                  {
+                    $and: [
+                      { $ne: ['$outfit', null] },
+                      { $gt: [{ $size: '$matchedOutfit' }, 0] },
+                    ],
+                  },
+                  '$outfit',
+                  null,
+                ],
               },
             },
           },

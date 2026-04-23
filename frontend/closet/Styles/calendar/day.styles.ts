@@ -146,6 +146,10 @@ export const styles = StyleSheet.create({
     padding: 6,
     zIndex: 10,
   },
+  outfitPreviewTap: {
+    width: '100%',
+    alignItems: 'center',
+  },
   outfitImage: {
     width: '90%',
     height: 380,

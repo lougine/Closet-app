@@ -5,6 +5,7 @@ import { ActivityIndicator, Alert, Image, Modal, PanResponder, RefreshControl, S
 import OutfitPreviewCollage from '../../../components/OutfitPreviewCollage';
 import { styles } from '../../../Styles/calendar/day.styles';
 import { COLORS, DAYS_SHORT, getOutfitForDate, getWeekDays, isSameDay, MONTHS, OutfitEntry, toDateKey, useCalendar } from '../../../context/calendar-context';
+import { useWardrobe } from '../../../context/wardrobeContext';
 import { useAppTheme } from '../../../context/themeContext';
 import { getAppTheme } from '../../../constants/appTheme';
 
@@ -35,11 +36,16 @@ export default function DayScreen() {
     loading,
     deleteOutfit,
   } = useCalendar();
+  const { items, refreshItems } = useWardrobe();
 
   const [menuVisible, setMenuVisible] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const outfitPreviewBackground = isDarkMode ? '#1c1c1c' : '#f4f4f4';
   const outfitPreviewEmptyBackground = isDarkMode ? '#2b2b2b' : '#ececec';
+  const previewFallbackItems = items.map((item) => ({
+    id: String(item.id),
+    image: item.image || null,
+  }));
 
   async function handlePullRefresh() {
     if (isRefreshing) return;
@@ -138,6 +144,7 @@ export default function DayScreen() {
           try {
             setMenuVisible(false);
             await deleteOutfit(outfit._id);
+            await refreshItems();
           } catch {
             Alert.alert('Error', 'Could not delete outfit. Try again.');
           }
@@ -163,6 +170,7 @@ export default function DayScreen() {
         name: 'Duplicated outfit',
         previewImage: outfit.previewImage,
       });
+      await refreshItems();
       setSelectedDate(targetDate);
       setCurrentMonth(new Date(targetDate.getFullYear(), targetDate.getMonth(), 1));
       Alert.alert('Saved', 'Outfit duplicated to tomorrow.');
@@ -328,23 +336,16 @@ export default function DayScreen() {
 
         <TouchableOpacity
           activeOpacity={0.9}
+          style={{ width: '100%', alignItems: 'center' }}
           onPress={() => openOutfitDetail(selectedOutfit!)}
         >
-          {selectedOutfit?.previewImage || selectedOutfit?.garments?.some((garment) => garment?.imageUrl)
-            ? (
-              <OutfitPreviewCollage
-                outfit={selectedOutfit}
-                style={styles.outfitImage}
-                previewBackgroundColor={outfitPreviewBackground}
-                emptyBackgroundColor={outfitPreviewEmptyBackground}
-              />
-            )
-            : (
-              <View style={[styles.outfitImage, styles.outfitImagePlaceholder]}>
-                <Ionicons name="shirt-outline" size={48} color={COLORS.lightGray} />
-                <Text style={[styles.outfitSavedText, { color: theme.subText }]}>Outfit saved</Text>
-              </View>
-            )}
+          <OutfitPreviewCollage
+            outfit={selectedOutfit}
+            style={styles.outfitImage}
+            fallbackItems={previewFallbackItems}
+            previewBackgroundColor={outfitPreviewBackground}
+            emptyBackgroundColor={outfitPreviewEmptyBackground}
+          />
         </TouchableOpacity>
 
         <View style={styles.outfitMetaRow}>
