@@ -486,6 +486,27 @@ export const s = StyleSheet.create({
     height: "50%",
     padding: 1,
   },
+  previewFlatLayContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignContent: "flex-start",
+    justifyContent: "space-between",
+    padding: 6,
+    rowGap: 4,
+  },
+  previewFlatLayTile: {
+    height: "48%",
+    borderRadius: 8,
+    overflow: "hidden",
+    backgroundColor: "#f0f0f0",
+    padding: 2,
+  },
+  previewFlatLayTileTwoCol: {
+    width: "49%",
+  },
+  previewFlatLayTileThreeCol: {
+    width: "32%",
+  },
   gridEmpty: {
     width: "100%",
     height: "88%",

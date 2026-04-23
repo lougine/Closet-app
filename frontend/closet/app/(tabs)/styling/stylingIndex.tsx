@@ -718,8 +718,12 @@ export default function StylingScreen() {
       };
 
   const resolveInitialMode = (): Mode => {
-    if (params.mode === "randomize" || params.mode === "discover") return "Randomize";
-    if (params.mode === "create") return "Create outfit";
+    const normalizedMode = String(params.mode || "").trim().toLowerCase();
+    if (normalizedMode === "randomize" || normalizedMode === "discover") return "Randomize";
+    if (normalizedMode === "ai-recommended" || normalizedMode === "ai recommended" || normalizedMode === "ai") {
+      return "AI recommended";
+    }
+    if (normalizedMode === "create") return "Create outfit";
     return "Create outfit";
   };
 
@@ -735,6 +739,25 @@ export default function StylingScreen() {
   const [capturingCreatePreview, setCapturingCreatePreview] = useState(false);
   const { items, incrementOutfitCount } = useWardrobe();
   const createOutfitCanvasRef = useRef<View>(null);
+
+  useEffect(() => {
+    const normalizedMode = String(params.mode || "").trim().toLowerCase();
+    if (!normalizedMode) return;
+
+    if (normalizedMode === "randomize" || normalizedMode === "discover") {
+      setMode("Randomize");
+      return;
+    }
+
+    if (normalizedMode === "ai-recommended" || normalizedMode === "ai recommended" || normalizedMode === "ai") {
+      setMode("AI recommended");
+      return;
+    }
+
+    if (normalizedMode === "create") {
+      setMode("Create outfit");
+    }
+  }, [params.mode]);
 
   const getToken = async () => {
     const token = await SecureStore.getItemAsync("userToken");

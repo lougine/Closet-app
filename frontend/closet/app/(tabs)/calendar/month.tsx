@@ -39,6 +39,9 @@ export default function MonthScreen() {
   const weekHeaderCellWidth = useMemo(() => ({ width: cellSize }), [cellSize]);
   const gridCellSize = useMemo(() => ({ width: cellSize, height: cellSize + 10 }), [cellSize]);
   const thumbSize = useMemo(() => ({ width: cellSize - 8, height: cellSize - 8 }), [cellSize]);
+  const darkFitSurface = isDarkMode ? '#2A2A2A' : undefined;
+  const outfitPreviewBackground = isDarkMode ? '#1c1c1c' : '#f4f4f4';
+  const outfitPreviewEmptyBackground = isDarkMode ? '#2b2b2b' : '#ececec';
 
   const mostWorn = getMostWornThisMonth(outfits, year, month);
   const streak = getStreak(outfitMap);
@@ -187,7 +190,12 @@ export default function MonthScreen() {
               style={[styles.loggedLookCard, { backgroundColor: theme.card, borderColor: theme.border }]}
               onPress={() => openOutfitDetail(outfit)}
             >
-              <OutfitPreviewCollage outfit={outfit} style={styles.loggedLookThumb} />
+              <OutfitPreviewCollage
+                outfit={outfit}
+                style={[styles.loggedLookThumb, darkFitSurface ? { backgroundColor: darkFitSurface } : null]}
+                previewBackgroundColor={outfitPreviewBackground}
+                emptyBackgroundColor={outfitPreviewEmptyBackground}
+              />
               <View style={styles.loggedLookTextWrap}>
                 <Text style={[styles.loggedLookDay, { color: theme.text }]}>
                   {DAYS_SHORT[date.getDay()]} look
@@ -276,7 +284,10 @@ export default function MonthScreen() {
                       style={[
                         styles.gridThumb,
                         thumbSize,
+                        darkFitSurface ? { backgroundColor: darkFitSurface } : null,
                       ]}
+                      previewBackgroundColor={outfitPreviewBackground}
+                      emptyBackgroundColor={outfitPreviewEmptyBackground}
                     />
                   )}
                 </TouchableOpacity>
@@ -289,7 +300,12 @@ export default function MonthScreen() {
 
             <View style={[styles.analyticsCard, { backgroundColor: theme.card }] }>
               {mostWorn ? (
-                <OutfitPreviewCollage outfit={mostWorn.outfit} style={styles.analyticsThumb} />
+                <OutfitPreviewCollage
+                  outfit={mostWorn.outfit}
+                  style={[styles.analyticsThumb, darkFitSurface ? { backgroundColor: darkFitSurface } : null]}
+                  previewBackgroundColor={outfitPreviewBackground}
+                  emptyBackgroundColor={outfitPreviewEmptyBackground}
+                />
               ) : (
                 <View style={styles.analyticsThumbEmpty}>
                   <Ionicons name="shirt-outline" size={22} color={COLORS.lightGray} />
