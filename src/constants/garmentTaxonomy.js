@@ -68,9 +68,30 @@ const ALLOWED_GARMENT_STYLE_TAGS = [
 const ALLOWED_GARMENT_SUBCATEGORY_SET = new Set(ALLOWED_GARMENT_SUBCATEGORIES);
 const ALLOWED_GARMENT_STYLE_TAG_SET = new Set(ALLOWED_GARMENT_STYLE_TAGS);
 
+const ALLOWED_FABRICS = [
+  'cotton',
+  'denim',
+  'leather',
+  'silk',
+  'wool',
+  'polyester',
+  'linen',
+  'velvet',
+  'chiffon',
+  'fleece',
+  'lace',
+  'nylon',
+  'corduroy',
+  'spandex',
+  'satin'
+];
+const ALLOWED_FABRIC_SET = new Set(ALLOWED_FABRICS);
+
 module.exports = {
   ALLOWED_GARMENT_SUBCATEGORIES,
   ALLOWED_GARMENT_STYLE_TAGS,
   ALLOWED_GARMENT_SUBCATEGORY_SET,
   ALLOWED_GARMENT_STYLE_TAG_SET,
+  ALLOWED_FABRICS,
+  ALLOWED_FABRIC_SET,
 };
