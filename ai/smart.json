@@ -1,0 +1,90 @@
+[
+  {
+    "_id": "69a2eeb08d6d71613b34e341",
+    "name": "Classic White T-Shirt",
+    "type": "tshirt",
+    "color": "white",
+    "season": "summer",
+    "occasion": "casual"
+  },
+  {
+    "_id": "69a2eeb08d6d71613b34e342",
+    "name": "Black Cotton T-Shirt",
+    "type": "tshirt",
+    "color": "black",
+    "season": "summer",
+    "occasion": "casual"
+  },
+  {
+    "_id": "69a2eeb08d6d71613b34e343",
+    "name": "Navy Winter T-Shirt",
+    "type": "tshirt",
+    "color": "navy",
+    "season": "winter",
+    "occasion": "casual"
+  },
+  {
+    "_id": "69a2eeb08d6d71613b34e344",
+    "name": "Blue Slim Jeans",
+    "type": "pants",
+    "color": "blue",
+    "season": "summer",
+    "occasion": "casual"
+  },
+  {
+    "_id": "69a2eeb08d6d71613b34e345",
+    "name": "Black Formal Pants",
+    "type": "pants",
+    "color": "black",
+    "season": "winter",
+    "occasion": "formal"
+  },
+  {
+    "_id": "69a2eeb08d6d71613b34e346",
+    "name": "Gray Chinos",
+    "type": "pants",
+    "color": "gray",
+    "season": "summer",
+    "occasion": "casual"
+  },
+  {
+    "_id": "69a2eeb08d6d71613b34e347",
+    "name": "White Sneakers",
+    "type": "shoes",
+    "color": "white",
+    "season": "summer",
+    "occasion": "casual"
+  },
+  {
+    "_id": "69a2eeb08d6d71613b34e348",
+    "name": "Black Leather Shoes",
+    "type": "shoes",
+    "color": "black",
+    "season": "winter",
+    "occasion": "formal"
+  },
+  {
+    "_id": "69a2eeb08d6d71613b34e349",
+    "name": "Brown Boots",
+    "type": "shoes",
+    "color": "brown",
+    "season": "winter",
+    "occasion": "casual"
+  },
+  {
+    "_id": "69a2eeb08d6d71613b34e34a",
+    "name": "Black Classic Suit",
+    "type": "suit",
+    "color": "black",
+    "season": "winter",
+    "occasion": "formal"
+  },
+  {
+    "_id": "69a2eeb08d6d71613b34e34b",
+    "name": "Navy Business Suit",
+    "type": "suit",
+    "color": "navy",
+    "season": "winter",
+    "occasion": "formal"
+  }
+]
