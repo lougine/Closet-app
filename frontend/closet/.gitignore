@@ -40,4 +40,6 @@ app-example
 
 # generated native folders
 /ios
-/android
+# /android is committed because it contains native Unity bridge code
+# android/unityLibrary is excluded (300MB binary — copy from Unity build output)
+/android/unityLibrary

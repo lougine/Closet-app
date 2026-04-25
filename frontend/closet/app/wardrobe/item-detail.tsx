@@ -21,6 +21,7 @@ import {
 import { getAppTheme } from "../../constants/appTheme";
 import { buildApiUrl, buildAuthHeaders, buildImageUrl } from "../../constants/api";
 import { getUploadErrorMessage, uploadMultipartWithRetry } from "../../services/uploadRequest";
+import ARService from "../../services/ARService";
 import { removeBackgroundFromImageUri } from "../../services/removeBackground";
 import { useAppTheme } from "../../context/themeContext";
 import { useWardrobe, type ClothingItem } from "../../context/wardrobeContext";
@@ -920,6 +921,22 @@ export default function ItemDetailScreen() {
               </View>
             </View>
             <View style={[s.divider, { backgroundColor: theme.border }]} />
+
+            <TouchableOpacity
+              style={[s.pinkBtn, s.pinkBtnDetails]}
+              onPress={() => {
+                const category = item.category?.[0] ?? 'Tops';
+                const isBottom = category === 'Bottoms';
+                ARService.openWithProduct({
+                  arCategory: item.subcategory ?? category,
+                  fabricType: item.fabric ?? 'Cotton',
+                  primaryColor: resolveColorHex(item.colors?.[0] ?? '#FFFFFF'),
+                  slot: isBottom ? 'LowerBody' : 'UpperBody',
+                });
+              }}
+            >
+              <Text style={s.pinkBtnText}>Try On</Text>
+            </TouchableOpacity>
 
             <TouchableOpacity
               style={[s.pinkBtn, s.pinkBtnDetails, (savingDetails || deletingItem) && s.disabledOpacity]}
