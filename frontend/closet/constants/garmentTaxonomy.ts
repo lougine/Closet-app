@@ -30,3 +30,23 @@ export const GARMENT_STYLE_TAG_OPTIONS = [
 ] as const;
 
 export const GARMENT_STYLE_TAG_SET = new Set<string>(GARMENT_STYLE_TAG_OPTIONS);
+
+export const GARMENT_FABRIC_OPTIONS = [
+  'cotton',
+  'denim',
+  'leather',
+  'silk',
+  'wool',
+  'polyester',
+  'linen',
+  'velvet',
+  'chiffon',
+  'fleece',
+  'lace',
+  'nylon',
+  'corduroy',
+  'spandex',
+  'satin'
+] as const;
+
+export const GARMENT_FABRIC_SET = new Set<string>(GARMENT_FABRIC_OPTIONS);

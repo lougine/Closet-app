@@ -41,6 +41,11 @@ const garmentSchema = new mongoose.Schema({
     default: null,
   },
 
+  fabric: {
+    type: String,
+    default: null,
+  },
+
   tags: {
     type: [String],
     default: [],

@@ -15,6 +15,8 @@ import {
   GARMENT_SUBCATEGORY_TREE,
   GARMENT_STYLE_TAG_OPTIONS,
   GARMENT_STYLE_TAG_SET,
+  GARMENT_FABRIC_OPTIONS,
+  GARMENT_FABRIC_SET,
 } from "../../constants/garmentTaxonomy";
 import { getAppTheme } from "../../constants/appTheme";
 import { buildApiUrl, buildAuthHeaders, buildImageUrl } from "../../constants/api";
@@ -324,6 +326,7 @@ export default function ItemDetailScreen() {
         brand: item.brand ?? null,
         purchasePrice: typeof item.totalCost === "number" ? item.totalCost : null,
         color: item.colors?.[0] ?? null,
+        fabric: item.fabric ?? null,
       }),
     });
 
@@ -338,6 +341,7 @@ export default function ItemDetailScreen() {
       label: garment.name ?? item.label,
       category: garment.category ? [garment.category] : (item.category ?? []),
       subcategory: garment.subcategory ?? item.subcategory,
+      fabric: garment.fabric ?? item.fabric,
       size: garment.size ?? undefined,
       brand: garment.brand ?? undefined,
       tags: Array.isArray(garment.tags) ? garment.tags : (item.tags ?? []),
@@ -866,6 +870,30 @@ export default function ItemDetailScreen() {
                   </Text>
                 </TouchableOpacity>
               )}
+            </View>
+            <View style={[s.divider, { backgroundColor: theme.border }]} />
+
+            <View>
+              <View style={s.rowBetween}>
+                <Text style={[s.rowLabel, { color: theme.text }]}>Fabric</Text>
+              </View>
+              <View style={s.tagsWrap}>
+                {GARMENT_FABRIC_OPTIONS.map((fabric) => {
+                  const selected = item.fabric?.toLowerCase() === fabric.toLowerCase();
+                  return (
+                    <TouchableOpacity
+                      key={fabric}
+                      style={[
+                        s.addBtn,
+                        selected && s.addBtnActive,
+                      ]}
+                      onPress={() => update({ fabric: selected ? undefined : fabric })}
+                    >
+                      <Text style={[s.addBtnText, selected && s.addBtnTextActive]}>{fabric}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
             </View>
             <View style={[s.divider, { backgroundColor: theme.border }]} />
 

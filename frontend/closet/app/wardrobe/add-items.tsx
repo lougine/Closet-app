@@ -17,6 +17,7 @@ import {
 } from "../../constants/imageUpload";
 import { getAppTheme } from "../../constants/appTheme";
 import { buildApiUrl, buildImageUrl } from "../../constants/api";
+import { GARMENT_FABRIC_OPTIONS } from "../../constants/garmentTaxonomy";
 import { getUploadErrorMessage, UploadRequestError, uploadMultipartWithRetry } from "../../services/uploadRequest";
 import { removeBackgroundFromImageUri } from "../../services/removeBackground";
 import { useAppTheme } from "../../context/themeContext";
@@ -63,6 +64,7 @@ const CATEGORY_BG: Record<string, string> = {
 interface ItemForm {
   category: string; colors: string[]; brand: string;
   size: string; tags: string[]; cost: string; datePurchased: string;
+  fabric?: string;
 }
 
 interface QueuedImage {
@@ -79,6 +81,7 @@ const createInitialForm = (): ItemForm => ({
   tags: [],
   cost: "",
   datePurchased: "",
+  fabric: "",
 });
 
 const TILE_WIDTH = Dimensions.get("window").width - 32;
@@ -463,6 +466,9 @@ export default function AddItemsScreen() {
         formData.append('category', target.form.category);
         if (target.form.colors.length > 0) {
           formData.append('color', target.form.colors[0]);
+        }
+        if (target.form.fabric) {
+          formData.append('fabric', target.form.fabric);
         }
         if (purchasePrice !== null) {
           formData.append('purchasePrice', String(purchasePrice));
@@ -849,6 +855,32 @@ export default function AddItemsScreen() {
           <Section title="Brand" isDarkMode={isDarkMode}>
             <TextInput style={[s.textInput, { borderColor: theme.border, backgroundColor: theme.inputBg, color: theme.text }]} value={form.brand} onChangeText={(v) => update("brand", v)}
               placeholder="e.g. Zara, H&M, Vintage" placeholderTextColor={theme.subText} returnKeyType="done" />
+          </Section>
+
+          <Section title="Fabric" isDarkMode={isDarkMode}>
+            <View style={s.chipRow}>
+              {GARMENT_FABRIC_OPTIONS.map((fabric) => (
+                <TouchableOpacity
+                  key={fabric}
+                  style={[
+                    s.chip,
+                    { backgroundColor: isDarkMode ? "#2A2A2A" : "#fafafa", borderColor: theme.border },
+                    form.fabric === fabric && s.chipActive,
+                  ]}
+                  onPress={() => update("fabric", form.fabric === fabric ? undefined : fabric)}
+                >
+                  <Text
+                    style={[
+                      s.chipText,
+                      { color: isDarkMode ? "#C8C8C8" : "#555" },
+                      form.fabric === fabric && s.chipTextActive,
+                    ]}
+                  >
+                    {fabric}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </Section>
 
           <Section title="Size" isDarkMode={isDarkMode}>
