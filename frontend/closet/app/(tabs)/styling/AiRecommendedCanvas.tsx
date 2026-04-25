@@ -1,6 +1,8 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useMemo, useState } from "react";
 import { ScrollView, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from "react-native";
+import * as SecureStore from "expo-secure-store";
+import { buildApiUrl } from "../../../constants/api";
 import AuthenticatedImage from "../../../components/AuthenticatedImage";
 import { s } from "../../../Styles/styling.styles";
 import { useAppTheme } from "../../../context/themeContext";
@@ -121,11 +123,38 @@ export function useAiRecommendedLogic({
   const loadAiRecommendations = async () => {
     setLoadingAi(true);
     try {
-      const nextRecommendations = buildLocalRecommendations(3);
+      const token = await SecureStore.getItemAsync('userToken');
+      const res = await fetch(buildApiUrl('/api/outfits/recommendations'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          count: 3,
+          event: eventText || inputText,
+          temperatureC: 25, // Mocked or passed dynamically later
+        }),
+      });
+
+      if (!res.ok) throw new Error('Failed to load AI recommendations');
+      
+      const { recommendations: backendRecs } = await res.json();
+      
+      let nextRecommendations = backendRecs;
+      if (!nextRecommendations || nextRecommendations.length === 0) {
+        nextRecommendations = buildLocalRecommendations(3);
+      }
 
       setRecommendations(nextRecommendations);
       setActiveRecommendation(0);
       applyRecommendationAt(0, nextRecommendations);
+    } catch (e) {
+      console.warn("AI Recommendations Error, falling back to local:", e);
+      const fallback = buildLocalRecommendations(3);
+      setRecommendations(fallback);
+      setActiveRecommendation(0);
+      applyRecommendationAt(0, fallback);
     } finally {
       setLoadingAi(false);
     }
@@ -326,15 +355,23 @@ export default function AiRecommendedCanvas(props: Props) {
           <Text style={[s.tempTxt, { color: theme.subText }]}>{temperatureC}°C</Text>
         </View>
         <Text style={[s.eventTxt, { color: theme.text }]}>Event: {inputText.trim() || eventText}</Text>
-        <View style={[s.inputRow, { borderColor: theme.border, backgroundColor: theme.inputBg }] }>
+        <View style={[s.inputRow, { borderColor: theme.border, backgroundColor: theme.inputBg, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, borderWidth: 1, marginTop: 10 }] }>
           <TextInput
-            style={[s.input, { color: theme.text }]}
-            placeholder="Type here or speak"
+            style={[s.input, { color: theme.text, flex: 1, padding: 0 }]}
+            placeholder="Type your event or style here..."
             placeholderTextColor={theme.subText}
             value={inputText}
             onChangeText={setInputText}
+            onSubmitEditing={loadAiRecommendations}
+            returnKeyType="send"
           />
-          <Ionicons name="mic-outline" size={20} color={theme.subText} />
+          <TouchableOpacity onPress={loadAiRecommendations} disabled={loadingAi} style={{ marginLeft: 10 }}>
+            {loadingAi ? (
+              <MaterialCommunityIcons name="loading" size={20} color={theme.subText} />
+            ) : (
+              <Ionicons name="send" size={20} color={"#1E88E5"} />
+            )}
+          </TouchableOpacity>
         </View>
         {recommendations[activeRecommendation]?.reason ? (
           <Text style={[s.recommendationReason, { color: theme.subText }]}>

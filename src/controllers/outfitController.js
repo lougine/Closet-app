@@ -7,6 +7,7 @@ const CommunityPost = require('../models/communityPost');
 const { createImageUpload } = require('../middleware/imageUploadMiddleware');
 const { deleteImageByUrl } = require('../utils/imageFileUtils');
 const { buildImageMetadata } = require('../utils/imageMetadata');
+const { generateScoredOutfits } = require('../services/aiRecommendationService');
 
 const DEFAULT_RANDOMIZE_COUNT = 4;
 const MAX_STYLING_COUNT = 8;
@@ -625,65 +626,31 @@ exports.getAiRecommendations = async (req, res) => {
       return res.json({ recommendations: [], context: { event, temperatureC: parsedTemperature } });
     }
 
-    const context = {
-      seasons: deriveSeasonPreference(parsedTemperature),
-      isFormalEvent: /wedding|formal|office|meeting|business|interview|ceremony/i.test(event),
+    const currentSeason = deriveSeasonPreference(parsedTemperature)[0] || 'mild';
+    const recommendationContext = {
+      currentSeason,
+      favoriteColors: [],
+      dislikedItemNames: [],
+      likedItemNames: [],
     };
 
-    const scored = garments
-      .map((garment) => {
-        const result = scoreGarment(garment, context);
-        return {
-          garment,
-          score: result.score,
-          reasons: result.reasons,
-        };
-      })
-      .sort((a, b) => b.score - a.score || String(a.garment.name).localeCompare(String(b.garment.name)));
-
-    const topPool = scored.slice(0, Math.max(count * 4, DEFAULT_RANDOMIZE_COUNT));
-    const recommendationCount = Math.min(count, 5);
-    const recommendations = [];
-    const seenCombos = new Set();
-
-    for (let i = 0; i < recommendationCount; i += 1) {
-      const poolSlice = topPool.slice(i, i + 8).map((entry) => entry.garment);
-      const sourcePool = poolSlice.length > 0 ? poolSlice : topPool.map((entry) => entry.garment);
-      const selected = buildBalancedOutfit(sourcePool, Math.min(DEFAULT_RANDOMIZE_COUNT, sourcePool.length));
-      const comboKey = selected
-        .map((g) => g._id.toString())
-        .sort()
-        .join(':');
-
-      if (!comboKey || seenCombos.has(comboKey)) {
-        continue;
-      }
-      seenCombos.add(comboKey);
-
-      const selectedScores = selected.map((garment) => (
-        scored.find((entry) => entry.garment._id.toString() === garment._id.toString())
-      )).filter(Boolean);
-
-      const totalScore = selectedScores.reduce((sum, entry) => sum + entry.score, 0);
-      const reasonSet = new Set(selectedScores.flatMap((entry) => entry.reasons));
-
-      recommendations.push({
-        name: `${event ? `${event} ` : ''}Look ${recommendations.length + 1}`.trim(),
-        score: totalScore,
-        reason: reasonSet.size > 0
-          ? Array.from(reasonSet).slice(0, 3).join(', ')
-          : 'balanced outfit from your wardrobe',
-        garments: selected.map(mapGarment),
-      });
-    }
+    const aiOutfits = generateScoredOutfits(garments, recommendationContext, count);
+    
+    // Map to expected format
+    const recommendations = aiOutfits.map((outfit, index) => ({
+      name: `${event ? `${event} ` : ''}Look ${index + 1}`.trim(),
+      score: outfit.score,
+      reason: outfit.reason || 'AI selected based on style and color harmony.',
+      garments: outfit.garments.filter(Boolean).map(mapGarment),
+    }));
 
     return res.json({
       recommendations,
       context: {
         event,
         temperatureC: parsedTemperature,
-        interpretedSeasons: context.seasons,
-        formalEventDetected: context.isFormalEvent,
+        interpretedSeasons: deriveSeasonPreference(parsedTemperature),
+        formalEventDetected: /wedding|formal|office|meeting|business|interview|ceremony/i.test(event),
       },
     });
   } catch (error) {
