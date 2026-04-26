@@ -2,7 +2,7 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useMemo, useState } from "react";
 import { ScrollView, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from "react-native";
 import * as SecureStore from "expo-secure-store";
-import { buildApiUrl } from "../../../constants/api";
+import { buildAuthHeaders, fetchApiWithFallback } from "../../../constants/api";
 import AuthenticatedImage from "../../../components/AuthenticatedImage";
 import { s } from "../../../Styles/styling.styles";
 import { useAppTheme } from "../../../context/themeContext";
@@ -24,6 +24,12 @@ export type Recommendation = {
   garments: RecommendationGarment[];
 };
 
+type ChatMessage = {
+  id: string;
+  role: "assistant" | "user";
+  content: string;
+};
+
 type WardrobeItem = {
   id: string | number;
   _id?: string;
@@ -38,7 +44,16 @@ type UseAiRecommendedLogicParams = {
   inputText: string;
   eventText: string;
   setSelected: React.Dispatch<React.SetStateAction<string[]>>;
+  setInputText: React.Dispatch<React.SetStateAction<string>>;
 };
+
+const buildInitialChatMessages = (eventText: string): ChatMessage[] => [
+  {
+    id: "assistant-welcome",
+    role: "assistant",
+    content: `Ask me what to wear for ${eventText || "an event"}, or describe the vibe you want.`,
+  },
+];
 
 export function useAiRecommendedLogic({
   items,
@@ -46,11 +61,13 @@ export function useAiRecommendedLogic({
   inputText,
   eventText,
   setSelected,
+  setInputText,
 }: UseAiRecommendedLogicParams) {
   const [loadingAi, setLoadingAi] = useState(false);
   const [aiShowcaseOpen, setAiShowcaseOpen] = useState(false);
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [activeRecommendation, setActiveRecommendation] = useState(0);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => buildInitialChatMessages(eventText));
 
   const applyRecommendationAt = (index: number, next: Recommendation[]) => {
     if (!next[index]) {
@@ -124,23 +141,23 @@ export function useAiRecommendedLogic({
     setLoadingAi(true);
     try {
       const token = await SecureStore.getItemAsync('userToken');
-      const res = await fetch(buildApiUrl('/api/outfits/recommendations'), {
+      const res = await fetchApiWithFallback('/api/outfits/recommendations', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
+          ...buildAuthHeaders(token),
         },
         body: JSON.stringify({
           count: 3,
           event: eventText || inputText,
-          temperatureC: 25, // Mocked or passed dynamically later
+          temperatureC: 25,
         }),
       });
 
       if (!res.ok) throw new Error('Failed to load AI recommendations');
-      
+
       const { recommendations: backendRecs } = await res.json();
-      
+
       let nextRecommendations = backendRecs;
       if (!nextRecommendations || nextRecommendations.length === 0) {
         nextRecommendations = buildLocalRecommendations(3);
@@ -155,6 +172,120 @@ export function useAiRecommendedLogic({
       setRecommendations(fallback);
       setActiveRecommendation(0);
       applyRecommendationAt(0, fallback);
+    } finally {
+      setLoadingAi(false);
+    }
+  };
+
+  const buildAssistantReplyFromRecommendations = (nextRecommendations: Recommendation[], message: string) => {
+    const topRecommendation = nextRecommendations[0];
+    const topGarments = topRecommendation?.garments || [];
+    const garmentNames = topGarments
+      .map((garment) => garment.name || garment.category)
+      .filter(Boolean)
+      .slice(0, 3)
+      .join(', ');
+
+    if (topRecommendation && garmentNames) {
+      return `${topRecommendation.reason || 'Here is a stronger option for your look.'} I would start with ${garmentNames}.`;
+    }
+
+    return `I looked at ${message.toLowerCase().includes('office') ? 'your outfit for work' : 'your wardrobe'} and refreshed the strongest matching looks.`;
+  };
+
+  const sendStyleMessage = async () => {
+    const message = inputText.trim() || eventText.trim();
+    if (!message || loadingAi) return;
+
+    const userMessage: ChatMessage = {
+      id: `user-${Date.now()}`,
+      role: 'user',
+      content: message,
+    };
+
+    const nextMessages = [...chatMessages, userMessage];
+    setChatMessages(nextMessages);
+    setLoadingAi(true);
+    setInputText('');
+
+    try {
+      const token = await SecureStore.getItemAsync('userToken');
+      const chatResponse = await fetchApiWithFallback('/api/outfits/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...buildAuthHeaders(token),
+        },
+        body: JSON.stringify({
+          message,
+          event: eventText,
+          temperatureC: 25,
+          count: 3,
+          messages: nextMessages.slice(-8).map((entry) => ({
+            role: entry.role,
+            content: entry.content,
+          })),
+        }),
+      });
+
+      let payload: any = null;
+      if (chatResponse.ok) {
+        payload = await chatResponse.json();
+      } else {
+        const fallbackResponse = await fetchApiWithFallback('/api/outfits/recommendations', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...buildAuthHeaders(token),
+          },
+          body: JSON.stringify({
+            count: 3,
+            event: eventText || message,
+            temperatureC: 25,
+          }),
+        });
+
+        if (!fallbackResponse.ok) {
+          throw new Error('Failed to reach styling endpoints');
+        }
+
+        const fallbackPayload = await fallbackResponse.json();
+        payload = {
+          reply: buildAssistantReplyFromRecommendations(fallbackPayload?.recommendations || [], message),
+          recommendations: fallbackPayload?.recommendations || [],
+        };
+      }
+
+      const replyText = String(payload?.reply || '').trim() || 'I can help refine that look.';
+
+      setChatMessages((current) => ([
+        ...current,
+        {
+          id: `assistant-${Date.now()}`,
+          role: 'assistant',
+          content: replyText,
+        },
+      ]));
+
+      if (Array.isArray(payload?.recommendations) && payload.recommendations.length > 0) {
+        setRecommendations(payload.recommendations);
+        setActiveRecommendation(0);
+        applyRecommendationAt(0, payload.recommendations);
+      }
+    } catch (error) {
+      console.warn('Style chat Error, falling back to recommendations:', error);
+      const fallback = buildLocalRecommendations(3);
+      setRecommendations(fallback);
+      setActiveRecommendation(0);
+      applyRecommendationAt(0, fallback);
+      setChatMessages((current) => ([
+        ...current,
+        {
+          id: `assistant-fallback-${Date.now()}`,
+          role: 'assistant',
+          content: 'I could not reach the styling service, so I refreshed the outfit suggestions locally.',
+        },
+      ]));
     } finally {
       setLoadingAi(false);
     }
@@ -218,6 +349,7 @@ export function useAiRecommendedLogic({
     setRecommendations([]);
     setActiveRecommendation(0);
     setAiShowcaseOpen(false);
+    setChatMessages(buildInitialChatMessages(eventText));
   };
 
   return {
@@ -230,6 +362,8 @@ export function useAiRecommendedLogic({
     selectedGridColumns,
     aiShowcaseDisplayItems,
     loadAiRecommendations,
+    sendStyleMessage,
+    chatMessages,
     resetAiState,
   };
 }
@@ -251,6 +385,8 @@ type Props = {
   temperatureC: number;
   recommendations: Array<{ reason?: string }>;
   activeRecommendation: number;
+  chatMessages: ChatMessage[];
+  sendStyleMessage: () => void;
 };
 
 export default function AiRecommendedCanvas(props: Props) {
@@ -288,6 +424,8 @@ export default function AiRecommendedCanvas(props: Props) {
     temperatureC,
     recommendations,
     activeRecommendation,
+    chatMessages,
+    sendStyleMessage,
   } = props;
 
   return (
@@ -354,18 +492,34 @@ export default function AiRecommendedCanvas(props: Props) {
         <View style={s.tempRow}>
           <Text style={[s.tempTxt, { color: theme.subText }]}>{temperatureC}°C</Text>
         </View>
-        <Text style={[s.eventTxt, { color: theme.text }]}>Event: {inputText.trim() || eventText}</Text>
+        <Text style={[s.eventTxt, { color: theme.text }]}>Style chat</Text>
+        <View style={s.chatThread}>
+          {chatMessages.map((message) => (
+            <View
+              key={message.id}
+              style={[
+                s.chatBubble,
+                message.role === 'user' ? s.chatBubbleUser : s.chatBubbleAssistant,
+                { backgroundColor: message.role === 'user' ? '#1E88E5' : (isDarkMode ? '#2A2A2A' : '#F7F7F7') },
+              ]}
+            >
+              <Text style={[s.chatBubbleText, { color: message.role === 'user' ? '#fff' : theme.text }]}>
+                {message.content}
+              </Text>
+            </View>
+          ))}
+        </View>
         <View style={[s.inputRow, { borderColor: theme.border, backgroundColor: theme.inputBg, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, borderWidth: 1, marginTop: 10 }] }>
           <TextInput
             style={[s.input, { color: theme.text, flex: 1, padding: 0 }]}
-            placeholder="Type your event or style here..."
+            placeholder="Ask for outfit advice or a vibe..."
             placeholderTextColor={theme.subText}
             value={inputText}
             onChangeText={setInputText}
-            onSubmitEditing={loadAiRecommendations}
+            onSubmitEditing={sendStyleMessage}
             returnKeyType="send"
           />
-          <TouchableOpacity onPress={loadAiRecommendations} disabled={loadingAi} style={{ marginLeft: 10 }}>
+          <TouchableOpacity onPress={sendStyleMessage} disabled={loadingAi} style={{ marginLeft: 10 }}>
             {loadingAi ? (
               <MaterialCommunityIcons name="loading" size={20} color={theme.subText} />
             ) : (

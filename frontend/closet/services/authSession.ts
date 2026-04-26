@@ -1,5 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
-import { buildApiUrl } from '@/constants/api';
+import { fetchApiWithFallback } from '@/constants/api';
 
 const USER_TOKEN_KEY = 'userToken';
 
@@ -12,10 +12,13 @@ export async function persistAuthTokenAndHydrateWardrobe(
 }
 
 export async function exchangeGoogleAccessTokenForAppToken(accessToken: string) {
-  const response = await fetch(buildApiUrl('/api/auth/google/exchange'), {
+  const response = await fetchApiWithFallback('/api/auth/google/exchange', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ accessToken }),
+  }, {
+    timeoutMs: 15000,
+    retries: 1,
   });
 
   if (!response.ok) {

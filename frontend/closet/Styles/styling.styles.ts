@@ -410,6 +410,28 @@ export const s = StyleSheet.create({
     color: "#1a1a1a", 
     marginBottom: 14 
   },
+  chatThread: {
+    gap: 8,
+    maxHeight: 176,
+    marginBottom: 6,
+  },
+  chatBubble: {
+    maxWidth: "92%",
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  chatBubbleAssistant: {
+    alignSelf: "flex-start",
+  },
+  chatBubbleUser: {
+    alignSelf: "flex-end",
+  },
+  chatBubbleText: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: "500",
+  },
   inputRow:{
     flexDirection: "row", 
     alignItems: "center",

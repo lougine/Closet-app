@@ -5,7 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import * as WebBrowser from 'expo-web-browser';
 import React, { useEffect, useState } from 'react';
 import { Alert, Image, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { buildApiUrl } from "@/constants/api";
+import { fetchApiWithFallback } from "@/constants/api";
 import { useWardrobe } from '../../context/wardrobeContext';
 import {
   exchangeGoogleAccessTokenForAppToken,
@@ -76,7 +76,7 @@ export default function SignUpScreen() {
 
     try {
       setLoading(true);
-      const res = await fetch(buildApiUrl('/api/auth/register'), {
+      const res = await fetchApiWithFallback('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -84,6 +84,9 @@ export default function SignUpScreen() {
           email: normalizedEmail,
           password,
         }),
+      }, {
+        timeoutMs: 15000,
+        retries: 1,
       });
 
       if (!res.ok) {

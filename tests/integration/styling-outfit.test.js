@@ -37,6 +37,7 @@ beforeAll(async () => {
   mongoServer = await MongoMemoryServer.create();
   process.env.MONGO_URI = mongoServer.getUri();
   process.env.JWT_SECRET = 'test-secret';
+  process.env.GROQ_API_KEY = '';
 
   app = require('../../src/app');
   await waitForConnection();
@@ -185,5 +186,52 @@ describe('Styling outfit endpoints', () => {
 
     expect(response.status).toBe(400);
     expect(response.body.message).toMatch(/temperatureC/i);
+  });
+
+  test('POST /api/outfits/chat returns a style reply and recommendations', async () => {
+    const user = await createUser();
+
+    await Garment.insertMany([
+      {
+        owner: user._id,
+        name: 'White Shirt',
+        category: 'Tops',
+        color: 'White',
+        season: 'spring',
+      },
+      {
+        owner: user._id,
+        name: 'Black Trousers',
+        category: 'Bottoms',
+        color: 'Black',
+        season: 'spring',
+      },
+      {
+        owner: user._id,
+        name: 'Black Loafers',
+        category: 'Footwear',
+        color: 'Black',
+        season: 'spring',
+      },
+    ]);
+
+    const response = await request(app)
+      .post('/api/outfits/chat')
+      .set(authHeader(user._id.toString()))
+      .send({
+        message: 'What should I wear to an office meeting?',
+        event: 'Office meeting',
+        temperatureC: 18,
+        messages: [
+          { role: 'user', content: 'What should I wear to an office meeting?' },
+        ],
+      });
+
+    expect(response.status).toBe(200);
+    expect(typeof response.body.reply).toBe('string');
+    expect(response.body.reply.length).toBeGreaterThan(0);
+    expect(Array.isArray(response.body.recommendations)).toBe(true);
+    expect(response.body.recommendations.length).toBeGreaterThan(0);
+    expect(response.body.context.event).toBe('Office meeting');
   });
 });

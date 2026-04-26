@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import * as SecureStore from "expo-secure-store";
-import { buildApiUrl, buildImageUrl } from "../constants/api";
+import { buildImageUrl, fetchApiWithFallback } from "../constants/api";
 import { fetchCurrentUserProfile } from "@/services/userProfileService";
 
 const LOOKBOOK_IDS_KEY = "lookbookIds";
@@ -83,10 +83,13 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
     let page = 1;
 
     while (true) {
-      const response = await fetch(buildApiUrl(`/api/garments?page=${page}&limit=${GARMENTS_PAGE_SIZE}`), {
+      const response = await fetchApiWithFallback(`/api/garments?page=${page}&limit=${GARMENTS_PAGE_SIZE}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
+      }, {
+        timeoutMs: 12000,
+        retries: 1,
       });
 
       if (!response.ok) {
@@ -123,10 +126,13 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
 
       const [garmentsResult, outfitsResponse] = await Promise.all([
         fetchAllGarments(token),
-        fetch(buildApiUrl('/api/outfits'), {
+        fetchApiWithFallback('/api/outfits', {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
+        }, {
+          timeoutMs: 12000,
+          retries: 1,
         }),
       ]);
 

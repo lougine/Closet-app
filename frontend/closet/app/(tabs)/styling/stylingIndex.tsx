@@ -849,6 +849,8 @@ export default function StylingScreen() {
     selectedGridColumns,
     aiShowcaseDisplayItems,
     loadAiRecommendations,
+    sendStyleMessage,
+    chatMessages,
     resetAiState,
   } = useAiRecommendedLogic({
     items,
@@ -856,6 +858,7 @@ export default function StylingScreen() {
     inputText,
     eventText,
     setSelected,
+    setInputText,
   });
 
   const handleModeChange = (nextMode: Mode) => {
@@ -1162,6 +1165,8 @@ export default function StylingScreen() {
             temperatureC={temperatureC}
             recommendations={recommendations}
             activeRecommendation={activeRecommendation}
+            chatMessages={chatMessages}
+            sendStyleMessage={sendStyleMessage}
           />
         ) : mode === "Randomize" ? (
           <RandomizeCanvas
