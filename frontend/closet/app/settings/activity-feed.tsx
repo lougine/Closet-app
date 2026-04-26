@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from 'rea
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
-import { buildApiUrl, buildAuthHeaders } from '@/constants/api';
+import { buildApiUrl, buildAuthHeaders, fetchApiWithFallback } from '@/constants/api';
 import { COLORS } from '@/constants/theme';
 import { getAppTheme } from '@/constants/appTheme';
 import { useAppTheme } from '@/context/themeContext';
@@ -48,9 +48,9 @@ export default function ActivityFeedScreen() {
   async function fetchActivity() {
     try {
       const token = await SecureStore.getItemAsync('userToken');
-      const res = await fetch(buildApiUrl('/api/users/me/activity'), {
+      const res = await fetchApiWithFallback('/api/users/me/activity', {
         headers: buildAuthHeaders(token),
-      });
+      }, { timeoutMs: 12000, retries: 1 });
       const data = await res.json();
       setActivities(data);
     } catch (e) {

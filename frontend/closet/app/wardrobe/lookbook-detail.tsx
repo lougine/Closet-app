@@ -20,7 +20,7 @@ import {
   IMAGE_UPLOAD_QUALITY,
   validateImageFileSize,
 } from "../../constants/imageUpload";
-import { buildApiUrl, buildAuthHeaders, buildImageUrl } from "../../constants/api";
+import { buildApiUrl, buildAuthHeaders, buildImageUrl, fetchApiWithFallback } from "../../constants/api";
 import { useWardrobe } from "../../context/wardrobeContext";
 import { UploadRequestError, getUploadErrorMessage, uploadMultipartWithRetry } from "../../services/uploadRequest";
 
@@ -165,7 +165,7 @@ export default function LookbookDetailScreen() {
         return;
       }
 
-      const response = await fetch(buildApiUrl(`/api/outfits/${lookbook._id}`), {
+      const response = await fetchApiWithFallback(`/api/outfits/${lookbook._id}`, {
         method: "PUT",
         headers: {
           ...buildAuthHeaders(token),
@@ -175,7 +175,7 @@ export default function LookbookDetailScreen() {
           garments: draftGarmentIds,
           isLookbook: true,
         }),
-      });
+      }, { timeoutMs: 15000, retries: 1 });
 
       if (!response.ok) {
         const errorPayload = await response.json().catch(() => ({}));
@@ -207,7 +207,7 @@ export default function LookbookDetailScreen() {
         return;
       }
 
-      const response = await fetch(buildApiUrl(`/api/outfits/${lookbook._id}`), {
+      const response = await fetchApiWithFallback(`/api/outfits/${lookbook._id}`, {
         method: "PUT",
         headers: {
           ...buildAuthHeaders(token),
@@ -217,7 +217,7 @@ export default function LookbookDetailScreen() {
           garments: nextGarments,
           isLookbook: true,
         }),
-      });
+      }, { timeoutMs: 15000, retries: 1 });
 
       if (!response.ok) {
         const errorPayload = await response.json().catch(() => ({}));
@@ -251,14 +251,14 @@ export default function LookbookDetailScreen() {
         return;
       }
 
-      const response = await fetch(buildApiUrl(`/api/outfits/${lookbook._id}`), {
+      const response = await fetchApiWithFallback(`/api/outfits/${lookbook._id}`, {
         method: "PUT",
         headers: {
           ...buildAuthHeaders(token),
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ previewImage: nextCoverImage, isLookbook: true }),
-      });
+      }, { timeoutMs: 15000, retries: 1 });
 
       if (!response.ok) {
         const errorPayload = await response.json().catch(() => ({}));
@@ -370,14 +370,14 @@ export default function LookbookDetailScreen() {
         return;
       }
 
-      const response = await fetch(buildApiUrl(`/api/outfits/${lookbook._id}`), {
+      const response = await fetchApiWithFallback(`/api/outfits/${lookbook._id}`, {
         method: "PUT",
         headers: {
           ...buildAuthHeaders(token),
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ name: trimmed, isLookbook: true }),
-      });
+      }, { timeoutMs: 15000, retries: 1 });
 
       if (!response.ok) {
         const errorPayload = await response.json().catch(() => ({}));
@@ -412,10 +412,10 @@ export default function LookbookDetailScreen() {
               return;
             }
 
-            const response = await fetch(buildApiUrl(`/api/outfits/${lookbook._id}`), {
+            const response = await fetchApiWithFallback(`/api/outfits/${lookbook._id}`, {
               method: "DELETE",
               headers: buildAuthHeaders(token),
-            });
+            }, { timeoutMs: 15000, retries: 1 });
 
             if (!response.ok) {
               const errorPayload = await response.json().catch(() => ({}));

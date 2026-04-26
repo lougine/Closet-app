@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, ScrollView, Switch, Alert, ActivityIndica
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
-import { buildApiUrl, buildAuthHeaders } from '@/constants/api';
+import { buildApiUrl, buildAuthHeaders, fetchApiWithFallback } from '@/constants/api';
 import { COLORS } from '@/constants/theme';
 import { getAppTheme } from '@/constants/appTheme';
 import { useAppTheme } from '@/context/themeContext';
@@ -53,9 +53,9 @@ export default function NotificationsScreen() {
   async function fetchSettings() {
     try {
       const token = await SecureStore.getItemAsync('userToken');
-      const res = await fetch(buildApiUrl('/api/users/me/notifications'), {
+      const res = await fetchApiWithFallback('/api/users/me/notifications', {
         headers: buildAuthHeaders(token),
-      });
+      }, { timeoutMs: 12000, retries: 1 });
       const data = await res.json();
       setSettings({
         dailyOutfitReminder: Boolean(data?.dailyOutfitReminder),
@@ -81,14 +81,14 @@ export default function NotificationsScreen() {
 
     try {
       const token = await SecureStore.getItemAsync('userToken');
-      await fetch(buildApiUrl('/api/users/me/notifications'), {
+      await fetchApiWithFallback('/api/users/me/notifications', {
         method: 'PUT',
         headers: {
           ...buildAuthHeaders(token),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(updated),
-      });
+      }, { timeoutMs: 12000, retries: 1 });
     } catch (e) {
       setSettings(previous);
       Alert.alert('Error', 'Could not update notification setting.');

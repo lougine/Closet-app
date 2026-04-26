@@ -5,7 +5,7 @@ import * as SecureStore from "expo-secure-store";
 import { Alert, Dimensions, FlatList, StatusBar, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AuthenticatedImage from "../../components/AuthenticatedImage";
-import { buildApiUrl, buildAuthHeaders } from "../../constants/api";
+import { buildAuthHeaders, fetchApiWithFallback } from "../../constants/api";
 import { getAppTheme } from "../../constants/appTheme";
 import { useAppTheme } from "../../context/themeContext";
 import { useWardrobe } from "../../context/wardrobeContext";
@@ -63,7 +63,7 @@ export default function LookbookScreen() {
 
     setSaving(true);
     try {
-      const response = await fetch(buildApiUrl("/api/outfits"), {
+      const response = await fetchApiWithFallback("/api/outfits", {
         method: "POST",
         headers: {
           ...buildAuthHeaders(token),
@@ -75,7 +75,7 @@ export default function LookbookScreen() {
           date: new Date().toISOString(),
           isLookbook: true,
         }),
-      });
+      }, { timeoutMs: 20000, retries: 1 });
 
       if (!response.ok) {
         const errorPayload = await response.json().catch(() => ({}));

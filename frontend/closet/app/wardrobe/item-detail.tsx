@@ -19,7 +19,7 @@ import {
   GARMENT_FABRIC_SET,
 } from "../../constants/garmentTaxonomy";
 import { getAppTheme } from "../../constants/appTheme";
-import { buildApiUrl, buildAuthHeaders, buildImageUrl } from "../../constants/api";
+import { buildApiUrl, buildAuthHeaders, buildImageUrl, fetchApiWithFallback } from "../../constants/api";
 import { getUploadErrorMessage, uploadMultipartWithRetry } from "../../services/uploadRequest";
 import ARService from "../../services/ARService";
 import { removeBackgroundFromImageUri } from "../../services/removeBackground";
@@ -170,9 +170,9 @@ export default function ItemDetailScreen() {
         return;
       }
 
-      const response = await fetch(buildApiUrl("/api/outfits"), {
+      const response = await fetchApiWithFallback("/api/outfits", {
         headers: buildAuthHeaders(token),
-      });
+      }, { timeoutMs: 12000, retries: 1 });
 
       if (!response.ok) {
         setRelatedOutfits([]);
@@ -271,14 +271,14 @@ export default function ItemDetailScreen() {
       throw new Error("Session expired. Please log in again.");
     }
 
-    const response = await fetch(buildApiUrl(`/api/garments/${item.id}`), {
+    const response = await fetchApiWithFallback(`/api/garments/${item.id}`, {
       method: "PUT",
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ color: nextColor ?? null }),
-    });
+    }, { timeoutMs: 12000, retries: 1 });
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ message: "Unable to update color." }));
@@ -314,7 +314,7 @@ export default function ItemDetailScreen() {
       throw new Error("Session expired. Please log in again.");
     }
 
-    const response = await fetch(buildApiUrl(`/api/garments/${item.id}`), {
+    const response = await fetchApiWithFallback(`/api/garments/${item.id}`, {
       method: "PUT",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -360,14 +360,14 @@ export default function ItemDetailScreen() {
       throw new Error("Session expired. Please log in again.");
     }
 
-    const response = await fetch(buildApiUrl(`/api/garments/${item.id}/subcategory`), {
+    const response = await fetchApiWithFallback(`/api/garments/${item.id}/subcategory`, {
       method: "PATCH",
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ subcategory: item.subcategory ?? null }),
-    });
+    }, { timeoutMs: 12000, retries: 1 });
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ message: "Unable to update subcategory." }));
@@ -389,14 +389,14 @@ export default function ItemDetailScreen() {
       ),
     );
 
-    const response = await fetch(buildApiUrl(`/api/garments/${item.id}/tags`), {
+    const response = await fetchApiWithFallback(`/api/garments/${item.id}/tags`, {
       method: "PATCH",
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ tags: sanitizedTags }),
-    });
+    }, { timeoutMs: 12000, retries: 1 });
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ message: "Unable to update tags." }));
@@ -429,12 +429,12 @@ export default function ItemDetailScreen() {
       }
 
       setDeletingItem(true);
-      const response = await fetch(buildApiUrl(`/api/garments/${item.id}`), {
+      const response = await fetchApiWithFallback(`/api/garments/${item.id}`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${token}`,
         },
-      });
+      }, { timeoutMs: 12000, retries: 1 });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: "Unable to delete item." }));
@@ -462,14 +462,14 @@ export default function ItemDetailScreen() {
 
       setMarkingWorn(true);
 
-      const response = await fetch(buildApiUrl('/api/usage/log'), {
+      const response = await fetchApiWithFallback('/api/usage/log', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ garmentId: item.id }),
-      });
+      }, { timeoutMs: 12000, retries: 1 });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: 'Unable to log wear event' }));
