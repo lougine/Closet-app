@@ -1,5 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
-import { buildApiUrl, buildAuthHeaders, buildImageUrl } from '@/constants/api';
+import { buildApiUrl, buildAuthHeaders, buildImageUrl, fetchApiWithFallback } from '@/constants/api';
 import { uploadMultipartWithRetry } from '@/services/uploadRequest';
 
 export type UserProfile = {
@@ -139,8 +139,11 @@ function normalizePublicUserPost(payload: any): PublicUserPost {
 export async function fetchCurrentUserProfile(): Promise<UserProfile> {
   const token = await getRequiredToken();
 
-  const res = await fetch(buildApiUrl('/api/users/me'), {
+  const res = await fetchApiWithFallback('/api/users/me', {
     headers: buildAuthHeaders(token),
+  }, {
+    timeoutMs: 12000,
+    retries: 1,
   });
 
   const payload = await parseResponse(res, 'Failed to load profile.');
@@ -273,13 +276,16 @@ export async function updateProfileDetails({
 }): Promise<UserProfile> {
   const token = await getRequiredToken();
 
-  const res = await fetch(buildApiUrl('/api/users/me'), {
+  const res = await fetchApiWithFallback('/api/users/me', {
     method: 'PUT',
     headers: {
       ...buildAuthHeaders(token),
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ name, email }),
+  }, {
+    timeoutMs: 12000,
+    retries: 1,
   });
 
   const payload = await parseResponse(res, 'Failed to update profile details.');
@@ -289,13 +295,16 @@ export async function updateProfileDetails({
 export async function updateDisplayName(name: string): Promise<UserProfile> {
   const token = await getRequiredToken();
 
-  const res = await fetch(buildApiUrl('/api/users/me'), {
+  const res = await fetchApiWithFallback('/api/users/me', {
     method: 'PUT',
     headers: {
       ...buildAuthHeaders(token),
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ name }),
+  }, {
+    timeoutMs: 12000,
+    retries: 1,
   });
 
   const payload = await parseResponse(res, 'Failed to update profile name.');
@@ -339,13 +348,16 @@ export function uploadBannerImage(uri: string): Promise<UserProfile> {
 export async function saveBannerPreset(bannerPreset: string): Promise<UserProfile> {
   const token = await getRequiredToken();
 
-  const res = await fetch(buildApiUrl('/api/users/me/banner-preset'), {
+  const res = await fetchApiWithFallback('/api/users/me/banner-preset', {
     method: 'PUT',
     headers: {
       ...buildAuthHeaders(token),
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ bannerPreset }),
+  }, {
+    timeoutMs: 12000,
+    retries: 1,
   });
 
   const payload = await parseResponse(res, 'Failed to save banner preset.');

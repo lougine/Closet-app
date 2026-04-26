@@ -1,5 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
-import { buildApiUrl, buildAuthHeaders, buildImageUrl } from '@/constants/api';
+import { buildAuthHeaders, buildImageUrl, fetchApiWithFallback } from '@/constants/api';
 
 export type SocialUser = {
   _id: string;
@@ -65,7 +65,10 @@ async function fetchWithRouteFallback(
   let lastResponse: Response | null = null;
 
   for (const path of paths) {
-    const res = await fetch(buildApiUrl(path), init);
+    const res = await fetchApiWithFallback(path, init, {
+      timeoutMs: 12000,
+      retries: 1,
+    });
     lastResponse = res;
 
     if (res.status !== 404) {

@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import * as SecureStore from 'expo-secure-store';
 import AuthenticatedImage from '@/components/AuthenticatedImage';
-import { buildApiUrl, buildAuthHeaders, buildImageUrl } from '@/constants/api';
+import { buildAuthHeaders, buildImageUrl, fetchApiWithFallback } from '@/constants/api';
 import { COLORS } from '@/constants/theme';
 import { useAppTheme } from '@/context/themeContext';
 import Svg, { Circle, G, Path, Text as SvgText,} from 'react-native-svg';
@@ -167,7 +167,10 @@ export default function AnalyticsScreen() {
 
       const token = await SecureStore.getItemAsync('userToken');
       const headers = buildAuthHeaders(token);
-      const trendsRes = await fetch(buildApiUrl(`/api/analytics/usage-trends?months=${months}`), { headers });
+      const trendsRes = await fetchApiWithFallback(`/api/analytics/usage-trends?months=${months}`, { headers }, {
+        timeoutMs: 12000,
+        retries: 1,
+      });
       setUsageTrends(await parseJsonOrThrow(trendsRes, 'Usage trends'));
       setSelectedTrendMonths(months);
 
@@ -194,13 +197,13 @@ export default function AnalyticsScreen() {
       }));
 
       const [overviewRes, catRes, colourRes, mostRes, leastRes, neverRes, costRes] = await Promise.all([
-        fetch(buildApiUrl('/api/analytics/overview'), { headers }),
-        fetch(buildApiUrl('/api/analytics/categories'), { headers }),
-        fetch(buildApiUrl('/api/analytics/colours'), { headers }),
-        fetch(buildApiUrl('/api/analytics/most-worn?limit=6'), { headers }),
-        fetch(buildApiUrl('/api/analytics/least-worn?limit=6'), { headers }),
-        fetch(buildApiUrl('/api/analytics/never-worn?limit=6'), { headers }),
-        fetch(buildApiUrl('/api/analytics/cost-per-wear?limit=20'), { headers }),
+        fetchApiWithFallback('/api/analytics/overview', { headers }, { timeoutMs: 12000, retries: 1 }),
+        fetchApiWithFallback('/api/analytics/categories', { headers }, { timeoutMs: 12000, retries: 1 }),
+        fetchApiWithFallback('/api/analytics/colours', { headers }, { timeoutMs: 12000, retries: 1 }),
+        fetchApiWithFallback('/api/analytics/most-worn?limit=6', { headers }, { timeoutMs: 12000, retries: 1 }),
+        fetchApiWithFallback('/api/analytics/least-worn?limit=6', { headers }, { timeoutMs: 12000, retries: 1 }),
+        fetchApiWithFallback('/api/analytics/never-worn?limit=6', { headers }, { timeoutMs: 12000, retries: 1 }),
+        fetchApiWithFallback('/api/analytics/cost-per-wear?limit=20', { headers }, { timeoutMs: 12000, retries: 1 }),
       ]);
 
       setOverview(await parseJsonOrThrow(overviewRes, 'Overview'));

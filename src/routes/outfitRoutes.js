@@ -14,6 +14,7 @@ router.use(authMiddleware);
 
 router.get('/randomize', outfitController.getRandomizedOutfit);
 router.post('/recommendations', outfitController.getAiRecommendations);
+router.post('/chat', outfitController.getStyleChatResponse);
 router.post("/", outfitController.createOutfit);
 router.get(
 	"/",

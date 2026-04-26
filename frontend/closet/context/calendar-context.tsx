@@ -1,6 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { buildApiUrl, buildAuthHeaders } from '@/constants/api';
+import { buildAuthHeaders, fetchApiWithFallback } from '@/constants/api';
 import { uploadMultipartWithRetry } from '@/services/uploadRequest';
 
 export const COLORS = {
@@ -18,6 +18,9 @@ export const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
+
+const CALENDAR_REQUEST_TIMEOUT_MS = 20000;
+const CALENDAR_FETCH_RETRY_COUNT = 1;
 
 export type OutfitEntry = {
   _id: string;
@@ -193,9 +196,22 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
     try {
       setLoading(true);
       const token = await SecureStore.getItemAsync('userToken');
-      const res = await fetch(buildApiUrl('/api/outfits'), {
+      if (!token) {
+        setOutfits([]);
+        return;
+      }
+
+      const res = await fetchApiWithFallback('/api/outfits', {
         headers: buildAuthHeaders(token),
+      }, {
+        timeoutMs: CALENDAR_REQUEST_TIMEOUT_MS,
+        retries: CALENDAR_FETCH_RETRY_COUNT,
       });
+
+      if (!res.ok) {
+        throw new Error(`Calendar outfit request failed (${res.status})`);
+      }
+
       const data = await res.json();
       const normalized = Array.isArray(data) ? data.map(normalizeOutfitEntry) : [];
       setOutfits(normalized);
@@ -209,9 +225,12 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
   async function deleteOutfit(id: string) {
     try {
       const token = await SecureStore.getItemAsync('userToken');
-      await fetch(buildApiUrl(`/api/outfits/${id}`), {
+      await fetchApiWithFallback(`/api/outfits/${id}`, {
         method: 'DELETE',
         headers: buildAuthHeaders(token),
+      }, {
+        timeoutMs: CALENDAR_REQUEST_TIMEOUT_MS,
+        retries: CALENDAR_FETCH_RETRY_COUNT,
       });
       setOutfits((prev) => prev.filter((o) => o._id !== id));
     } catch (e) {
@@ -245,7 +264,7 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
     
     const previewImageIsLocal = Boolean(previewImage && /^(file|content|ph):/i.test(previewImage));
 
-    const res = await fetch(buildApiUrl('/api/outfits'), {
+    const res = await fetchApiWithFallback('/api/outfits', {
       method: 'POST',
       headers: {
         ...buildAuthHeaders(token),
@@ -258,6 +277,9 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
         ...(previewImage && !previewImageIsLocal ? { previewImage } : {}),
         ...(styledLayout ? { styledLayout } : {}),
       }),
+    }, {
+      timeoutMs: CALENDAR_REQUEST_TIMEOUT_MS,
+      retries: CALENDAR_FETCH_RETRY_COUNT,
     });
 
     if (!res.ok) {
@@ -299,7 +321,7 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
     const [year, month, day] = dateKey.split('-').map(Number);
     const normalizedDate = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0)).toISOString();
 
-    const res = await fetch(buildApiUrl(`/api/outfits/${outfitId}`), {
+    const res = await fetchApiWithFallback(`/api/outfits/${outfitId}`, {
       method: 'PUT',
       headers: {
         ...buildAuthHeaders(token),
@@ -308,6 +330,9 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
       body: JSON.stringify({
         date: normalizedDate,
       }),
+    }, {
+      timeoutMs: CALENDAR_REQUEST_TIMEOUT_MS,
+      retries: CALENDAR_FETCH_RETRY_COUNT,
     });
 
     if (!res.ok) {

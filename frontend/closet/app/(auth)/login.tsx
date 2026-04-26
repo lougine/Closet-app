@@ -17,7 +17,7 @@ import {
   View,
   Alert,
 } from "react-native";
-import { buildApiUrl } from "@/constants/api";
+import { fetchApiWithFallback } from "@/constants/api";
 import { useWardrobe } from "../../context/wardrobeContext";
 import {
   exchangeGoogleAccessTokenForAppToken,
@@ -51,10 +51,13 @@ export default function LoginScreen() {
 
     try {
       setLoading(true);
-      const res = await fetch(buildApiUrl('/api/auth/login'), {
+      const res = await fetchApiWithFallback('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: normalizedEmail, password: normalizedPassword }),
+      }, {
+        timeoutMs: 15000,
+        retries: 1,
       });
 
       if (!res.ok) {

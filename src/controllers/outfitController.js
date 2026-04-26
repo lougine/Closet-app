@@ -8,6 +8,7 @@ const { createImageUpload } = require('../middleware/imageUploadMiddleware');
 const { deleteImageByUrl } = require('../utils/imageFileUtils');
 const { buildImageMetadata } = require('../utils/imageMetadata');
 const { generateScoredOutfits } = require('../services/aiRecommendationService');
+const { generateStyleChatReply } = require('../services/styleChatService');
 
 const DEFAULT_RANDOMIZE_COUNT = 4;
 const MAX_STYLING_COUNT = 8;
@@ -261,6 +262,35 @@ const mapGarment = (garment) => ({
   season: garment.season,
   imageUrl: garment.imageUrl,
 });
+
+const buildRecommendationResponse = (event, temperatureC, garments, count = 3) => {
+  const currentSeason = deriveSeasonPreference(temperatureC)[0] || 'mild';
+  const recommendationContext = {
+    currentSeason,
+    favoriteColors: [],
+    dislikedItemNames: [],
+    likedItemNames: [],
+  };
+
+  const aiOutfits = generateScoredOutfits(garments, recommendationContext, count);
+
+  const recommendations = aiOutfits.map((outfit, index) => ({
+    name: `${event ? `${event} ` : ''}Look ${index + 1}`.trim(),
+    score: outfit.score,
+    reason: outfit.reason || 'AI selected based on style and color harmony.',
+    garments: outfit.garments.filter(Boolean).map(mapGarment),
+  }));
+
+  return {
+    recommendations,
+    context: {
+      event,
+      temperatureC,
+      interpretedSeasons: deriveSeasonPreference(temperatureC),
+      formalEventDetected: /wedding|formal|office|meeting|business|interview|ceremony/i.test(event),
+    },
+  };
+};
 
 exports.uploadCoverImage = createImageUpload('coverImage');
 
@@ -626,32 +656,47 @@ exports.getAiRecommendations = async (req, res) => {
       return res.json({ recommendations: [], context: { event, temperatureC: parsedTemperature } });
     }
 
-    const currentSeason = deriveSeasonPreference(parsedTemperature)[0] || 'mild';
-    const recommendationContext = {
-      currentSeason,
-      favoriteColors: [],
-      dislikedItemNames: [],
-      likedItemNames: [],
-    };
+    return res.json(buildRecommendationResponse(event, parsedTemperature, garments, count));
+  } catch (error) {
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+};
 
-    const aiOutfits = generateScoredOutfits(garments, recommendationContext, count);
-    
-    // Map to expected format
-    const recommendations = aiOutfits.map((outfit, index) => ({
-      name: `${event ? `${event} ` : ''}Look ${index + 1}`.trim(),
-      score: outfit.score,
-      reason: outfit.reason || 'AI selected based on style and color harmony.',
-      garments: outfit.garments.filter(Boolean).map(mapGarment),
-    }));
+exports.getStyleChatResponse = async (req, res) => {
+  try {
+    const message = String(req.body.message || '').trim();
+    if (!message) {
+      return res.status(400).json({ message: 'message is required' });
+    }
+
+    const event = String(req.body.event || '').trim();
+    const temperatureValue = req.body.temperatureC;
+    const parsedTemperature = temperatureValue === undefined || temperatureValue === null || temperatureValue === ''
+      ? null
+      : Number(temperatureValue);
+
+    if (parsedTemperature !== null && Number.isNaN(parsedTemperature)) {
+      return res.status(400).json({ message: 'temperatureC must be a valid number' });
+    }
+
+    const garments = await Garment.find({ owner: req.user.userId }).lean();
+    const count = parseCount(req.body.count, 3) || 3;
+    const recommendationPayload = garments.length > 0
+      ? buildRecommendationResponse(event || message, parsedTemperature, garments, count)
+      : { recommendations: [], context: { event, temperatureC: parsedTemperature } };
+
+    const reply = await generateStyleChatReply({
+      message,
+      event,
+      temperatureC: parsedTemperature,
+      garments,
+      conversation: Array.isArray(req.body.messages) ? req.body.messages : [],
+      recommendations: recommendationPayload.recommendations,
+    });
 
     return res.json({
-      recommendations,
-      context: {
-        event,
-        temperatureC: parsedTemperature,
-        interpretedSeasons: deriveSeasonPreference(parsedTemperature),
-        formalEventDetected: /wedding|formal|office|meeting|business|interview|ceremony/i.test(event),
-      },
+      reply,
+      ...recommendationPayload,
     });
   } catch (error) {
     return res.status(500).json({ message: 'Internal server error' });

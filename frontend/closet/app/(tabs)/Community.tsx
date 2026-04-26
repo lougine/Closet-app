@@ -5,7 +5,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, FlatList, RefreshControl, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AuthenticatedImage from "../../components/AuthenticatedImage";
-import { buildApiUrl, buildAuthHeaders, buildImageUrl } from "../../constants/api";
+import { buildAuthHeaders, buildImageUrl, fetchApiWithFallback } from "../../constants/api";
 import { searchUsers, toggleFollow, type SocialUser } from "@/services/socialService";
 import createCommunityStyles from "../../Styles/communityStyles";
 import { useAppTheme } from "../../context/themeContext";
@@ -88,10 +88,16 @@ const CommunityScreen: React.FC = () => {
 
   const communityFetch = async (path: string, init?: RequestInit) => {
     const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-    const primary = await fetch(buildApiUrl(`${COMMUNITY_BASE}${normalizedPath}`), init);
+    const primary = await fetchApiWithFallback(`${COMMUNITY_BASE}${normalizedPath}`, init, {
+      timeoutMs: 12000,
+      retries: 1,
+    });
 
     if (primary.status === 404) {
-      return fetch(buildApiUrl(`${LEGACY_COMMUNITY_BASE}${normalizedPath}`), init);
+      return fetchApiWithFallback(`${LEGACY_COMMUNITY_BASE}${normalizedPath}`, init, {
+        timeoutMs: 12000,
+        retries: 1,
+      });
     }
 
     return primary;
