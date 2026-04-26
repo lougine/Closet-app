@@ -36,9 +36,19 @@ export default function OutfitScreen() {
     );
 
   const selectedItems = items.filter((i) => selected.includes(i.id));
-  const previewItems = useMemo(() => (
-    selectedItems.filter((item) => Boolean(item.image)).slice(0, 8)
-  ), [selectedItems]);
+  const previewItems = useMemo(
+    () =>
+      selectedItems
+        .filter(
+          (
+            item
+          ): item is (typeof selectedItems)[number] & {
+            image: string;
+          } => typeof item.image === "string" && item.image.length > 0
+        )
+        .slice(0, 8),
+    [selectedItems]
+  );
   const previewColumns = previewItems.length > 4 ? 3 : 2;
 
   const uploadOutfitPreview = async (outfitId: string, previewUri: string, token: string) => {
