@@ -5,11 +5,12 @@ const PINK = "#e83d84";
 
 export const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#fff" },
+  scroll: { flex: 1 },
   topBar: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === "android" ? 16 : 8,
+    paddingTop: Platform.OS === "android" ? 8 : 4,
     paddingBottom: 4,
   },
   topBtn: {
@@ -98,7 +99,7 @@ export const s = StyleSheet.create({
     borderRadius: 2,
   },
   content: {
-    flex: 1,
+    paddingBottom: 8,
   },
   row: {
     flexDirection: "row",
@@ -330,8 +331,16 @@ export const s = StyleSheet.create({
     paddingHorizontal: 32,
     alignItems: "center",
   },
+  detailsActions: {
+    marginTop: 8,
+    gap: 10,
+  },
   pinkBtnDetails: {
     marginHorizontal: 20,
+  },
+  disabledBtn: {
+    opacity: 0.55,
+    backgroundColor: "#c79aae",
   },
   pinkBtnSpaced: {
     marginTop: 16,

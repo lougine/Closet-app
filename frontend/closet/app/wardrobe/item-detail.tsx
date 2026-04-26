@@ -1,7 +1,7 @@
 import { Feather, Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import * as SecureStore from "expo-secure-store";
 import { Alert, ScrollView, Share, StatusBar, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -160,6 +160,30 @@ export default function ItemDetailScreen() {
   const [relatedOutfits, setRelatedOutfits] = useState<ItemOutfitSummary[]>([]);
   const [loadingRelatedOutfits, setLoadingRelatedOutfits] = useState(false);
   const [appliedSearchedImageMarker, setAppliedSearchedImageMarker] = useState<string | null>(null);
+
+  const buildSaveSignature = useCallback((source: ClothingItem) => {
+    const styleTags = Array.from(
+      new Set(
+        (source.tags ?? [])
+          .map((tag) => String(tag || "").trim().toLowerCase())
+          .filter((tag) => GARMENT_STYLE_TAG_SET.has(tag)),
+      ),
+    ).sort();
+
+    return JSON.stringify({
+      category: source.category?.[0] ?? null,
+      subcategory: source.subcategory ?? null,
+      size: source.size?.trim() || null,
+      brand: source.brand?.trim() || null,
+      purchasePrice: typeof source.totalCost === "number" ? source.totalCost : null,
+      fabric: source.fabric?.trim() || null,
+      styleTags,
+    });
+  }, []);
+
+  const [savedSignature, setSavedSignature] = useState<string>(() => buildSaveSignature(initialItem));
+  const currentSignature = useMemo(() => buildSaveSignature(item), [buildSaveSignature, item]);
+  const hasPendingChanges = currentSignature !== savedSignature;
 
   const fetchRelatedOutfits = async () => {
     try {
@@ -405,12 +429,13 @@ export default function ItemDetailScreen() {
   };
 
   const saveItemDetails = async () => {
-    if (savingDetails) return;
+    if (savingDetails || !hasPendingChanges) return;
     try {
       setSavingDetails(true);
       await persistItemDetails();
       await Promise.all([persistSubcategory(), persistTags()]);
       await refreshItems();
+      setSavedSignature(currentSignature);
       router.replace("/(tabs)" as any);
     } catch (error: any) {
       Alert.alert("Save failed", getUploadErrorMessage(error, "Unable to save item changes."));
@@ -641,67 +666,71 @@ export default function ItemDetailScreen() {
   const theme = { ...baseTheme, panel: baseTheme.card, softPanel: baseTheme.softCard };
 
   return (
-    <SafeAreaView style={[s.root, { backgroundColor: theme.screen }]}>
+    <SafeAreaView style={[s.root, { backgroundColor: theme.screen }]} edges={["left", "right"]}>
       <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} />
 
-      <View style={s.topBar}>
-        <TouchableOpacity style={s.topBtn} onPress={() => router.back()}>
-          <Ionicons name="close" size={20} color={theme.text} />
-        </TouchableOpacity>
-        <View style={s.topSpacer} />
-        <TouchableOpacity style={s.topBtn} onPress={() => Share.share({ message: `Check out my ${item.label || "item"}!` })}>
-          <Ionicons name="share-outline" size={20} color={theme.text} />
-        </TouchableOpacity>
-      </View>
-
-      <TouchableOpacity style={[s.imageWrap, { backgroundColor: theme.softPanel }]} activeOpacity={1}>
-        {item.image ? (
-          <AuthenticatedImage source={{ uri: item.image }} style={s.image} resizeMode="contain" />
-        ) : (
-          <View style={s.imagePlaceholder}>
-            <Ionicons name="image-outline" size={64} color={theme.subText} />
-          </View>
-        )}
-        <View style={s.cpwPill}>
-          <Text style={s.cpwText}>cost/wear ${cpw}</Text>
-        </View>
-        {uploadingImage ? (
-          <View style={[s.cpwPill, s.processingPill]}>
-            <Text style={s.cpwText}>{removingBackground ? "Removing background..." : "Uploading image..."}</Text>
-          </View>
-        ) : null}
-        <View style={s.imageActions}>
-          <TouchableOpacity onPress={() => Alert.alert("Delete Item", "Remove this item from your wardrobe?", [
-            { text: "Cancel", style: "cancel" },
-            { text: "Delete", style: "destructive", onPress: deleteItem },
-          ])}>
-            <Ionicons name="trash-outline" size={22} color={theme.subText} />
+      <ScrollView
+        style={[s.scroll, { backgroundColor: theme.screen }]}
+        contentContainerStyle={s.content}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={s.topBar}>
+          <TouchableOpacity style={s.topBtn} onPress={() => router.back()}>
+            <Ionicons name="close" size={20} color={theme.text} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={openImageMenu}>
-            <Ionicons name="ellipsis-horizontal" size={22} color={theme.subText} />
+          <View style={s.topSpacer} />
+          <TouchableOpacity style={s.topBtn} onPress={() => Share.share({ message: `Check out my ${item.label || "item"}!` })}>
+            <Ionicons name="share-outline" size={20} color={theme.text} />
           </TouchableOpacity>
         </View>
-      </TouchableOpacity>
 
-      <View style={[s.tabNav, { borderBottomColor: theme.border }]}>
-        {DETAIL_TABS.map((tab) => (
-          <TouchableOpacity key={tab} style={s.tabBtn} onPress={() => setActiveTab(tab)}>
-            <Text
-              style={[
-                s.tabBtnText,
-                { color: theme.subText },
-                activeTab === tab && s.tabBtnTextActive,
-                activeTab === tab && { color: theme.text },
-              ]}
-            >
-              {tab}
-            </Text>
-            {activeTab === tab && <View style={[s.tabUnderline, { backgroundColor: theme.text }]} />}
-          </TouchableOpacity>
-        ))}
-      </View>
+        <TouchableOpacity style={[s.imageWrap, { backgroundColor: theme.softPanel }]} activeOpacity={1}>
+          {item.image ? (
+            <AuthenticatedImage source={{ uri: item.image }} style={s.image} resizeMode="contain" />
+          ) : (
+            <View style={s.imagePlaceholder}>
+              <Ionicons name="image-outline" size={64} color={theme.subText} />
+            </View>
+          )}
+          <View style={s.cpwPill}>
+            <Text style={s.cpwText}>cost/wear ${cpw}</Text>
+          </View>
+          {uploadingImage ? (
+            <View style={[s.cpwPill, s.processingPill]}>
+              <Text style={s.cpwText}>{removingBackground ? "Removing background..." : "Uploading image..."}</Text>
+            </View>
+          ) : null}
+          <View style={s.imageActions}>
+            <TouchableOpacity onPress={() => Alert.alert("Delete Item", "Remove this item from your wardrobe?", [
+              { text: "Cancel", style: "cancel" },
+              { text: "Delete", style: "destructive", onPress: deleteItem },
+            ])}>
+              <Ionicons name="trash-outline" size={22} color={theme.subText} />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={openImageMenu}>
+              <Ionicons name="ellipsis-horizontal" size={22} color={theme.subText} />
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
 
-      <ScrollView style={[s.content, { backgroundColor: theme.screen }]} showsVerticalScrollIndicator={false}>
+        <View style={[s.tabNav, { borderBottomColor: theme.border }]}>
+          {DETAIL_TABS.map((tab) => (
+            <TouchableOpacity key={tab} style={s.tabBtn} onPress={() => setActiveTab(tab)}>
+              <Text
+                style={[
+                  s.tabBtnText,
+                  { color: theme.subText },
+                  activeTab === tab && s.tabBtnTextActive,
+                  activeTab === tab && { color: theme.text },
+                ]}
+              >
+                {tab}
+              </Text>
+              {activeTab === tab && <View style={[s.tabUnderline, { backgroundColor: theme.text }]} />}
+            </TouchableOpacity>
+          ))}
+        </View>
+
         {activeTab === "Details" && (
           <View>
             <View style={s.row}>
@@ -922,29 +951,37 @@ export default function ItemDetailScreen() {
             </View>
             <View style={[s.divider, { backgroundColor: theme.border }]} />
 
-            <TouchableOpacity
-              style={[s.pinkBtn, s.pinkBtnDetails]}
-              onPress={() => {
-                const category = item.category?.[0] ?? 'Tops';
-                const isBottom = category === 'Bottoms';
-                ARService.openWithProduct({
-                  arCategory: item.subcategory ?? category,
-                  fabricType: item.fabric ?? 'Cotton',
-                  primaryColor: resolveColorHex(item.colors?.[0] ?? '#FFFFFF'),
-                  slot: isBottom ? 'LowerBody' : 'UpperBody',
-                });
-              }}
-            >
-              <Text style={s.pinkBtnText}>Try On</Text>
-            </TouchableOpacity>
+            <View style={s.detailsActions}>
+              <TouchableOpacity
+                style={[s.pinkBtn, s.pinkBtnDetails]}
+                onPress={() => {
+                  const category = item.category?.[0] ?? 'Tops';
+                  const isBottom = category === 'Bottoms';
+                  ARService.openWithProduct({
+                    arCategory: item.subcategory ?? category,
+                    fabricType: item.fabric ?? 'Cotton',
+                    primaryColor: resolveColorHex(item.colors?.[0] ?? '#FFFFFF'),
+                    slot: isBottom ? 'LowerBody' : 'UpperBody',
+                  });
+                }}
+              >
+                <Text style={s.pinkBtnText}>Try On</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[s.pinkBtn, s.pinkBtnDetails, (savingDetails || deletingItem) && s.disabledOpacity]}
-              onPress={saveItemDetails}
-              disabled={savingDetails || deletingItem}
-            >
-              <Text style={s.pinkBtnText}>{savingDetails ? "Saving..." : "Save Item Changes"}</Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  s.pinkBtn,
+                  s.pinkBtnDetails,
+                  (!hasPendingChanges || savingDetails || deletingItem) && s.disabledBtn,
+                ]}
+                onPress={saveItemDetails}
+                disabled={!hasPendingChanges || savingDetails || deletingItem}
+              >
+                <Text style={s.pinkBtnText}>
+                  {savingDetails ? "Saving..." : hasPendingChanges ? "Save Item Changes" : "No Changes to Save"}
+                </Text>
+              </TouchableOpacity>
+            </View>
             <View style={[s.divider, { backgroundColor: theme.border }]} />
           </View>
         )}

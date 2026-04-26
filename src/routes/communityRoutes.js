@@ -38,7 +38,7 @@ router.get(
   '/feed',
   validatePositiveIntegerQuery({ field: 'page', min: 1 }),
   validatePositiveIntegerQuery({ field: 'limit', min: 1, max: 50 }),
-  communityController.getFeed
+  communityController.getFeed,
 );
 
 router.post('/posts', communityController.createPost);
@@ -46,7 +46,7 @@ router.post('/posts', communityController.createPost);
 router.post(
   '/posts/:postId/like',
   validateObjectIdField({ source: 'params', field: 'postId', required: true }),
-  communityController.toggleLike
+  communityController.toggleLike,
 );
 
 router.get(
@@ -54,19 +54,16 @@ router.get(
   validateObjectIdField({ source: 'params', field: 'postId', required: true }),
   validatePositiveIntegerQuery({ field: 'page', min: 1 }),
   validatePositiveIntegerQuery({ field: 'limit', min: 1, max: 100 }),
-  communityController.getComments
+  communityController.getComments,
 );
 
 router.post(
   '/posts/:postId/comments',
   validateObjectIdField({ source: 'params', field: 'postId', required: true }),
-  communityController.addComment
+  communityController.addComment,
 );
 
-router.post(
-  '/posts/:postId/vote',
-  validateObjectIdField({ source: 'params', field: 'postId', required: true }),
-  communityController.voteOnPoll
-);
+router.get('/notifications', communityController.getNotifications);
+router.post('/notifications/read', communityController.markNotificationsRead);
 
 module.exports = router;

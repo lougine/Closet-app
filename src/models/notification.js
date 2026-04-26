@@ -15,7 +15,13 @@ const notificationSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ['styled_outfit_shared'],
+      enum: [
+        'styled_outfit_shared', 
+        'new_post',            
+        'new_follower',        
+        'like',                 
+        'comment',              
+      ],
       required: true,
       index: true,
     },

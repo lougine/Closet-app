@@ -14,6 +14,12 @@ router.use(authMiddleware);
 router.get("/", garmentController.getGarments);
 router.post('/search-images', searchRateLimit, garmentController.searchGarmentReferenceImages);
 router.post('/remove-background-url', removeBackgroundRateLimit, garmentController.removeGarmentImageBackgroundByUrl);
+router.post(
+	'/auto-detect',
+	garmentController.uploadImage,
+	imageUploadErrorHandler,
+	garmentController.autoDetectGarmentDetails,
+);
 
 router.post(
 	"/",

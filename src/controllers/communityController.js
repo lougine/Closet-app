@@ -2,7 +2,9 @@ const mongoose = require('mongoose');
 
 const CommunityComment = require('../models/communityComment');
 const CommunityPost = require('../models/communityPost');
+const Notification = require('../models/notification');
 const Outfit = require('../models/outfit');
+const User = require('../models/user');
 
 const parseLimit = (value, fallback = 20, max = 50) => {
   const parsed = Number(value);
@@ -17,17 +19,17 @@ const parsePage = (value, fallback = 1) => {
 };
 
 const escapeRegex = (value) => String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 const SELF_STYLED_BACKFILL_BATCH_SIZE = 500;
 let lastSelfStyledBackfillAt = 0;
 
 const buildOutfitCaption = (outfit) => {
   const name = String(outfit?.name || '').trim();
-  return name ? `Styled ${name}` : 'Styled a fit';
+  return name && name.toLowerCase() !== 'create outfit' ? name : '';
 };
 
 const shouldRunSelfStyledBackfill = () => {
   const now = Date.now();
-  // Keep feed fast: perform this safety backfill at most once every 60 seconds.
   if (now - lastSelfStyledBackfillAt < 60000) return false;
   lastSelfStyledBackfillAt = now;
   return true;
@@ -50,55 +52,42 @@ const backfillMissingSelfStyledOutfitPosts = async () => {
 
   if (!outfits.length) return;
 
-  const outfitIds = outfits.map((outfit) => outfit._id);
-  const existing = await CommunityPost.find({
-    sourceOutfitId: { $in: outfitIds },
-  })
+  const outfitIds = outfits.map((o) => o._id);
+  const existing = await CommunityPost.find({ sourceOutfitId: { $in: outfitIds } })
     .select('sourceOutfitId')
     .lean();
 
-  const existingIds = new Set(existing.map((entry) => String(entry.sourceOutfitId)));
-  const missingOutfits = outfits.filter((outfit) => !existingIds.has(String(outfit._id)));
-
-  if (!missingOutfits.length) return;
+  const existingIds = new Set(existing.map((e) => String(e.sourceOutfitId)));
+  const missing = outfits.filter((o) => !existingIds.has(String(o._id)));
+  if (!missing.length) return;
 
   await CommunityPost.insertMany(
-    missingOutfits.map((outfit) => ({
+    missing.map((outfit) => ({
       author: outfit.owner,
       type: 'post',
       sourceType: 'outfit',
       sourceOutfitId: outfit._id,
       caption: buildOutfitCaption(outfit),
       imageUrl: outfit.previewImage || null,
-      tags: ['fit', 'styled-fit'],
-      poll: { question: null, options: [], endsAt: null },
+      tags: ['outfit'],
     })),
     { ordered: false }
-  ).catch(() => {
-    // Ignore duplicate races from parallel requests; unique index enforces consistency.
-  });
+  ).catch(() => {});
 };
 
-const serializePost = (postDoc, userId) => {
-  const post = postDoc.toObject();
-  const likedByMe = post.likes.some((likeUserId) => String(likeUserId) === String(userId));
-
-  const poll = post.type === 'poll'
-    ? {
-      question: post.poll?.question || '',
-      endsAt: post.poll?.endsAt || null,
-      options: (post.poll?.options || []).map((option, idx) => ({
-        index: idx,
-        text: option.text,
-        votes: option.votes.length,
-        votedByMe: option.votes.some((voteUserId) => String(voteUserId) === String(userId)),
-      })),
-    }
-    : null;
+const serializePost = (postDoc, userId, outfitMetaMap = new Map()) => {
+  const post = postDoc.toObject ? postDoc.toObject() : postDoc;
+  const likedByMe = (post.likes || []).some(
+    (id) => String(id) === String(userId)
+  );
+  const sourceOutfitId = post.sourceOutfitId ? String(post.sourceOutfitId) : null;
+  const outfitMeta = sourceOutfitId ? outfitMetaMap.get(sourceOutfitId) : null;
 
   return {
     _id: post._id,
-    type: post.type,
+    type: 'post',
+    sourceType: post.sourceType || 'manual',
+    sourceOutfitId,
     caption: post.caption,
     imageUrl: post.imageUrl,
     tags: post.tags,
@@ -109,10 +98,11 @@ const serializePost = (postDoc, userId) => {
       name: post.author?.name,
       profilePicture: post.author?.profilePicture || null,
     },
-    likeCount: post.likes.length,
+    likeCount: (post.likes || []).length,
     likedByMe,
     commentsCount: post.commentsCount || 0,
-    poll,
+    styledForUser: outfitMeta?.styledForUser || null,
+    styledByUser: outfitMeta?.styledByUser || null,
   };
 };
 
@@ -122,6 +112,7 @@ exports.getFeed = async (req, res) => {
 
     const userId = req.user.userId;
     const filter = String(req.query.filter || 'for-you').toLowerCase();
+    const styledScope = String(req.query.styledScope || 'you').toLowerCase();
     const search = String(req.query.search || '').trim().slice(0, 80);
 
     const page = parsePage(req.query.page, 1);
@@ -129,8 +120,88 @@ exports.getFeed = async (req, res) => {
     const skip = (page - 1) * limit;
 
     const query = {};
-    if (filter === 'polls') {
-      query.type = 'poll';
+
+    if (filter === 'friends') {
+
+      const currentUser = await User.findById(userId).select('following').lean();
+      const followingIds = (currentUser?.following || []).map((id) => new mongoose.Types.ObjectId(String(id)));
+      if (!followingIds.length) {
+
+        return res.json({
+          filter,
+          items: [],
+          pagination: { page, limit, total: 0, totalPages: 0 },
+        });
+      }
+      query.author = { $in: followingIds };
+    } else if (filter === 'outfits') {
+
+      query.sourceType = 'outfit';
+      
+      const selfOutfits = await Outfit.find({
+        $expr: {
+          $and: [
+            { $eq: ['$owner', '$createdBy'] },
+            {
+              $or: [
+                { $eq: ['$styledForUserId', null] },
+                { $eq: ['$styledForUserId', '$owner'] },
+              ],
+            },
+          ],
+        },
+      })
+        .select('_id')
+        .lean();
+      const selfOutfitIds = selfOutfits.map((o) => o._id);
+      query.sourceOutfitId = { $in: selfOutfitIds };
+    } else if (filter === 'styled-for') {
+  
+      query.sourceType = 'outfit';
+      let outfitCriteria = {
+        styledForUserId: { $ne: null },
+        $expr: {
+          $and: [
+            { $eq: ['$styledForUserId', '$owner'] },
+            { $ne: ['$owner', '$createdBy'] },
+          ],
+        },
+      };
+
+      if (styledScope === 'you') {
+        outfitCriteria = {
+          ...outfitCriteria,
+          owner: new mongoose.Types.ObjectId(String(userId)),
+        };
+      } else if (styledScope === 'by-you') {
+        outfitCriteria = {
+          ...outfitCriteria,
+          createdBy: new mongoose.Types.ObjectId(String(userId)),
+        };
+      } else if (styledScope === 'friends') {
+        const currentUser = await User.findById(userId).select('following').lean();
+        const followingIds = (currentUser?.following || []).map(
+          (id) => new mongoose.Types.ObjectId(String(id))
+        );
+        if (!followingIds.length) {
+          return res.json({
+            filter,
+            styledScope,
+            items: [],
+            pagination: { page, limit, total: 0, totalPages: 0 },
+          });
+        }
+        outfitCriteria = {
+          ...outfitCriteria,
+          owner: { $in: followingIds },
+        };
+      }
+
+      const styledForOutfits = await Outfit.find(outfitCriteria)
+        .select('_id')
+        .lean();
+      const styledForOutfitIds = styledForOutfits.map((o) => o._id);
+      query.sourceOutfitId = { $in: styledForOutfitIds };
     }
 
     if (search) {
@@ -150,9 +221,50 @@ exports.getFeed = async (req, res) => {
       CommunityPost.countDocuments(query),
     ]);
 
+    const outfitIds = posts
+      .map((post) => (post?.sourceOutfitId ? String(post.sourceOutfitId) : ''))
+      .filter(Boolean);
+    const uniqueOutfitIds = [...new Set(outfitIds)];
+    const outfitMetaMap = new Map();
+    if (uniqueOutfitIds.length) {
+      const outfits = await Outfit.find({ _id: { $in: uniqueOutfitIds } })
+        .select('_id owner createdBy styledForUserId')
+        .populate('owner', 'name profilePicture')
+        .populate('createdBy', 'name profilePicture')
+        .populate('styledForUserId', 'name profilePicture')
+        .lean();
+
+      outfits.forEach((outfit) => {
+        const owner = outfit?.owner || null;
+        const createdBy = outfit?.createdBy || null;
+        const styledForUserId = outfit?.styledForUserId || null;
+
+        const styledForUser = owner || styledForUserId || null;
+        const styledByUser = createdBy || null;
+
+        outfitMetaMap.set(String(outfit._id), {
+          styledForUser: styledForUser
+            ? {
+                _id: String(styledForUser._id || ''),
+                name: String(styledForUser.name || 'User'),
+                profilePicture: styledForUser.profilePicture || null,
+              }
+            : null,
+          styledByUser: styledByUser
+            ? {
+                _id: String(styledByUser._id || ''),
+                name: String(styledByUser.name || 'User'),
+                profilePicture: styledByUser.profilePicture || null,
+              }
+            : null,
+        });
+      });
+    }
+
     res.json({
       filter,
-      items: posts.map((post) => serializePost(post, userId)),
+      ...(filter === 'styled-for' ? { styledScope } : {}),
+      items: posts.map((post) => serializePost(post, userId, outfitMetaMap)),
       pagination: {
         page,
         limit,
@@ -161,6 +273,7 @@ exports.getFeed = async (req, res) => {
       },
     });
   } catch (error) {
+    console.error('getFeed error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };
@@ -168,58 +281,46 @@ exports.getFeed = async (req, res) => {
 exports.createPost = async (req, res) => {
   try {
     const authorId = req.user.userId;
-    const {
-      type = 'post',
-      caption = '',
-      imageUrl = null,
-      tags = [],
-      poll,
-    } = req.body;
+    const { caption = '', imageUrl = null, tags = [] } = req.body;
 
-    if (type !== 'post' && type !== 'poll') {
-      return res.status(400).json({ message: 'type must be post or poll' });
-    }
-
-    if (!String(caption || '').trim() && !imageUrl && type !== 'poll') {
+    if (!String(caption || '').trim() && !imageUrl) {
       return res.status(400).json({ message: 'caption or imageUrl is required' });
-    }
-
-    let normalizedPoll = {
-      question: null,
-      options: [],
-      endsAt: null,
-    };
-
-    if (type === 'poll') {
-      const question = String(poll?.question || '').trim();
-      const options = Array.isArray(poll?.options)
-        ? poll.options.map((option) => String(option || '').trim()).filter(Boolean)
-        : [];
-
-      if (!question || options.length < 2) {
-        return res.status(400).json({ message: 'poll requires a question and at least 2 options' });
-      }
-
-      normalizedPoll = {
-        question,
-        options: options.slice(0, 6).map((text) => ({ text, votes: [] })),
-        endsAt: poll?.endsAt ? new Date(poll.endsAt) : null,
-      };
     }
 
     const created = await CommunityPost.create({
       author: authorId,
-      type,
+      type: 'post',
       caption: String(caption || '').trim(),
       imageUrl: imageUrl || null,
-      tags: Array.isArray(tags) ? tags.map((entry) => String(entry).trim()).filter(Boolean) : [],
-      poll: normalizedPoll,
+      tags: Array.isArray(tags)
+        ? tags.map((t) => String(t).trim()).filter(Boolean)
+        : [],
     });
 
-    const post = await CommunityPost.findById(created._id).populate('author', 'name profilePicture');
+    const post = await CommunityPost.findById(created._id).populate(
+      'author',
+      'name profilePicture'
+    );
+
+    try {
+      const author = await User.findById(authorId).select('name followers').lean();
+      if (author?.followers?.length) {
+        const notifications = author.followers.map((followerId) => ({
+          recipient: followerId,
+          actor: authorId,
+          type: 'new_post',
+          message: `${author.name} added a new post`,
+          communityPost: created._id,
+        }));
+        await Notification.insertMany(notifications, { ordered: false });
+      }
+    } catch (_) {
+      // Non-critical — don't fail the request
+    }
 
     res.status(201).json(serializePost(post, authorId));
   } catch (error) {
+    console.error('createPost error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };
@@ -231,11 +332,9 @@ exports.toggleLike = async (req, res) => {
     const userObjectId = new mongoose.Types.ObjectId(userId);
 
     const post = await CommunityPost.findById(postId);
-    if (!post) {
-      return res.status(404).json({ message: 'Post not found' });
-    }
+    if (!post) return res.status(404).json({ message: 'Post not found' });
 
-    const alreadyLiked = post.likes.some((likeUserId) => String(likeUserId) === userId);
+    const alreadyLiked = post.likes.some((id) => String(id) === userId);
 
     const updated = await CommunityPost.findByIdAndUpdate(
       postId,
@@ -244,6 +343,20 @@ exports.toggleLike = async (req, res) => {
         : { $addToSet: { likes: userObjectId } },
       { returnDocument: 'after' }
     ).populate('author', 'name profilePicture');
+
+    // Notify post author when someone likes (not self-like)
+    if (!alreadyLiked && String(post.author) !== userId) {
+      try {
+        const liker = await User.findById(userId).select('name').lean();
+        await Notification.create({
+          recipient: post.author,
+          actor: userId,
+          type: 'like',
+          message: `${liker?.name || 'Someone'} liked your post`,
+          communityPost: postId,
+        });
+      } catch (_) {}
+    }
 
     res.json(serializePost(updated, userId));
   } catch (error) {
@@ -259,9 +372,7 @@ exports.getComments = async (req, res) => {
     const skip = (page - 1) * limit;
 
     const postExists = await CommunityPost.exists({ _id: postId });
-    if (!postExists) {
-      return res.status(404).json({ message: 'Post not found' });
-    }
+    if (!postExists) return res.status(404).json({ message: 'Post not found' });
 
     const [comments, total] = await Promise.all([
       CommunityComment.find({ post: postId })
@@ -273,18 +384,13 @@ exports.getComments = async (req, res) => {
     ]);
 
     res.json({
-      items: comments.map((comment) => ({
-        _id: comment._id,
-        text: comment.text,
-        createdAt: comment.createdAt,
-        author: comment.author,
+      items: comments.map((c) => ({
+        _id: c._id,
+        text: c.text,
+        createdAt: c.createdAt,
+        author: c.author,
       })),
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
     });
   } catch (error) {
     res.status(500).json({ message: 'Internal server error' });
@@ -297,24 +403,31 @@ exports.addComment = async (req, res) => {
     const userId = req.user.userId;
     const text = String(req.body.text || '').trim();
 
-    if (!text) {
-      return res.status(400).json({ message: 'text is required' });
-    }
+    if (!text) return res.status(400).json({ message: 'text is required' });
 
     const post = await CommunityPost.findById(postId);
-    if (!post) {
-      return res.status(404).json({ message: 'Post not found' });
+    if (!post) return res.status(404).json({ message: 'Post not found' });
+
+    const comment = await CommunityComment.create({ post: postId, author: userId, text });
+    await CommunityPost.findByIdAndUpdate(postId, { $inc: { commentsCount: 1 } });
+
+    if (String(post.author) !== userId) {
+      try {
+        const commenter = await User.findById(userId).select('name').lean();
+        await Notification.create({
+          recipient: post.author,
+          actor: userId,
+          type: 'comment',
+          message: `${commenter?.name || 'Someone'} commented on your post`,
+          communityPost: postId,
+        });
+      } catch (_) {}
     }
 
-    const comment = await CommunityComment.create({
-      post: postId,
-      author: userId,
-      text,
-    });
-
-    await CommunityPost.findByIdAndUpdate(postId, { $inc: { commentsCount: 1 } }, { returnDocument: 'after' });
-
-    const hydrated = await CommunityComment.findById(comment._id).populate('author', 'name profilePicture');
+    const hydrated = await CommunityComment.findById(comment._id).populate(
+      'author',
+      'name profilePicture'
+    );
 
     res.status(201).json({
       _id: hydrated._id,
@@ -327,54 +440,68 @@ exports.addComment = async (req, res) => {
   }
 };
 
-exports.voteOnPoll = async (req, res) => {
+exports.getNotifications = async (req, res) => {
   try {
-    const postId = req.params.postId;
     const userId = req.user.userId;
-    const userObjectId = new mongoose.Types.ObjectId(userId);
-    const optionIndex = Number(req.body.optionIndex);
+    const limit = parseLimit(req.query.limit, 30, 50);
+    const page = parsePage(req.query.page, 1);
+    const skip = (page - 1) * limit;
 
-    if (!Number.isInteger(optionIndex) || optionIndex < 0) {
-      return res.status(400).json({ message: 'optionIndex must be a non-negative integer' });
+    if (!mongoose.isValidObjectId(userId)) {
+      return res.json({
+        items: [],
+        unreadCount: 0,
+        pagination: { page, limit, total: 0, totalPages: 0 },
+      });
     }
 
-    const post = await CommunityPost.findById(postId);
-    if (!post) {
-      return res.status(404).json({ message: 'Post not found' });
-    }
+    const recipientId = new mongoose.Types.ObjectId(String(userId));
 
-    if (post.type !== 'poll') {
-      return res.status(400).json({ message: 'Post is not a poll' });
-    }
+    const [notifications, total, unreadCount] = await Promise.all([
+      Notification.find({ recipient: recipientId })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate('actor', 'name profilePicture')
+        .lean(),
+      Notification.countDocuments({ recipient: recipientId }),
+      Notification.countDocuments({ recipient: recipientId, readAt: null }),
+    ]);
 
-    if (!post.poll || !Array.isArray(post.poll.options) || optionIndex >= post.poll.options.length) {
-      return res.status(400).json({ message: 'Invalid poll option' });
-    }
-
-    post.poll.options = post.poll.options.map((option, idx) => {
-      if (idx === optionIndex) {
-        const alreadyVotedThisOption = option.votes.some((voteUserId) => String(voteUserId) === userId);
-        if (!alreadyVotedThisOption) {
-          return {
-            ...option.toObject(),
-            votes: [...option.votes, userObjectId],
-          };
-        }
-        return option;
-      }
-
-      return {
-        ...option.toObject(),
-        votes: option.votes.filter((voteUserId) => String(voteUserId) !== userId),
-      };
+    res.json({
+      items: notifications.map((n) => ({
+        _id: String(n._id),
+        type: n.type,
+        message: n.message,
+        read: !!n.readAt,
+        createdAt: n.createdAt,
+        actor: n.actor
+          ? {
+              _id: String(n.actor._id),
+              name: n.actor.name,
+              profilePicture: n.actor.profilePicture || null,
+            }
+          : null,
+        communityPost: n.communityPost ? String(n.communityPost) : null,
+        outfit: n.outfit ? String(n.outfit) : null,
+      })),
+      unreadCount,
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
     });
-
-    await post.save();
-    const hydrated = await CommunityPost.findById(post._id).populate('author', 'name profilePicture');
-
-    res.json(serializePost(hydrated, userId));
   } catch (error) {
     res.status(500).json({ message: 'Internal server error' });
   }
 };
 
+exports.markNotificationsRead = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    await Notification.updateMany(
+      { recipient: userId, readAt: null },
+      { $set: { readAt: new Date() } }
+    );
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};

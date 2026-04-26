@@ -1,7 +1,7 @@
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { Tabs, useRouter } from "expo-router";
 import React, { useRef, useState } from "react";
-import { Animated, Image, Pressable, Text, TouchableOpacity, View } from "react-native";
+import { Animated, DeviceEventEmitter, Image, Pressable, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { styles } from "../../Styles/tabs_layout.styles";
 import { CalendarProvider } from "../../context/calendar-context";
@@ -141,6 +141,15 @@ export default function TabLayout() {
                     resizeMode="contain" />
                 ),
               }}
+              listeners={({ navigation, route }) => ({
+                tabPress: () => {
+                  const state = navigation.getState();
+                  const activeRouteName = state.routes[state.index]?.name;
+                  if (activeRouteName === route.name) {
+                    DeviceEventEmitter.emit("community-tab-press");
+                  }
+                },
+              })}
             />
             <Tabs.Screen
               name="calendar"

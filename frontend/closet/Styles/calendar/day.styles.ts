@@ -6,17 +6,24 @@ export const { width: SW } = Dimensions.get('window');
 const HEADER_H = 140;
 
 export const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: '#F6F6F6' },
+  flex: { 
+    flex: 1, 
+    backgroundColor: '#F6F6F6' 
+  },
   loadingWrap: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#F6F6F6',
   },
-  headerBg: {
-    height: HEADER_H,
-    position: 'relative',
-  },
+ headerBgLight: {
+  height: HEADER_H,
+  position: 'relative',
+},
+headerBgDark: {
+  height: HEADER_H,
+  position: 'relative',
+},
   headerWave: {
     position: 'absolute',
     top: 0,
@@ -63,7 +70,7 @@ export const styles = StyleSheet.create({
     fontWeight: '600',
   },
   dayNameSelected: {
-    color: '#000',
+    color: '#494949',
     fontWeight: '700',
   },
   dayBubble: {
@@ -146,10 +153,6 @@ export const styles = StyleSheet.create({
     padding: 6,
     zIndex: 10,
   },
-  outfitPreviewTap: {
-    width: '100%',
-    alignItems: 'center',
-  },
   outfitImage: {
     width: '90%',
     height: 380,
@@ -158,11 +161,6 @@ export const styles = StyleSheet.create({
   outfitImagePlaceholder: {
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  outfitSavedText: {
-    marginTop: 8,
-    color: COLORS.subText,
-    fontSize: 12,
   },
   outfitMetaRow: {
     marginTop: 16,
@@ -211,7 +209,6 @@ export const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.35)',
     justifyContent: 'center',
     alignItems: 'center',
   },
