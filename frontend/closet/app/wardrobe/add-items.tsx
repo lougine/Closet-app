@@ -16,7 +16,7 @@ import {
   validateImageFileSize,
 } from "../../constants/imageUpload";
 import { getAppTheme } from "../../constants/appTheme";
-import { buildApiUrl, buildImageUrl } from "../../constants/api";
+import { buildApiUrl, buildImageUrl, fetchApiWithFallback } from "../../constants/api";
 import { GARMENT_FABRIC_OPTIONS } from "../../constants/garmentTaxonomy";
 import { getUploadErrorMessage, UploadRequestError, uploadMultipartWithRetry } from "../../services/uploadRequest";
 import { removeBackgroundFromImageUri } from "../../services/removeBackground";
@@ -510,14 +510,14 @@ export default function AddItemsScreen() {
       purchasePrice: purchasePrice ?? undefined,
     };
 
-    const res = await fetch(buildApiUrl('/api/garments'), {
+    const res = await fetchApiWithFallback('/api/garments', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(garmentData),
-    });
+    }, { timeoutMs: 30000, retries: 1 });
 
     if (!res.ok) {
       const errorData = await res.json().catch(() => ({ message: 'Failed to save item' }));

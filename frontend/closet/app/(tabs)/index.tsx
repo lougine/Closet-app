@@ -11,7 +11,7 @@ import OutfitPreviewCollage from "../../components/OutfitPreviewCollage";
 import { IMAGE_UPLOAD_ASPECT, IMAGE_UPLOAD_QUALITY, validateImageFileSize } from "../../constants/imageUpload";
 import { fetchCurrentUserProfile, uploadBannerImage, uploadProfileImage } from "@/services/userProfileService";
 import { getUploadErrorMessage } from "../../services/uploadRequest";
-import { buildApiUrl, buildAuthHeaders } from "../../constants/api";
+import { buildApiUrl, buildAuthHeaders, fetchApiWithFallback } from "../../constants/api";
 import { getAppTheme } from "../../constants/appTheme";
 import { fc, s } from "../../Styles/index.styles";
 import { useCalendar } from "../../context/calendar-context";
@@ -400,9 +400,9 @@ export default function WardrobeScreen() {
       }
 
       const [response, storedIdsRaw] = await Promise.all([
-        fetch(buildApiUrl("/api/outfits"), {
+        fetchApiWithFallback("/api/outfits", {
           headers: buildAuthHeaders(token),
-        }),
+        }, { timeoutMs: 12000, retries: 1 }),
         SecureStore.getItemAsync(LOOKBOOK_IDS_KEY),
       ]);
 

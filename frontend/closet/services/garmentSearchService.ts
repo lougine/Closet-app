@@ -1,6 +1,6 @@
 import * as FileSystem from 'expo-file-system/legacy';
 
-import { buildApiUrl, buildAuthHeaders } from '@/constants/api';
+import { buildApiUrl, buildAuthHeaders, fetchApiWithFallback } from '@/constants/api';
 
 export type GarmentSearchImage = {
   imageUrl: string;
@@ -65,14 +65,14 @@ export async function searchGarmentImages(
   token: string,
   count = 10,
 ): Promise<GarmentSearchImage[]> {
-  const response = await fetch(buildApiUrl('/api/garments/search-images'), {
+  const response = await fetchApiWithFallback('/api/garments/search-images', {
     method: 'POST',
     headers: {
       ...buildAuthHeaders(token),
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ q: query, num: count }),
-  });
+  }, { timeoutMs: 30000, retries: 1 });
 
   if (!response.ok) {
     await parseErrorPayload(response, 'Unable to search garment images right now.');
@@ -87,14 +87,14 @@ export async function removeBackgroundFromImageUrl(
   token: string,
   size: RemoveBackgroundSize = 'preview',
 ): Promise<string> {
-  const response = await fetch(buildApiUrl('/api/garments/remove-background-url'), {
+  const response = await fetchApiWithFallback('/api/garments/remove-background-url', {
     method: 'POST',
     headers: {
       ...buildAuthHeaders(token),
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ imageUrl, size }),
-  });
+  }, { timeoutMs: 30000, retries: 1 });
 
   if (!response.ok) {
     await parseErrorPayload(response, 'Unable to remove background from selected image.');

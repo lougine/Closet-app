@@ -15,7 +15,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AuthenticatedImage from "../../components/AuthenticatedImage";
-import { buildApiUrl, buildAuthHeaders, buildImageUrl } from "../../constants/api";
+import { buildApiUrl, buildAuthHeaders, buildImageUrl, fetchApiWithFallback } from "../../constants/api";
 import { useWardrobe } from "../../context/wardrobeContext";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -122,14 +122,14 @@ export default function OutfitDetailScreen() {
         return;
       }
 
-      const response = await fetch(buildApiUrl(`/api/outfits/${outfit._id}`), {
+      const response = await fetchApiWithFallback(`/api/outfits/${outfit._id}`, {
         method: "PUT",
         headers: {
           ...buildAuthHeaders(token),
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ garments: draftGarmentIds }),
-      });
+      }, { timeoutMs: 15000, retries: 1 });
 
       if (!response.ok) {
         const errorPayload = await response.json().catch(() => ({}));
@@ -161,14 +161,14 @@ export default function OutfitDetailScreen() {
         return;
       }
 
-      const response = await fetch(buildApiUrl(`/api/outfits/${outfit._id}`), {
+      const response = await fetchApiWithFallback(`/api/outfits/${outfit._id}`, {
         method: "PUT",
         headers: {
           ...buildAuthHeaders(token),
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ garments: nextGarments }),
-      });
+      }, { timeoutMs: 15000, retries: 1 });
 
       if (!response.ok) {
         const errorPayload = await response.json().catch(() => ({}));
@@ -203,10 +203,10 @@ export default function OutfitDetailScreen() {
               return;
             }
 
-            const response = await fetch(buildApiUrl(`/api/outfits/${outfit._id}`), {
+            const response = await fetchApiWithFallback(`/api/outfits/${outfit._id}`, {
               method: "DELETE",
               headers: buildAuthHeaders(token),
-            });
+            }, { timeoutMs: 15000, retries: 1 });
 
             if (!response.ok) {
               const errorPayload = await response.json().catch(() => ({}));

@@ -6,7 +6,7 @@ import { Alert, FlatList, StatusBar, Text, TouchableOpacity, View } from "react-
 import { captureRef } from "react-native-view-shot";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AuthenticatedImage from "../../components/AuthenticatedImage";
-import { buildApiUrl, buildAuthHeaders } from "../../constants/api";
+import { buildAuthHeaders, fetchApiWithFallback } from "../../constants/api";
 import { getAppTheme } from "../../constants/appTheme";
 import { useAppTheme } from "../../context/themeContext";
 import { uploadMultipartWithRetry } from "../../services/uploadRequest";
@@ -71,7 +71,7 @@ export default function OutfitScreen() {
 
     setSaving(true);
     try {
-      const response = await fetch(buildApiUrl("/api/outfits"), {
+      const response = await fetchApiWithFallback("/api/outfits", {
         method: "POST",
         headers: {
           ...buildAuthHeaders(token),
@@ -82,7 +82,7 @@ export default function OutfitScreen() {
           garments: selected,
           date: new Date().toISOString(),
         }),
-      });
+      }, { timeoutMs: 20000, retries: 1 });
 
       if (!response.ok) {
         const errorPayload = await response.json().catch(() => ({}));

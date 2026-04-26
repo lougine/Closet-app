@@ -4,7 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import React, { useState } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import { Dimensions, Image, Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import { buildApiUrl, buildAuthHeaders } from '@/constants/api';
+import { buildApiUrl, buildAuthHeaders, fetchApiWithFallback } from '@/constants/api';
 import styles from '../../Styles/auth/signupdetails.styles';
 
 const { width } = Dimensions.get('window');
@@ -67,14 +67,14 @@ export default function ProfileSetupScreen() {
       shoppingFrequency: selected.shoppingFrequency || null,
     };
 
-    const res = await fetch(buildApiUrl('/api/users/me'), {
+    const res = await fetchApiWithFallback('/api/users/me', {
       method: 'PUT',
       headers: {
         ...buildAuthHeaders(token),
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(payload),
-    });
+    }, { timeoutMs: 15000, retries: 1 });
 
     if (!res.ok) {
       throw new Error('Failed to save signup details');

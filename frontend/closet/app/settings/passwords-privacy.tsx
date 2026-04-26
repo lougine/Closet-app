@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, ScrollView, TextInput, Alert, ActivityInd
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
-import { buildApiUrl, buildAuthHeaders } from '@/constants/api';
+import { buildApiUrl, buildAuthHeaders, fetchApiWithFallback } from '@/constants/api';
 import { COLORS } from '@/constants/theme';
 import { getAppTheme } from '@/constants/appTheme';
 import { useAppTheme } from '@/context/themeContext';
@@ -43,14 +43,14 @@ export default function PasswordsPrivacyScreen() {
     setSavingPw(true);
     try {
       const token = await SecureStore.getItemAsync('userToken');
-      const res = await fetch(buildApiUrl('/api/users/me/password'), {
+      const res = await fetchApiWithFallback('/api/users/me/password', {
         method: 'PUT',
         headers: {
           ...buildAuthHeaders(token),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ currentPassword: currentPw, newPassword: newPw }),
-      });
+      }, { timeoutMs: 15000, retries: 1 });
       if (res.status === 401) {
         Alert.alert('Incorrect password', 'Your current password is wrong.');
         return;
@@ -71,14 +71,14 @@ export default function PasswordsPrivacyScreen() {
 
     try {
       const token = await SecureStore.getItemAsync('userToken');
-      await fetch(buildApiUrl('/api/users/me/privacy'), {
+      await fetchApiWithFallback('/api/users/me/privacy', {
         method: 'PUT',
         headers: { ...buildAuthHeaders(token), 'Content-Type': 'application/json' },
         body: JSON.stringify({
           privateProfile: key === 'privateProfile' ? value : privateProfile,
           allowRecommendations: key === 'allowRecommendations' ? value : allowRecommendations,
         }),
-      });
+      }, { timeoutMs: 12000, retries: 1 });
     } catch {
       if (key === 'privateProfile') setPrivateProfile(!value);
       if (key === 'allowRecommendations') setAllowRecommendations(!value);

@@ -8,7 +8,7 @@ import AuthenticatedImage from "../../../components/AuthenticatedImage";
 import AiRecommendedCanvas, { useAiRecommendedLogic } from "./AiRecommendedCanvas";
 import CreateOutfitCanvas, { useCreateOutfitLogic } from "./CreateOutfitCanvas";
 import RandomizeCanvas, { RANDOMIZE_PRESETS, RandomizeControls, useRandomizeModeLogic } from "./RandomizeCanvas";
-import { buildApiUrl, buildAuthHeaders } from "../../../constants/api";
+import { buildApiUrl, buildAuthHeaders, fetchApiWithFallback } from "../../../constants/api";
 import { useWardrobe } from "../../../context/wardrobeContext";
 import { useAppTheme } from "../../../context/themeContext";
 import { PANEL_W, PINK, s } from "../../../Styles/styling.styles";
@@ -890,7 +890,7 @@ export default function StylingScreen() {
       const selectedRecommendation = recommendations[activeRecommendation];
 
       const response = await withTimeout(
-        fetch(buildApiUrl("/api/outfits"), {
+        fetchApiWithFallback("/api/outfits", {
           method: "POST",
           headers: {
             ...buildAuthHeaders(token),
@@ -908,7 +908,7 @@ export default function StylingScreen() {
                 }
               : undefined,
           }),
-        }),
+        }, { timeoutMs: 15000, retries: 1 }),
         15000,
         "Save request timed out. Please check your connection and try again.",
       );
@@ -975,7 +975,7 @@ export default function StylingScreen() {
       let previewImageUri: string | undefined;
 
       const response = await withTimeout(
-        fetch(buildApiUrl("/api/outfits"), {
+        fetchApiWithFallback("/api/outfits", {
           method: "POST",
           headers: {
             ...buildAuthHeaders(token),
@@ -993,7 +993,7 @@ export default function StylingScreen() {
                 }
               : undefined,
           }),
-        }),
+        }, { timeoutMs: 15000, retries: 1 }),
         15000,
         "Save request timed out. Please check your connection and try again.",
       );

@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Alert,
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
-import { buildApiUrl, buildAuthHeaders } from '@/constants/api';
+import { buildApiUrl, buildAuthHeaders, fetchApiWithFallback } from '@/constants/api';
 import { COLORS } from '@/constants/theme';
 import { getAppTheme } from '@/constants/appTheme';
 import { useAppTheme } from '@/context/themeContext';
@@ -84,9 +84,9 @@ export default function PersonalInfoScreen() {
       const token = await SecureStore.getItemAsync('userToken');
       if (!token) { setLoading(false); return; }
 
-      const res = await fetch(buildApiUrl('/api/users/me'), {
+      const res = await fetchApiWithFallback('/api/users/me', {
         headers: buildAuthHeaders(token),
-      });
+      }, { timeoutMs: 12000, retries: 1 });
 
       if (!res.ok) { setLoading(false); return; } 
 
@@ -133,7 +133,7 @@ export default function PersonalInfoScreen() {
     setSaving(true);
     try {
       const token = await SecureStore.getItemAsync('userToken');
-      const res = await fetch(buildApiUrl('/api/users/me'), {
+      const res = await fetchApiWithFallback('/api/users/me', {
         method: 'PUT',
         headers: {
           ...buildAuthHeaders(token),

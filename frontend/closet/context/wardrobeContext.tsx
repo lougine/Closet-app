@@ -117,6 +117,7 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
     try {
       const token = await SecureStore.getItemAsync('userToken');
       if (!token) {
+        console.warn('Wardrobe: No auth token available');
         setLoading(false);
         return;
       }
@@ -136,9 +137,37 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
         }),
       ]);
 
+      console.log('Wardrobe: Fetched', {
+        garmentsOk: garmentsResult.ok,
+        garmentCount: garmentsResult.garments?.length || 0,
+        outfitsResponseOk: outfitsResponse.ok,
+        outfitsResponseStatus: outfitsResponse.status,
+      });
+
       if (garmentsResult.ok) {
         const garments = garmentsResult.garments;
-        const outfits = outfitsResponse.ok ? await outfitsResponse.json() : [];
+        
+        // Ensure outfits response is handled correctly
+        let outfits: any[] = [];
+        if (outfitsResponse.ok) {
+          try {
+            outfits = await outfitsResponse.json();
+            if (!Array.isArray(outfits)) {
+              console.warn('Wardrobe: Outfits response is not an array:', outfits);
+              outfits = [];
+            }
+          } catch (parseError) {
+            console.error('Wardrobe: Failed to parse outfits JSON:', parseError);
+            outfits = [];
+          }
+        } else {
+          const errorPayload = await outfitsResponse.json().catch(() => ({}));
+          console.warn('Wardrobe: Outfits fetch failed', {
+            status: outfitsResponse.status,
+            error: errorPayload,
+          });
+        }
+
         const storedLookbookIds = new Set(
           parseStoredLookbookIds(await SecureStore.getItemAsync(LOOKBOOK_IDS_KEY)),
         );
@@ -176,6 +205,12 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
         }).length;
         const outfitCount = ownedOutfits.length;
 
+        console.log('Wardrobe: Setting items and counts', {
+          itemCount: formattedItems.length,
+          outfitCount,
+          lookbookCount,
+        });
+
         setItems(formattedItems);
         setCounts(prev => ({
           ...prev,
@@ -185,12 +220,18 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
         }));
       } else {
         const errorPayload = await garmentsResult.response.json().catch(() => ({}));
-        console.error('Failed to fetch garments:', garmentsResult.response.status, errorPayload);
+        console.error('Wardrobe: Failed to fetch garments', {
+          status: garmentsResult.response.status,
+          error: errorPayload,
+        });
         setItems([]);
         setCounts(prev => ({ ...prev, items: 0, outfits: 0, lookbooks: 0 }));
       }
     } catch (error) {
-      console.error('Error fetching garments:', error);
+      console.error('Wardrobe: Error fetching wardrobe data:', error);
+      setItems([]);
+      setCounts(prev => ({ ...prev, items: 0, outfits: 0, lookbooks: 0 }));
+      setLoading(false);
     } finally {
       setLoading(false);
     }
