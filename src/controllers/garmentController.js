@@ -1,4 +1,6 @@
 const mongoose = require('mongoose');
+const fs = require('fs/promises');
+const Groq = require('groq-sdk');
 const Garment = require("../models/garment");
 const Usage = require('../models/usage');
 const { createImageUpload } = require("../middleware/imageUploadMiddleware");
@@ -11,10 +13,49 @@ const {
   ALLOWED_GARMENT_STYLE_TAGS,
   ALLOWED_GARMENT_SUBCATEGORY_SET,
   ALLOWED_GARMENT_STYLE_TAG_SET,
+  ALLOWED_FABRIC_SET,
 } = require('../constants/garmentTaxonomy');
 
 const SERPER_IMAGE_SEARCH_URL = 'https://google.serper.dev/images';
 const REMOVE_BG_API_URL = 'https://api.remove.bg/v1.0/removebg';
+const GROQ_API_KEY = process.env.GROQ_API_KEY || process.env.GROQ_API_TOKEN || '';
+const GROQ_VISION_MODEL = process.env.GROQ_VISION_MODEL || process.env.GROQ_MODEL || 'llama-3.2-11b-vision-preview';
+const groqClient = GROQ_API_KEY ? new Groq({ apiKey: GROQ_API_KEY }) : null;
+
+const ALLOWED_GARMENT_CATEGORIES = [
+  'Tops',
+  'Bottoms',
+  'Dresses',
+  'Outerwear',
+  'Footwear',
+  'Accessories',
+  'Bags',
+  'Swimwear',
+];
+
+const CATEGORY_TO_SUBCATEGORIES = {
+  Tops: ['t-shirt', 'blouse', 'crop top', 'tank top', 'shirt', 'hoodie', 'sweater', 'cardigan'],
+  Bottoms: ['jeans', 'skirt', 'shorts', 'trousers', 'leggings', 'cargo pants', 'sweatpants'],
+  Dresses: ['mini dress', 'bodycon'],
+  Outerwear: ['jacket', 'blazer', 'coat', 'trench coat', 'puffer', 'leather jacket', 'denim jacket', 'vest'],
+  Footwear: ['sneakers', 'heels', 'boots', 'sandals', 'platforms'],
+  Accessories: ['bag', 'belt', 'hat', 'sunglasses', 'jewellery', 'scarf', 'watch'],
+  Bags: ['handbag', 'tote', 'clutch', 'backpack', 'mini bag', 'shoulder bag'],
+  Swimwear: ['one-piece', 'coverup', 'swim shorts'],
+};
+
+const SUBCATEGORY_TO_CATEGORY = Object.entries(CATEGORY_TO_SUBCATEGORIES).reduce((acc, [category, subcategories]) => {
+  for (const subcategory of subcategories) {
+    acc[subcategory] = category;
+  }
+  return acc;
+}, {});
+
+const ALLOWED_COLORS = [
+  'Black', 'White', 'Grey', 'Brown', 'Beige', 'Red', 'Pink', 'Purple',
+  'Blue', 'Navy', 'Green', 'Yellow', 'Orange', 'Gold', 'Mint', 'Cream',
+];
+const ALLOWED_COLOR_SET = new Set(ALLOWED_COLORS.map((value) => value.toLowerCase()));
 
 const BLOCKED_IMAGE_HOST_TOKENS = [
   'pinterest',
@@ -113,6 +154,254 @@ const normalizeUniqueTagList = (rawTags) => {
     .filter(Boolean);
 
   return [...new Set(normalized)];
+};
+
+const normalizeColor = (value) => {
+  const normalized = normalizeToken(value);
+  if (!normalized) return null;
+
+  if (normalized.includes('gray')) return 'Grey';
+  if (normalized.includes('grey')) return 'Grey';
+
+  const canonical = ALLOWED_COLORS.find((color) => normalized.includes(color.toLowerCase()));
+  return canonical || null;
+};
+
+const normalizeCategory = (value) => {
+  const normalized = normalizeToken(value);
+  if (!normalized) return null;
+
+  const direct = ALLOWED_GARMENT_CATEGORIES.find((category) => category.toLowerCase() === normalized);
+  if (direct) return direct;
+
+  const fuzzy = ALLOWED_GARMENT_CATEGORIES.find((category) => normalized.includes(category.toLowerCase()));
+  return fuzzy || null;
+};
+
+const normalizeSubcategory = (value) => {
+  const normalized = normalizeToken(value);
+  if (!normalized) return null;
+  if (ALLOWED_GARMENT_SUBCATEGORY_SET.has(normalized)) return normalized;
+
+  const fuzzy = ALLOWED_GARMENT_SUBCATEGORIES.find((subcategory) => normalized.includes(subcategory));
+  return fuzzy || null;
+};
+
+const normalizeFabric = (value) => {
+  const normalized = normalizeToken(value);
+  if (!normalized) return null;
+  if (ALLOWED_FABRIC_SET.has(normalized)) return normalized;
+
+  for (const allowed of ALLOWED_FABRIC_SET) {
+    if (normalized.includes(allowed)) return allowed;
+  }
+
+  return null;
+};
+
+const extractFirstJsonObject = (rawValue) => {
+  if (typeof rawValue !== 'string') return null;
+
+  const stripped = rawValue
+    .replace(/```json/gi, '')
+    .replace(/```/g, '')
+    .trim();
+
+  try {
+    return JSON.parse(stripped);
+  } catch (error) {
+    const match = stripped.match(/\{[\s\S]*\}/);
+    if (!match) return null;
+    try {
+      return JSON.parse(match[0]);
+    } catch {
+      return null;
+    }
+  }
+};
+
+const inferFromTextHeuristics = (rawText) => {
+  const text = normalizeToken(rawText);
+
+  const inferredSubcategory = ALLOWED_GARMENT_SUBCATEGORIES.find((subcategory) => text.includes(subcategory)) || null;
+  const inferredCategory = inferredSubcategory
+    ? SUBCATEGORY_TO_CATEGORY[inferredSubcategory] || null
+    : (text.includes('shoe') || text.includes('sneaker') ? 'Footwear'
+      : text.includes('dress') ? 'Dresses'
+      : text.includes('jacket') || text.includes('coat') || text.includes('blazer') ? 'Outerwear'
+      : text.includes('jeans') || text.includes('pants') || text.includes('shorts') || text.includes('skirt') ? 'Bottoms'
+      : text.includes('bag') || text.includes('tote') || text.includes('backpack') ? 'Bags'
+      : text.includes('swim') ? 'Swimwear'
+      : text.includes('belt') || text.includes('hat') || text.includes('scarf') || text.includes('watch') ? 'Accessories'
+      : null);
+
+  const inferredColor = normalizeColor(text);
+  const inferredFabric = normalizeFabric(text);
+
+  const styleTags = [];
+  if (text.includes('formal') || text.includes('office') || text.includes('blazer') || text.includes('suit')) styleTags.push('formal', 'business');
+  if (text.includes('casual') || text.includes('daily')) styleTags.push('casual');
+  if (text.includes('sport') || text.includes('gym') || text.includes('running')) styleTags.push('sportswear', 'athleisure');
+  if (text.includes('street') || text.includes('oversized') || text.includes('cargo')) styleTags.push('streetwear');
+  if (text.includes('vintage') || text.includes('retro')) styleTags.push('vintage');
+  if (text.includes('minimal')) styleTags.push('minimalist');
+  if (text.includes('luxury') || text.includes('designer')) styleTags.push('luxury');
+  if (text.includes('vacation') || text.includes('resort') || text.includes('beach')) styleTags.push('vacation');
+
+  return {
+    category: inferredCategory,
+    subcategory: inferredSubcategory,
+    color: inferredColor,
+    fabric: inferredFabric,
+    styleTags: [...new Set(styleTags)].filter((tag) => ALLOWED_GARMENT_STYLE_TAG_SET.has(tag)),
+  };
+};
+
+const sanitizeDetectedAttributes = (raw, fallbackText) => {
+  const fallback = inferFromTextHeuristics(fallbackText);
+  const source = raw && typeof raw === 'object' ? raw : {};
+
+  let category = normalizeCategory(source.category) || fallback.category;
+  let subcategory = normalizeSubcategory(source.subcategory) || fallback.subcategory;
+  let color = normalizeColor(source.color) || fallback.color;
+  let fabric = normalizeFabric(source.fabric) || fallback.fabric;
+
+  if (subcategory && !category) {
+    category = SUBCATEGORY_TO_CATEGORY[subcategory] || null;
+  }
+
+  if (subcategory && category) {
+    const allowedForCategory = CATEGORY_TO_SUBCATEGORIES[category] || [];
+    if (!allowedForCategory.includes(subcategory)) {
+      subcategory = null;
+    }
+  }
+
+  const sourceTags = Array.isArray(source.styleTags)
+    ? source.styleTags
+    : (Array.isArray(source.tags) ? source.tags : []);
+
+  const styleTags = normalizeUniqueTagList(sourceTags)
+    .filter((tag) => ALLOWED_GARMENT_STYLE_TAG_SET.has(tag));
+
+  const mergedStyleTags = [...new Set([...(fallback.styleTags || []), ...styleTags])].slice(0, 4);
+
+  return {
+    category: category || null,
+    subcategory: subcategory || null,
+    color: color || null,
+    fabric: fabric || null,
+    styleTags: mergedStyleTags,
+  };
+};
+
+exports.autoDetectGarmentDetails = async (req, res) => {
+  let uploadedImageUrl = null;
+  let imageDataUrl = null;
+
+  try {
+    const bodyImageUrl = typeof req.body?.imageUrl === 'string' ? req.body.imageUrl.trim() : '';
+    if (req.file) {
+      uploadedImageUrl = getUploadedImageUrl(req.file);
+
+      if (uploadedImageUrl && /^https:\/\//i.test(uploadedImageUrl)) {
+        const validatedUploadedUrl = await validateOutboundImageUrl(uploadedImageUrl);
+        if (!validatedUploadedUrl.ok) {
+          return res.status(400).json({ message: validatedUploadedUrl.reason || 'Invalid uploaded image URL.' });
+        }
+        uploadedImageUrl = validatedUploadedUrl.normalizedUrl;
+      } else if (req.file?.path) {
+        const fileBuffer = await fs.readFile(req.file.path);
+        const mimeType = req.file.mimetype || 'image/jpeg';
+        imageDataUrl = `data:${mimeType};base64,${fileBuffer.toString('base64')}`;
+      }
+    }
+
+    let imageUrl = uploadedImageUrl || null;
+    if (!imageDataUrl && !imageUrl && bodyImageUrl) {
+      const validatedImageUrl = await validateOutboundImageUrl(bodyImageUrl);
+      if (!validatedImageUrl.ok) {
+        return res.status(400).json({ message: validatedImageUrl.reason || 'Invalid image URL.' });
+      }
+      imageUrl = validatedImageUrl.normalizedUrl;
+    }
+
+    if (!imageDataUrl && !imageUrl) {
+      return res.status(400).json({ message: 'image or imageUrl is required.' });
+    }
+
+    const visionImageSource = imageDataUrl || imageUrl;
+    const fallbackText = [
+      req.body?.name,
+      req.body?.fileName,
+      req.file?.originalname,
+      imageUrl,
+      bodyImageUrl,
+    ].filter(Boolean).join(' ');
+
+    let detected = sanitizeDetectedAttributes({}, fallbackText);
+
+    if (groqClient) {
+      try {
+        const completion = await groqClient.chat.completions.create({
+          model: GROQ_VISION_MODEL,
+          temperature: 0.2,
+          max_tokens: 350,
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a fashion metadata detector. Return valid JSON only with keys: category, subcategory, color, fabric, styleTags. Do not include markdown.',
+            },
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'text',
+                  text: [
+                    'Analyze this clothing image and infer normalized metadata.',
+                    `category must be one of: ${ALLOWED_GARMENT_CATEGORIES.join(', ')}`,
+                    `subcategory must be one of: ${ALLOWED_GARMENT_SUBCATEGORIES.join(', ')}`,
+                    `color should be one of: ${ALLOWED_COLORS.join(', ')}`,
+                    `fabric should be one of: ${Array.from(ALLOWED_FABRIC_SET).join(', ')}`,
+                    `styleTags should be an array from: ${ALLOWED_GARMENT_STYLE_TAGS.join(', ')}`,
+                    'Use null for unknown values and return at most 4 style tags.',
+                  ].join('\n'),
+                },
+                {
+                  type: 'image_url',
+                  image_url: {
+                    url: visionImageSource,
+                  },
+                },
+              ],
+            },
+          ],
+        });
+
+        const content = completion?.choices?.[0]?.message?.content;
+        const parsed = extractFirstJsonObject(content);
+        detected = sanitizeDetectedAttributes(parsed || {}, fallbackText);
+      } catch (error) {
+        detected = sanitizeDetectedAttributes({}, fallbackText);
+      }
+    }
+
+    return res.json({
+      ...detected,
+      sourceImageUrl: imageUrl || uploadedImageUrl || null,
+      usedModel: groqClient ? GROQ_VISION_MODEL : null,
+    });
+  } catch (error) {
+    return res.status(500).json({ message: 'Internal server error' });
+  } finally {
+    if (uploadedImageUrl) {
+      try {
+        await deleteImageByUrl(uploadedImageUrl);
+      } catch (cleanupError) {
+        // Ignore cleanup failures; response should not fail because of orphan cleanup.
+      }
+    }
+  }
 };
 
 const scoreImage = (img) => {

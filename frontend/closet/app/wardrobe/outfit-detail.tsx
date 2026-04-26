@@ -1,18 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
-import React, { useMemo, useState } from "react";
-import {
-  Alert,
-  Dimensions,
-  FlatList,
-  Modal,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-  Share,
-} from "react-native";
+import React, { useEffect, useMemo, useState } from "react";
+import { Alert, Dimensions, FlatList, Modal, StyleSheet, Text, TouchableOpacity, View, Share } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AuthenticatedImage from "../../components/AuthenticatedImage";
 import { buildApiUrl, buildAuthHeaders, buildImageUrl, fetchApiWithFallback } from "../../constants/api";
@@ -50,21 +40,49 @@ const formatCategory = (category: unknown) => {
 
 export default function OutfitDetailScreen() {
   const router = useRouter();
-  const { outfitJson } = useLocalSearchParams<{ outfitJson: string }>();
+  const { outfitJson, outfitId } = useLocalSearchParams<{ outfitJson?: string; outfitId?: string }>();
   const { items, refreshItems, decrementOutfitCount } = useWardrobe();
+  const [remoteOutfit, setRemoteOutfit] = useState<OutfitSummary | null>(null);
+  const [loadingRemoteOutfit, setLoadingRemoteOutfit] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [editingItems, setEditingItems] = useState(false);
   const [draftGarmentIds, setDraftGarmentIds] = useState<string[]>([]);
   const [savingItems, setSavingItems] = useState(false);
 
   const outfit: OutfitSummary | null = useMemo(() => {
-    if (!outfitJson) return null;
-    try {
-      return JSON.parse(outfitJson);
-    } catch {
-      return null;
+    if (outfitJson) {
+      try {
+        return JSON.parse(outfitJson);
+      } catch {
+        return null;
+      }
     }
-  }, [outfitJson]);
+
+    return remoteOutfit;
+  }, [outfitJson, remoteOutfit]);
+
+  useEffect(() => {
+    if (outfitJson || !outfitId || remoteOutfit || loadingRemoteOutfit) return;
+
+    let isActive = true;
+    const loadOutfit = async () => {
+      setLoadingRemoteOutfit(true);
+      try {
+        const response = await fetchApiWithFallback(`/api/outfits/${String(outfitId)}`);
+        if (!response.ok) return;
+        const payload = await response.json();
+        if (!isActive) return;
+        setRemoteOutfit(payload);
+      } catch {
+        // ignore silently
+      } finally {
+        if (isActive) setLoadingRemoteOutfit(false);
+      }
+    };
+
+    void loadOutfit();
+    return () => { isActive = false; };
+  }, [outfitJson, outfitId, remoteOutfit, loadingRemoteOutfit]);
 
   const garmentIds = useMemo(
     () => (Array.isArray(outfit?.garmentIds) ? outfit.garmentIds : []),

@@ -158,6 +158,12 @@ export const s = StyleSheet.create({
   removeBgBtnDisabled: {
     opacity: 0.65,
   },
+  autoDetectBtn: {
+    backgroundColor: "#FF76A1",
+  },
+  autoDetectBtnDisabled: {
+    opacity: 0.65,
+  },
   removeBgBtnText: {
     color: "#fff",
     fontWeight: "600",

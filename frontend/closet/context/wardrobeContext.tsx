@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import * as SecureStore from "expo-secure-store";
 import { buildImageUrl, fetchApiWithFallback } from "../constants/api";
 import { fetchCurrentUserProfile } from "@/services/userProfileService";
@@ -77,6 +77,7 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<ClothingItem[]>([]);
   const [counts, setCounts] = useState({ items: 0, outfits: 0, lookbooks: 0 });
   const [loading, setLoading] = useState(true);
+  const inFlightFetchRef = useRef<Promise<void> | null>(null);
 
   const fetchAllGarments = useCallback(async (token: string) => {
     const allGarments: any[] = [];
@@ -114,6 +115,12 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const fetchItems = useCallback(async () => {
+    if (inFlightFetchRef.current) {
+      await inFlightFetchRef.current;
+      return;
+    }
+
+    const runFetch = async () => {
     try {
       const token = await SecureStore.getItemAsync('userToken');
       if (!token) {
@@ -136,13 +143,6 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
           retries: 1,
         }),
       ]);
-
-      console.log('Wardrobe: Fetched', {
-        garmentsOk: garmentsResult.ok,
-        garmentCount: garmentsResult.garments?.length || 0,
-        outfitsResponseOk: outfitsResponse.ok,
-        outfitsResponseStatus: outfitsResponse.status,
-      });
 
       if (garmentsResult.ok) {
         const garments = garmentsResult.garments;
@@ -205,12 +205,6 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
         }).length;
         const outfitCount = ownedOutfits.length;
 
-        console.log('Wardrobe: Setting items and counts', {
-          itemCount: formattedItems.length,
-          outfitCount,
-          lookbookCount,
-        });
-
         setItems(formattedItems);
         setCounts(prev => ({
           ...prev,
@@ -235,6 +229,13 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
+    };
+
+    const fetchPromise = runFetch().finally(() => {
+      inFlightFetchRef.current = null;
+    });
+    inFlightFetchRef.current = fetchPromise;
+    await fetchPromise;
   }, [fetchAllGarments]);
 
   const getCategoryBg = (category: string) => {

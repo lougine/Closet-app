@@ -216,7 +216,7 @@ export default function DayScreen() {
 
   return (
     <View style={[styles.flex, { backgroundColor: theme.screen }]} {...panResponder.panHandlers}>
-      <View style={[styles.headerBg, { backgroundColor: isDarkMode ? '#1A1A1A' : undefined }]}>
+      <View style={isDarkMode ? styles.headerBgDark : styles.headerBgLight}>
         <View style={styles.headerRow}>
           <TouchableOpacity onPress={prevWeek} style={styles.arrowBtn}>
             <Ionicons name="chevron-back" size={22} color={theme.text} />

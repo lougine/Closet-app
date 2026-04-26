@@ -4,20 +4,13 @@ import * as ImageManipulator from "expo-image-manipulator";
 import * as FileSystem from "expo-file-system/legacy";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
-import {
-  ActivityIndicator, Alert, Image, KeyboardAvoidingView,
-  Platform, ScrollView, StatusBar, Text, TextInput, TouchableOpacity, View, Dimensions,
-} from "react-native";
+import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StatusBar, Text, TextInput, TouchableOpacity, View, Dimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as SecureStore from "expo-secure-store";
-import {
-  IMAGE_UPLOAD_ASPECT,
-  IMAGE_UPLOAD_QUALITY,
-  validateImageFileSize,
-} from "../../constants/imageUpload";
+import { IMAGE_UPLOAD_ASPECT, IMAGE_UPLOAD_QUALITY, validateImageFileSize } from "../../constants/imageUpload";
 import { getAppTheme } from "../../constants/appTheme";
 import { buildApiUrl, buildImageUrl, fetchApiWithFallback } from "../../constants/api";
-import { GARMENT_FABRIC_OPTIONS } from "../../constants/garmentTaxonomy";
+import { GARMENT_FABRIC_OPTIONS, GARMENT_STYLE_TAG_OPTIONS } from "../../constants/garmentTaxonomy";
 import { getUploadErrorMessage, UploadRequestError, uploadMultipartWithRetry } from "../../services/uploadRequest";
 import { removeBackgroundFromImageUri } from "../../services/removeBackground";
 import { useAppTheme } from "../../context/themeContext";
@@ -67,6 +60,14 @@ interface ItemForm {
   fabric?: string;
 }
 
+type AutoDetectPayload = {
+  category?: string | null;
+  subcategory?: string | null;
+  color?: string | null;
+  fabric?: string | null;
+  styleTags?: string[];
+};
+
 interface QueuedImage {
   id: string;
   uri: string;
@@ -85,6 +86,14 @@ const createInitialForm = (): ItemForm => ({
 });
 
 const TILE_WIDTH = Dimensions.get("window").width - 32;
+const STYLE_TAG_SET = new Set(GARMENT_STYLE_TAG_OPTIONS.map((tag) => tag.toLowerCase()));
+const SUBCATEGORY_LABEL_BY_LOWER = Object.values(CATEGORY_TREE)
+  .flat()
+  .reduce<Record<string, string>>((acc, subcategory) => {
+    acc[subcategory.toLowerCase()] = subcategory;
+    return acc;
+  }, {});
+const COLOR_LABEL_SET = new Set(COLOR_OPTIONS.map((option) => option.label.toLowerCase()));
 
 const getAutoItemName = (category: string) => {
   const base = category?.trim() || "Item";
@@ -205,6 +214,8 @@ export default function AddItemsScreen() {
   const [processingBackground, setProcessingBackground] = useState(false);
   const [lastLaunchKeyHandled, setLastLaunchKeyHandled] = useState<string | null>(null);
   const [hasAutoProcessedInitialQueue, setHasAutoProcessedInitialQueue] = useState(false);
+  const [autoDetecting, setAutoDetecting] = useState(false);
+  const [autoDetectedAssetIds, setAutoDetectedAssetIds] = useState<Record<string, boolean>>({});
 
   const applyPickedAsset = (asset: QueuedImage) => {
     setImage(asset.uri);
@@ -253,6 +264,7 @@ export default function AddItemsScreen() {
 
       setImageQueue(processedAssets);
       setItemDrafts(nextDrafts);
+      setAutoDetectedAssetIds({});
       setCurrentImageIndex(0);
       applyPickedAsset(processedAssets[0]);
       setForm(nextDrafts[processedAssets[0].id] ?? createInitialForm());
@@ -269,6 +281,114 @@ export default function AddItemsScreen() {
     setHasAutoProcessedInitialQueue(true);
     applyPickedAssets(initialQueue);
   }, [hasAutoProcessedInitialQueue, initialQueue]);
+
+  const mergeAutoDetectedForm = (baseForm: ItemForm, payload: AutoDetectPayload): ItemForm => {
+    const nextForm: ItemForm = { ...baseForm };
+
+    const normalizedCategory = typeof payload.category === "string" ? payload.category.trim() : "";
+    if (normalizedCategory && CATEGORIES.includes(normalizedCategory)) {
+      nextForm.category = normalizedCategory;
+    }
+
+    const normalizedColor = typeof payload.color === "string" ? payload.color.trim() : "";
+    if (normalizedColor && nextForm.colors.length === 0 && COLOR_LABEL_SET.has(normalizedColor.toLowerCase())) {
+      const canonicalColor = COLOR_OPTIONS.find((option) => option.label.toLowerCase() === normalizedColor.toLowerCase())?.label;
+      if (canonicalColor) nextForm.colors = [canonicalColor];
+    }
+
+    const normalizedFabric = typeof payload.fabric === "string" ? payload.fabric.trim().toLowerCase() : "";
+    if (normalizedFabric && !nextForm.fabric && GARMENT_FABRIC_OPTIONS.includes(normalizedFabric as any)) {
+      nextForm.fabric = normalizedFabric;
+    }
+
+    const mergedTags = [...(nextForm.tags ?? [])];
+    const hasSelectedSubcategory = mergedTags.some((tag) => ALL_SUBCATEGORY_TAGS.has(tag.toLowerCase()));
+    const normalizedSubcategory = typeof payload.subcategory === "string" ? payload.subcategory.trim().toLowerCase() : "";
+    if (normalizedSubcategory && !hasSelectedSubcategory) {
+      const canonicalSubcategory = SUBCATEGORY_LABEL_BY_LOWER[normalizedSubcategory] || payload.subcategory || "";
+      if (canonicalSubcategory && !mergedTags.some((tag) => tag.toLowerCase() === canonicalSubcategory.toLowerCase())) {
+        mergedTags.push(canonicalSubcategory);
+      }
+    }
+
+    const detectedStyleTags = Array.isArray(payload.styleTags)
+      ? payload.styleTags.map((tag) => String(tag || "").toLowerCase()).filter((tag) => STYLE_TAG_SET.has(tag))
+      : [];
+
+    for (const styleTag of detectedStyleTags) {
+      if (!mergedTags.some((tag) => tag.toLowerCase() === styleTag)) {
+        mergedTags.push(styleTag);
+      }
+    }
+
+    nextForm.tags = mergedTags;
+    return nextForm;
+  };
+
+  const runAutoDetectForAsset = async (asset: QueuedImage, force = false) => {
+    if (!asset?.uri) return;
+    if (autoDetecting) return;
+    if (autoDetectedAssetIds[asset.id] && !force) return;
+
+    try {
+      const token = await SecureStore.getItemAsync('userToken');
+      if (!token) return;
+
+      setAutoDetecting(true);
+      setUploadStatus('Auto-detecting details...');
+
+      const imageMeta = getUploadImageMeta(asset.uri);
+      const formData = new FormData();
+      formData.append('image', {
+        uri: asset.uri,
+        name: `detect-${Date.now()}.${imageMeta.extension}`,
+        type: imageMeta.mimeType,
+      } as any);
+
+      const payload = await uploadMultipartWithRetry<AutoDetectPayload>({
+        endpoint: '/api/garments/auto-detect',
+        method: 'POST',
+        token,
+        formData,
+        timeoutMs: 45000,
+        retries: 1,
+        fallbackMessage: 'Unable to auto-detect item details.',
+      });
+
+      setItemDrafts((prevDrafts) => {
+        const baseDraft = prevDrafts[asset.id] ?? createInitialForm();
+        const mergedDraft = mergeAutoDetectedForm(baseDraft, payload);
+        const nextDrafts = {
+          ...prevDrafts,
+          [asset.id]: mergedDraft,
+        };
+
+        const currentAsset = imageQueue[currentImageIndex];
+        if (currentAsset?.id === asset.id) {
+          setForm(mergedDraft);
+        }
+
+        return nextDrafts;
+      });
+
+      setAutoDetectedAssetIds((prev) => ({ ...prev, [asset.id]: true }));
+    } catch (error) {
+      if (force) {
+        Alert.alert('Auto-detect failed', getUploadErrorMessage(error, 'Unable to auto-detect item attributes.'));
+      }
+    } finally {
+      setUploadStatus(null);
+      setAutoDetecting(false);
+    }
+  };
+
+  useEffect(() => {
+    const currentAsset = imageQueue[currentImageIndex];
+    if (!currentAsset || saving || processingBackground) return;
+    if (autoDetecting) return;
+    if (autoDetectedAssetIds[currentAsset.id]) return;
+    void runAutoDetectForAsset(currentAsset, false);
+  }, [imageQueue, currentImageIndex, saving, processingBackground, autoDetectedAssetIds, autoDetecting]);
 
   const requestPickerPermission = async (pickerSource: "camera" | "gallery") => {
     if (pickerSource === "camera") {
@@ -396,26 +516,6 @@ export default function AddItemsScreen() {
 
   const removeTag = (tag: string) =>
     update("tags", form.tags.filter((t) => t !== tag));
-
-  const handleRemoveBackground = async () => {
-    if (!image || processingBackground || saving) return;
-
-    try {
-      setProcessingBackground(true);
-      setUploadStatus("Removing background...");
-
-      const processedUri = await removeBackgroundFromImageUri(image);
-      setImage(processedUri);
-
-      const processedInfo = await FileSystem.getInfoAsync(processedUri);
-      setImageFileSize(processedInfo.exists ? (processedInfo as any).size ?? null : null);
-    } catch (error) {
-      Alert.alert("Background removal failed", getUploadErrorMessage(error, "Unable to remove background."));
-    } finally {
-      setUploadStatus(null);
-      setProcessingBackground(false);
-    }
-  };
 
   const handleCameraRoll = async () => {
     if (processingBackground || saving) return;
@@ -775,21 +875,6 @@ export default function AddItemsScreen() {
           </View>
           {imageQueue.length > 1 ? (
             <Text style={[s.multiPreviewCounter, { color: theme.subText }]}>{currentImageIndex + 1}/{imageQueue.length}</Text>
-          ) : null}
-
-          {image ? (
-            <View style={s.photoActionsRow}>
-              <TouchableOpacity
-                style={[s.photoActionBtn, s.removeBgBtn, (processingBackground || saving) && s.removeBgBtnDisabled]}
-                onPress={handleRemoveBackground}
-                disabled={processingBackground || saving}
-              >
-                <Ionicons name="cut-outline" size={16} color="#fff" />
-                <Text style={s.removeBgBtnText}>
-                  {processingBackground ? "Removing Background..." : "Remove Background"}
-                </Text>
-              </TouchableOpacity>
-            </View>
           ) : null}
 
           <Section title="Category" required isDarkMode={isDarkMode}>
