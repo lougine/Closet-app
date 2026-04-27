@@ -6,6 +6,8 @@
     "start": "node ./scripts/updateApiEnv.js && expo start",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "node ./scripts/updateApiEnv.js && expo start --android",
+    "android:devclient": "node ./scripts/updateApiEnv.js && expo run:android",
+    "start:devclient": "node ./scripts/updateApiEnv.js && expo start --dev-client",
     "ios": "node ./scripts/updateApiEnv.js && expo start --ios",
     "web": "node ./scripts/updateApiEnv.js && expo start --web",
     "lint": "expo lint"

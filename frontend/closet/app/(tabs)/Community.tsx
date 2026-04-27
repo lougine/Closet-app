@@ -113,6 +113,7 @@ const CommunityScreen: React.FC = () => {
   const feedListRef = useRef<FlatList<CommunityPost>>(null);
   const communityTapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const styledChipRef = useRef<React.ElementRef<typeof TouchableOpacity> | null>(null);
+  const authRedirectedRef = useRef(false);
 
   const filterChips = useMemo(
     () => [
@@ -141,6 +142,15 @@ const CommunityScreen: React.FC = () => {
     return res.json();
   };
 
+  const redirectToAuth = useCallback(async () => {
+    if (authRedirectedRef.current) return;
+    authRedirectedRef.current = true;
+    try {
+      await SecureStore.deleteItemAsync("userToken");
+    } catch {}
+    router.replace("/authentication" as any);
+  }, [router]);
+
   const communityFetch = async (path: string, init?: RequestInit) => {
     const normalizedPath = path.startsWith("/") ? path : `/${path}`;
     const primary = await fetchApiWithFallback(`${COMMUNITY_BASE}${normalizedPath}`, init, {
@@ -163,6 +173,7 @@ const CommunityScreen: React.FC = () => {
       if (!token) {
         setNotifications([]);
         setUnreadCount(0);
+        await redirectToAuth();
         return;
       }
       const response = await communityFetch("/notifications?limit=30", {
@@ -178,7 +189,13 @@ const CommunityScreen: React.FC = () => {
         });
 
         if (!legacyResponse.ok) {
-          if (legacyResponse.status === 401 || legacyResponse.status === 403 || legacyResponse.status === 404) {
+          if (legacyResponse.status === 401 || legacyResponse.status === 403) {
+            setNotifications([]);
+            setUnreadCount(0);
+            await redirectToAuth();
+            return;
+          }
+          if (legacyResponse.status === 404) {
             setNotifications([]);
             setUnreadCount(0);
             return;
@@ -215,6 +232,7 @@ const CommunityScreen: React.FC = () => {
         if (response.status === 401 || response.status === 403) {
           setNotifications([]);
           setUnreadCount(0);
+          await redirectToAuth();
           return;
         }
         if (response.status === 404) {
@@ -237,19 +255,23 @@ const CommunityScreen: React.FC = () => {
     } finally {
       setNotifLoading(false);
     }
-  }, []);
+  }, [redirectToAuth]);
 
   const markNotificationsRead = useCallback(async () => {
     try {
       const token = await SecureStore.getItemAsync("userToken");
+      if (!token) {
+        await redirectToAuth();
+        return;
+      }
       await communityFetch("/notifications/read", {
         method: "POST",
         headers: buildAuthHeaders(token),
       });
       setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
       setUnreadCount(0);
-    } catch (_) {}
-  }, []);
+    } catch {}
+  }, [redirectToAuth]);
 
   const fetchRelationshipState = useCallback(async () => {
     try {
@@ -266,7 +288,7 @@ const CommunityScreen: React.FC = () => {
 
       setFollowedUserIds(followingIds);
       setCurrentUserId(String(me?._id || ""));
-    } catch (_) {
+    } catch {
       setFollowedUserIds(new Set());
     }
   }, []);
@@ -281,6 +303,13 @@ const CommunityScreen: React.FC = () => {
         if (!silent && !append) setLoading(true);
 
         const token = await SecureStore.getItemAsync("userToken");
+        if (!token) {
+          setFeed([]);
+          setHasMore(false);
+          setPage(1);
+          await redirectToAuth();
+          return;
+        }
         const params = new URLSearchParams();
         params.append("filter", activeFilter);
         if (activeFilter === "styled-for") {
@@ -292,6 +321,13 @@ const CommunityScreen: React.FC = () => {
         const response = await communityFetch(`/feed?${params.toString()}`, {
           headers: buildAuthHeaders(token),
         });
+        if (response.status === 401 || response.status === 403) {
+          setFeed([]);
+          setHasMore(false);
+          setPage(1);
+          await redirectToAuth();
+          return;
+        }
 
         const data = await parseJsonOrThrow(response, "Community feed");
         const incomingItems: CommunityPost[] = data.items || [];
@@ -319,7 +355,7 @@ const CommunityScreen: React.FC = () => {
         setRefreshing(false);
       }
     },
-    [activeFilter, styledForScope]
+    [activeFilter, styledForScope, redirectToAuth]
   );
 
   useFocusEffect(
@@ -431,10 +467,18 @@ const CommunityScreen: React.FC = () => {
   const toggleLike = async (postId: string) => {
     try {
       const token = await SecureStore.getItemAsync("userToken");
+      if (!token) {
+        await redirectToAuth();
+        return;
+      }
       const response = await communityFetch(`/posts/${postId}/like`, {
         method: "POST",
         headers: buildAuthHeaders(token),
       });
+      if (response.status === 401 || response.status === 403) {
+        await redirectToAuth();
+        return;
+      }
       const updated = await parseJsonOrThrow(response, "Like post");
       setFeed((prev) => prev.map((item) => (item._id === postId ? updated : item)));
     } catch (error: any) {
@@ -450,9 +494,17 @@ const CommunityScreen: React.FC = () => {
     try {
       setLoadingCommentsByPost((prev) => ({ ...prev, [postId]: true }));
       const token = await SecureStore.getItemAsync("userToken");
+      if (!token) {
+        await redirectToAuth();
+        return;
+      }
       const response = await communityFetch(`/posts/${postId}/comments?limit=20`, {
         headers: buildAuthHeaders(token),
       });
+      if (response.status === 401 || response.status === 403) {
+        await redirectToAuth();
+        return;
+      }
       const data = await parseJsonOrThrow(response, "Load comments");
       setCommentsByPost((prev) => ({ ...prev, [postId]: data.items || [] }));
     } catch (error: any) {
@@ -469,11 +521,19 @@ const CommunityScreen: React.FC = () => {
     try {
       setSubmittingCommentFor(postId);
       const token = await SecureStore.getItemAsync("userToken");
+      if (!token) {
+        await redirectToAuth();
+        return;
+      }
       const response = await communityFetch(`/posts/${postId}/comments`, {
         method: "POST",
         headers: { ...buildAuthHeaders(token), "Content-Type": "application/json" },
         body: JSON.stringify({ text }),
       });
+      if (response.status === 401 || response.status === 403) {
+        await redirectToAuth();
+        return;
+      }
       const created = await parseJsonOrThrow(response, "Add comment");
       setCommentsByPost((prev) => ({ ...prev, [postId]: [created, ...(prev[postId] || [])] }));
       setCommentDraftByPost((prev) => ({ ...prev, [postId]: "" }));

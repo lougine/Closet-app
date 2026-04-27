@@ -1,6 +1,8 @@
 import { NativeModules, NativeEventEmitter, Platform } from 'react-native';
 
-const { UnityBridge } = NativeModules;
+type UnityBridgeModule = {
+  launchAR: (payload: string) => void;
+};
 
 export interface ARGarment {
   slot: 'UpperBody' | 'LowerBody';
@@ -16,28 +18,79 @@ export interface ARProduct {
   slot?: 'UpperBody' | 'LowerBody';
 }
 
+export interface ARAvailability {
+  available: boolean;
+  reason?: string;
+}
+
 let _emitter: NativeEventEmitter | null = null;
 
-function getEmitter(): NativeEventEmitter {
-  if (!_emitter && UnityBridge) {
-    _emitter = new NativeEventEmitter(UnityBridge);
+function getUnityBridge(): UnityBridgeModule | null {
+  const bridge = NativeModules?.UnityBridge as UnityBridgeModule | undefined;
+  return bridge ?? null;
+}
+
+function getEmitter(): NativeEventEmitter | null {
+  const unityBridge = getUnityBridge();
+  if (!_emitter && unityBridge) {
+    _emitter = new NativeEventEmitter(unityBridge);
   }
-  return _emitter!;
+  return _emitter;
+}
+
+function getAvailability(): ARAvailability {
+  if (Platform.OS !== 'android') {
+    return {
+      available: false,
+      reason: 'AR try-on is currently available on Android only.',
+    };
+  }
+
+  if (!getUnityBridge()) {
+    return {
+      available: false,
+      reason:
+        'AR try-on is unavailable in this build. Use an Android dev/client build that includes the Unity native module.',
+    };
+  }
+
+  return { available: true };
+}
+
+function attachCloseListener(onClose?: () => void): void {
+  if (!onClose) return;
+
+  const emitter = getEmitter();
+  if (!emitter) return;
+
+  const sub = emitter.addListener('onUnityEvent', (json: string) => {
+    try {
+      const event = JSON.parse(json) as { type?: string };
+      if (event.type === 'closed') {
+        sub.remove();
+        onClose();
+      }
+    } catch {}
+  });
 }
 
 const ARService = {
+  getAvailability(): ARAvailability {
+    return getAvailability();
+  },
+
   /**
    * Launch AR try-on with a single product
    */
-  openWithProduct(product: ARProduct, onClose?: () => void): void {
-    if (Platform.OS !== 'android') {
-      console.warn('ARService: AR try-on is Android only');
-      return;
+  openWithProduct(product: ARProduct, onClose?: () => void): boolean {
+    const availability = getAvailability();
+    if (!availability.available) {
+      console.warn(`ARService: ${availability.reason}`);
+      return false;
     }
-    if (!UnityBridge) {
-      console.error('ARService: UnityBridge native module not found. Is unityLibrary linked?');
-      return;
-    }
+
+    const unityBridge = getUnityBridge();
+    if (!unityBridge) return false;
 
     const garment: ARGarment = {
       slot: product.slot ?? 'UpperBody',
@@ -47,19 +100,9 @@ const ARService = {
     };
 
     const payload = JSON.stringify({ garments: [garment] });
-    UnityBridge.launchAR(payload);
-
-    if (onClose) {
-      const sub = getEmitter().addListener('onUnityEvent', (json: string) => {
-        try {
-          const event = JSON.parse(json);
-          if (event.type === 'closed') {
-            sub.remove();
-            onClose();
-          }
-        } catch (_) {}
-      });
-    }
+    unityBridge.launchAR(payload);
+    attachCloseListener(onClose);
+    return true;
   },
 
   /**
@@ -69,9 +112,15 @@ const ARService = {
     top: ARProduct,
     bottom: ARProduct,
     onClose?: () => void
-  ): void {
-    if (Platform.OS !== 'android') return;
-    if (!UnityBridge) return;
+  ): boolean {
+    const availability = getAvailability();
+    if (!availability.available) {
+      console.warn(`ARService: ${availability.reason}`);
+      return false;
+    }
+
+    const unityBridge = getUnityBridge();
+    if (!unityBridge) return false;
 
     const garments: ARGarment[] = [
       { slot: 'UpperBody', category: top.arCategory, fabricType: top.fabricType, primaryColor: top.primaryColor },
@@ -79,19 +128,9 @@ const ARService = {
     ];
 
     const payload = JSON.stringify({ garments });
-    UnityBridge.launchAR(payload);
-
-    if (onClose) {
-      const sub = getEmitter().addListener('onUnityEvent', (json: string) => {
-        try {
-          const event = JSON.parse(json);
-          if (event.type === 'closed') {
-            sub.remove();
-            onClose();
-          }
-        } catch (_) {}
-      });
-    }
+    unityBridge.launchAR(payload);
+    attachCloseListener(onClose);
+    return true;
   },
 };
 

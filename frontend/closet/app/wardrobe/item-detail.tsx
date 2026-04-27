@@ -955,6 +955,12 @@ export default function ItemDetailScreen() {
               <TouchableOpacity
                 style={[s.pinkBtn, s.pinkBtnDetails]}
                 onPress={() => {
+                  const availability = ARService.getAvailability();
+                  if (!availability.available) {
+                    Alert.alert("AR Try-On Unavailable", availability.reason ?? "This build does not include AR support.");
+                    return;
+                  }
+
                   const category = item.category?.[0] ?? 'Tops';
                   const isBottom = category === 'Bottoms';
                   ARService.openWithProduct({
