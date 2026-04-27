@@ -1,0 +1,11 @@
+﻿{
+    "actions":  [
+                    {
+                        "field":  "imageUrl",
+                        "previousValue":  "/uploads/example.jpg",
+                        "id":  "507f1f77bcf86cd799439011",
+                        "type":  "garment",
+                        "replacement":  null
+                    }
+                ]
+}

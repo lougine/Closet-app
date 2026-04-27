@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Smart Wardrobe | Analytics</title>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;600&family=DM+Sans:wght@300;400;500&display=swap"
+    rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg: #0e0e0e;
+      --surface: #161616;
+      --surface2: #1e1e1e;
+      --border: #2a2a2a;
+      --accent: #c8a96e;
+      --accent2: #e8c898;
+      --text: #f0ece4;
+      --text-muted: #888;
+      --glass: rgba(22, 22, 22, 0.8);
+      --radius: 18px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      min-height: 100vh;
+      padding: 40px 20px;
+      background-image:
+        radial-gradient(ellipse at 10% 10%, rgba(200, 169, 110, 0.05) 0%, transparent 70%),
+        radial-gradient(ellipse at 90% 90%, rgba(200, 169, 110, 0.04) 0%, transparent 70%);
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+
+    .nav {
+      margin-bottom: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .back-link {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.85rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: color 0.2s;
+    }
+
+    .back-link:hover {
+      color: var(--accent);
+    }
+
+    .header {
+      margin-bottom: 40px;
+      animation: fadeDown 0.8s ease both;
+    }
+
+    .header h1 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 3rem;
+      font-weight: 300;
+      letter-spacing: 0.1em;
+      color: var(--accent2);
+      margin-bottom: 8px;
+    }
+
+    .header p {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+    }
+
+    /* Dashboard Grid */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+      margin-bottom: 40px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      backdrop-filter: blur(10px);
+      transition: transform 0.3s ease, border-color 0.3s ease;
+      animation: fadeUp 0.8s ease both;
+    }
+
+    .card:hover {
+      border-color: var(--accent);
+      transform: translateY(-4px);
+    }
+
+    .stat-card {
+      text-align: center;
+    }
+
+    .stat-value {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 3rem;
+      color: var(--accent);
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+    }
+
+    .clickable-card {
+      cursor: pointer;
+      position: relative;
+    }
+
+    .clickable-card::after {
+      content: 'VIEW ALL';
+      position: absolute;
+      bottom: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 0.6rem;
+      color: var(--accent);
+      opacity: 0;
+      transition: opacity 0.3s;
+      letter-spacing: 1px;
+    }
+
+    .clickable-card:hover::after {
+      opacity: 1;
+    }
+
+    /* Modal Styles */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.85);
+      backdrop-filter: blur(8px);
+      z-index: 1000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+      opacity: 1;
+    }
+
+    .modal-content {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      width: 90%;
+      max-width: 800px;
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      animation: modalSlide 0.4s ease;
+    }
+
+    @keyframes modalSlide {
+      from { transform: translateY(30px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    .modal-header {
+      padding: 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.8rem;
+      color: var(--accent2);
+    }
+
+    .close-modal {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 1.5rem;
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+
+    .close-modal:hover {
+      color: var(--text);
+    }
+
+    .modal-body {
+      padding: 24px;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .history-list {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .history-item {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .history-info {
+      flex: 1;
+    }
+
+    .history-title {
+      color: var(--accent);
+      font-size: 0.9rem;
+      margin-bottom: 4px;
+    }
+
+    .history-meta {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .history-outfit {
+      font-size: 0.8rem;
+      color: var(--text);
+      font-style: italic;
+    }
+
+    .history-badge {
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      font-weight: bold;
+    }
+
+    .badge-liked { background: rgba(200, 169, 110, 0.2); color: var(--accent); }
+    .badge-suggested { background: rgba(136, 136, 136, 0.1); color: var(--text-muted); }
+
+
+    .style-profile {
+      grid-column: span 2;
+      display: flex;
+      gap: 30px;
+      align-items: center;
+    }
+
+    .chart-container {
+      width: 180px;
+      height: 180px;
+    }
+
+    .profile-info {
+      flex: 1;
+    }
+
+    .profile-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.6rem;
+      color: var(--accent2);
+      margin-bottom: 16px;
+    }
+
+    .profile-tag {
+      background: #1a1a1a;
+      border: 1px solid var(--border);
+      color: var(--accent);
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      margin-right: 8px;
+      margin-bottom: 8px;
+      display: inline-block;
+    }
+
+    /* Top Outfits */
+    .section-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 2rem;
+      color: var(--accent2);
+      margin: 60px 0 30px;
+      letter-spacing: 0.05em;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+
+    .section-title::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(90deg, var(--border), transparent);
+    }
+
+    .outfits-scroll {
+      display: flex;
+      gap: 20px;
+      overflow-x: auto;
+      padding-bottom: 20px;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+    }
+
+    .outfits-scroll::-webkit-scrollbar {
+      height: 4px;
+    }
+
+    .outfits-scroll::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 4px;
+    }
+
+    .outfit-card {
+      min-width: 280px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+    }
+
+    .outfit-img {
+      width: 100%;
+      height: 220px;
+      object-fit: cover;
+    }
+
+    .outfit-info {
+      padding: 16px;
+    }
+
+    .outfit-name {
+      font-size: 0.9rem;
+      color: var(--accent);
+      margin-bottom: 8px;
+    }
+
+    .outfit-items {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    .outfit-likes {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.75rem;
+      color: var(--accent2);
+      margin-top: 12px;
+    }
+
+    /* Tables */
+    .table-container {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      margin-top: 20px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+    }
+
+    th {
+      background: #1a1a1a;
+      padding: 16px;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      border-bottom: 1px solid var(--border);
+    }
+
+    td {
+      padding: 16px;
+      font-size: 0.85rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    .item-cell {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .item-img {
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      object-fit: cover;
+      border: 1px solid var(--border);
+    }
+
+    .price {
+      font-weight: 500;
+      color: var(--accent);
+    }
+
+    @keyframes fadeDown {
+      from {
+        opacity: 0;
+        transform: translateY(-20px);
+      }
+
+      to {
+        opacity: 1;
+        transform: none;
+      }
+    }
+
+    @keyframes fadeUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+
+      to {
+        opacity: 1;
+        transform: none;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .dashboard-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .style-profile {
+        grid-column: span 1;
+        flex-direction: column;
+        text-align: center;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <div class="nav">
+      <a href="/" class="back-link">&#8592; Back to Assistant</a>
+    </div>
+
+    <div class="header">
+      <p>Wardrobe Intelligence</p>
+      <h1>Style Analytics</h1>
+    </div>
+
+    <div class="dashboard-grid">
+      <!-- Stats -->
+      <div class="card stat-card clickable-card" style="animation-delay: 0.1s;" onclick="showLikedDetails()">
+        <div class="stat-value" id="totalLikes">0</div>
+        <div class="stat-label">Liked Outfits</div>
+      </div>
+      <div class="card stat-card clickable-card" style="animation-delay: 0.2s;" onclick="showHistoryDetails()">
+        <div class="stat-value" id="totalSuggestions">0</div>
+        <div class="stat-label">Total Suggestions</div>
+      </div>
+      <div class="card stat-card" style="animation-delay: 0.3s;">
+        <div class="stat-value" id="likeRate">0%</div>
+        <div class="stat-label">Approval Rate</div>
+      </div>
+
+      <!-- Style Profile -->
+      <div class="card style-profile" style="animation-delay: 0.4s;">
+        <div class="chart-container">
+          <canvas id="colorChart"></canvas>
+        </div>
+        <div class="profile-info">
+          <div class="profile-title">Style Profile</div>
+          <div id="profileTags">
+            <!-- Tags will be injected here -->
+          </div>
+          <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 16px;" id="profileDescription">
+            Analyzing your wardrobe patterns...
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-title">Top Rated Outfits</div>
+    <div class="outfits-scroll" id="topOutfits">
+      <!-- Outfits will be injected here -->
+    </div>
+
+    <div class="section-title">Investment Analysis (Cost Per Wear)</div>
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Wear Count</th>
+            <th>Total Cost</th>
+            <th>Cost Per Wear</th>
+          </tr>
+        </thead>
+        <tbody id="costPerWearTable">
+          <!-- Data will be injected here -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    // SESSION_ID
+    var SESSION_ID = localStorage.getItem("sw_session_id") || "default";
+
+    window.onload = function () {
+      fetchOverallStats();
+      fetchStyleInsights();
+      fetchTopOutfits();
+      fetchCostPerWear();
+    };
+
+    function fetchOverallStats() {
+      fetch('/analytics?userId=' + SESSION_ID)
+        .then(res => res.json())
+        .then(data => {
+          document.getElementById('totalSuggestions').innerText = data.totalSuggestions || 0;
+          document.getElementById('totalLikes').innerText = data.totalLikes || 0;
+          const rate = data.totalSuggestions > 0 ? ((data.totalLikes / data.totalSuggestions) * 100).toFixed(1) : 0;
+          document.getElementById('likeRate').innerText = rate + '%';
+        });
+    }
+
+    function fetchStyleInsights() {
+      fetch('/analytics/style?userId=' + SESSION_ID)
+        .then(res => res.json())
+        .then(data => {
+          if (data.message) {
+            document.getElementById('profileDescription').innerText = data.message;
+            return;
+          }
+
+          const tags = document.getElementById('profileTags');
+          tags.innerHTML = '';
+
+          // Color tags
+          data.topColors.forEach(c => {
+            const span = document.createElement('span');
+            span.className = 'profile-tag';
+            span.innerText = '🎨 ' + c;
+            tags.appendChild(span);
+          });
+
+          // Type tags
+          data.topTypes.forEach(t => {
+            const span = document.createElement('span');
+            span.className = 'profile-tag';
+            span.innerText = '👔 ' + t;
+            tags.appendChild(span);
+          });
+
+          document.getElementById('profileDescription').innerText =
+            `You gravitate towards ${data.topColors[0]} and ${data.topColors[1]} tones, with a strong preference for ${data.topTypes[0]}.`;
+
+          // Setup Chart
+          setupColorChart(data.topColors);
+        });
+    }
+
+    function setupColorChart(colors) {
+      const ctx = document.getElementById('colorChart').getContext('2d');
+      const colorValues = {
+        'white': '#f5f5f5', 'black': '#333', 'navy': '#1a237e', 'grey': '#9e9e9e',
+        'beige': '#d7ccc8', 'blue': '#1565c0', 'tan': '#c8a96e', 'brown': '#795548',
+        'burgundy': '#7b1fa2', 'charcoal': '#37474f'
+      };
+
+      const chartColors = colors.map(c => colorValues[c.toLowerCase()] || '#c8a96e');
+
+      new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: colors,
+          datasets: [{
+            data: colors.map((_, i) => 100 - (i * 15)),
+            backgroundColor: chartColors,
+            borderColor: '#0e0e0e',
+            borderWidth: 2
+          }]
+        },
+        options: {
+          cutout: '80%',
+          plugins: { legend: { display: false } },
+          responsive: true,
+          maintainAspectRatio: false
+        }
+      });
+    }
+
+    function fetchTopOutfits() {
+      fetch('/analytics/top-outfits?userId=' + SESSION_ID)
+        .then(res => res.json())
+        .then(data => {
+          const container = document.getElementById('topOutfits');
+          container.innerHTML = '';
+
+          if (data.length === 0) {
+            container.innerHTML = '<p style="color: var(--text-muted); font-size: 0.85rem;">No outfits liked yet! Start chatting to see your favorites here.</p>';
+            return;
+          }
+
+          data.forEach(item => {
+            const outfit = item.outfit;
+            const div = document.createElement('div');
+            div.className = 'outfit-card';
+            
+            // Build visual (3 images)
+            const tImg = (outfit.images && outfit.images.top) ? outfit.images.top : 'https://placehold.co/400?text=Top';
+            const bImg = (outfit.images && outfit.images.bottom) ? outfit.images.bottom : 'https://placehold.co/400?text=Bottom';
+            const sImg = (outfit.images && outfit.images.shoes) ? outfit.images.shoes : 'https://placehold.co/400?text=Shoes';
+
+            div.innerHTML = `
+              <div style="display:flex; height: 180px; background: #000;">
+                <img src="${tImg}" onerror="this.src='https://placehold.co/400?text=Top'" style="flex:1; width:33%; object-fit:cover; border-right:1px solid #222;">
+                <img src="${bImg}" onerror="this.src='https://placehold.co/400?text=Bottom'" style="flex:1; width:33%; object-fit:cover; border-right:1px solid #222;">
+                <img src="${sImg}" onerror="this.src='https://placehold.co/400?text=Shoes'" style="flex:1; width:33%; object-fit:cover;">
+              </div>
+              <div class="outfit-info">
+                <div class="outfit-name">${item.name || 'Personal Style'}</div>
+                <div class="outfit-items">
+                  ${outfit.top}<br>
+                  ${outfit.bottom}<br>
+                  ${outfit.shoes}
+                </div>
+                <div class="outfit-likes" style="justify-content: space-between;">
+                  <span>❤️ Liked ${item.count} times</span>
+                  <button onclick="recordWearDirectly('${outfit.top}', '${outfit.bottom}', '${outfit.shoes}')" 
+                          style="background: var(--accent); border:none; padding: 4px 10px; border-radius:12px; font-size: 0.65rem; color:#000; cursor:pointer; font-weight:bold; transition: 0.2s;">
+                    WORE THIS ✔️
+                  </button>
+                </div>
+              </div>
+            `;
+            container.appendChild(div);
+          });
+        });
+    }
+
+    function fetchCostPerWear() {
+      fetch('/analytics/cost-per-wear')
+        .then(res => res.json())
+        .then(data => {
+          const tbody = document.getElementById('costPerWearTable');
+          tbody.innerHTML = '';
+
+          data.slice(0, 10).forEach(item => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td>
+                <div class="item-cell">
+                  <img src="${item.imageUrl || 'https://placehold.co/40'}" class="item-img">
+                  <div>${item.name}</div>
+                </div>
+              </td>
+              <td>${item.wearCount} times</td>
+              <td class="price">$${item.price}</td>
+              <td class="price" style="color: var(--accent2)">$${item.costPerWear || item.price}</td>
+            `;
+            tbody.appendChild(tr);
+          });
+
+          if (data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 40px;">No wear history recorded yet.</td></tr>';
+          }
+        });
+    }
+
+    function recordWearDirectly(top, bottom, shoes) {
+      // Find items by name in the /clothes list and call wear endpoint
+      fetch('/clothes')
+        .then(res => res.json())
+        .then(clothes => {
+          const itemsToTrack = [top, bottom, shoes];
+          itemsToTrack.forEach(name => {
+            const item = clothes.find(c => c.name === name);
+            if (item) {
+              fetch(`/clothes/${item._id}/wear`, { method: 'POST' });
+            }
+          });
+          alert("Wear recorded! Refreshing dashboard...");
+          setTimeout(() => location.reload(), 500);
+        });
+    }
+
+    // Modal Logic
+    function showLikedDetails() {
+      const modal = document.getElementById('detailsModal');
+      const title = document.getElementById('modalTitle');
+      const body = document.getElementById('modalBody');
+
+      title.innerText = "All Liked Outfits";
+      body.innerHTML = '<p style="color: var(--text-muted)">Fetching your favorites...</p>';
+      modal.classList.add('active');
+
+      fetch('/feedback/liked?userId=' + SESSION_ID)
+        .then(res => res.json())
+        .then(data => {
+          if (data.length === 0) {
+            body.innerHTML = '<p style="color: var(--text-muted)">No liked outfits yet.</p>';
+            return;
+          }
+
+          let html = '<div class="history-list">';
+          data.forEach(item => {
+            const date = new Date(item.createdAt).toLocaleDateString();
+            const o = item.outfit;
+            html += `
+              <div class="history-item">
+                <div class="history-info">
+                  <div class="history-title">${item.occasion || 'Casual'} Selection</div>
+                  <div class="history-outfit">${o.top} + ${o.bottom} + ${o.shoes}</div>
+                  <div class="history-meta">${date}</div>
+                </div>
+                <div class="history-badge badge-liked">LIKED ❤️</div>
+              </div>
+            `;
+          });
+          html += '</div>';
+          body.innerHTML = html;
+        });
+    }
+
+    function showHistoryDetails() {
+      const modal = document.getElementById('detailsModal');
+      const title = document.getElementById('modalTitle');
+      const body = document.getElementById('modalBody');
+
+      title.innerText = "Suggestions History";
+      body.innerHTML = '<p style="color: var(--text-muted)">Fetching your history...</p>';
+      modal.classList.add('active');
+
+      fetch('/analytics/recent?userId=' + SESSION_ID)
+        .then(res => res.json())
+        .then(data => {
+          if (data.length === 0) {
+            body.innerHTML = '<p style="color: var(--text-muted)">No suggestions recorded.</p>';
+            return;
+          }
+
+          let html = '<div class="history-list">';
+          data.forEach(item => {
+            const date = new Date(item.createdAt).toLocaleString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' });
+            const o = item.outfitSuggested;
+            if (!o) return;
+            html += `
+              <div class="history-item">
+                <div class="history-info">
+                  <div class="history-title">${item.occasion || 'Style'} Insight</div>
+                  <div class="history-outfit">${o.top} + ${o.bottom} + ${o.shoes}</div>
+                  <div class="history-meta">${date} • ${item.weather || 'Unknown weather'}</div>
+                </div>
+                <div class="history-badge badge-suggested">SUGGESTED 💡</div>
+              </div>
+            `;
+          });
+          html += '</div>';
+          body.innerHTML = html;
+        });
+    }
+
+    function closeModal() {
+      document.getElementById('detailsModal').classList.remove('active');
+    }
+
+    // Close on escape
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeModal();
+    });
+  </script>
+
+  <!-- Modal HTML -->
+  <div class="modal-overlay" id="detailsModal" onclick="if(event.target === this) closeModal()">
+    <div class="modal-content" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div class="modal-title" id="modalTitle">Details</div>
+        <button class="close-modal" onclick="closeModal()">&times;</button>
+      </div>
+      <div class="modal-body" id="modalBody">
+        <!-- Content injected here -->
+      </div>
+    </div>
+  </div>
+</body>
+
+</html>
