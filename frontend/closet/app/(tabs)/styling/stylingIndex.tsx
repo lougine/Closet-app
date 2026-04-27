@@ -732,7 +732,7 @@ export default function StylingScreen() {
   const [selected, setSelected]   = useState<string[]>([]);
   const [lastSavedOutfitId, setLastSavedOutfitId] = useState<string>("");
   const [mainOutfitSaved, setMainOutfitSaved] = useState(false);
-  const eventText = "Lara's wedding";
+  const [eventText, setEventText] = useState("");
   const [inputText, setInputText] = useState("");
   const [temperatureC] = useState(23);
   const [savingOutfit, setSavingOutfit] = useState(false);

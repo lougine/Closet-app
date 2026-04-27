@@ -3,7 +3,7 @@
 // Groq-Powered Conversation
 // ===============================
 
-require("dotenv").config();
+require("dotenv").config({ path: '../.env' });
 const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
@@ -29,7 +29,14 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+const rawApiKey = process.env.GROQ_API_KEY || process.env.GROQ_API_TOKEN;
+const groq = rawApiKey ? new Groq({ apiKey: rawApiKey }) : {
+  chat: {
+    completions: {
+       create: async () => ({ choices: [{ message: { content: '{"reply": "I am running without an API key!"}' } }] })
+    }
+  }
+};
 const GROQ_MODEL = "llama-3.1-8b-instant";
 
 // ── MongoDB ──
@@ -1045,6 +1052,7 @@ const chatHistories = {};
 const sessionEnvironments = {}; // stores indoor/outdoor per session
 
 async function askGroq(sessionId, userMessage, systemPrompt) {
+  if (!groq) return null;
   try {
     if (!chatHistories[sessionId]) chatHistories[sessionId] = [];
     chatHistories[sessionId].push({ role: "user", content: userMessage });
@@ -1682,7 +1690,7 @@ cron.schedule("0 7 * * *", async () => {
 });
 
 // ── START ──
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => {
   console.log(`
 ╔════════════════════════════════════════╗

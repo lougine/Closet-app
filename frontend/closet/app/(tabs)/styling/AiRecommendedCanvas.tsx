@@ -51,7 +51,9 @@ const buildInitialChatMessages = (eventText: string): ChatMessage[] => [
   {
     id: "assistant-welcome",
     role: "assistant",
-    content: `Ask me what to wear for ${eventText || "an event"}, or describe the vibe you want.`,
+    content: eventText 
+      ? `Ask me what to wear for ${eventText}, or describe the vibe you want.`
+      : `Ask me what to wear for an event, or describe the vibe you want.`,
   },
 ];
 
@@ -271,6 +273,11 @@ export function useAiRecommendedLogic({
         setRecommendations(payload.recommendations);
         setActiveRecommendation(0);
         applyRecommendationAt(0, payload.recommendations);
+        
+        // If the AI specifically returned matched garments from the chat, auto-open the visualizer
+        if (payload.recommendations[0]?.name === 'Chatbot Suggestion') {
+          setAiShowcaseOpen(true);
+        }
       }
     } catch (error) {
       console.warn('Style chat Error, falling back to recommendations:', error);

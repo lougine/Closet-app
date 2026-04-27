@@ -685,7 +685,7 @@ exports.getStyleChatResponse = async (req, res) => {
       ? buildRecommendationResponse(event || message, parsedTemperature, garments, count)
       : { recommendations: [], context: { event, temperatureC: parsedTemperature } };
 
-    const reply = await generateStyleChatReply({
+    const { reply, matchedIds } = await generateStyleChatReply({
       message,
       event,
       temperatureC: parsedTemperature,
@@ -693,6 +693,28 @@ exports.getStyleChatResponse = async (req, res) => {
       conversation: Array.isArray(req.body.messages) ? req.body.messages : [],
       recommendations: recommendationPayload.recommendations,
     });
+
+    if (matchedIds && matchedIds.length > 0) {
+      const aiGarments = garments
+        .filter(g => matchedIds.includes(String(g._id)))
+        .map(g => ({
+          _id: g._id,
+          name: g.name,
+          category: g.category,
+          imageUrl: g.imageUrl,
+          color: g.color || '',
+          season: g.season || '',
+        }));
+
+      if (aiGarments.length > 0) {
+        recommendationPayload.recommendations.unshift({
+          name: 'Chatbot Suggestion',
+          score: 1.0,
+          reason: 'Matches the exact items recommended in the chat.',
+          garments: aiGarments,
+        });
+      }
+    }
 
     return res.json({
       reply,
