@@ -1,4 +1,5 @@
-# Unity
+
+# ================= UNITY GENERATED =================
 [Ll]ibrary/
 [Tt]emp/
 [Oo]bj/
@@ -6,20 +7,31 @@
 [Bb]uilds/
 [Ll]ogs/
 UserSettings/
+MemoryCaptures/
 
-# Plastic SCM (IMPORTANT)
-.plastic/
+# Unity metadata noise
+*.csproj
+*.unityproj
+*.sln
+*.user
+*.pidb
+*.booproj
+*.opendb
+*.VC.db
 
-# Node / frontend
-node_modules/
-.env
+# Crash / debug
+sysinfo.txt
 
-# Expo / JS tooling
-.expo/
+# Addressables
+[Aa]ssets/[Aa]ddressable[Aa]ssets[Dd]ata/
 
-# Backups (DO NOT TRACK)
-backups/
+# ================= IDE =================
+.vscode/
+.idea/
 
-# OS / misc
+# ================= OS =================
 .DS_Store
 Thumbs.db
+
+# ================= PLASTIC SCM =================
+.plastic/
