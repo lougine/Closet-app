@@ -1,6 +1,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { execSync } = require('child_process');
 
 const envPath = path.resolve(__dirname, '../.env');
 const backendEnvPath = path.resolve(__dirname, '../../../.env');
@@ -80,8 +81,64 @@ function getLocalIp() {
   return candidates[0]?.address || 'localhost';
 }
 
-function writeEnv(ip) {
-  const url = `http://${ip}:5000`;
+function parseBooleanEnv(name) {
+  const value = process.env[name];
+  if (value == null) return null;
+  const normalized = String(value).trim().toLowerCase();
+  if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
+  if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
+  return null;
+}
+
+function getConnectedAdbDeviceIds() {
+  try {
+    const output = execSync('adb devices', { stdio: ['ignore', 'pipe', 'ignore'] }).toString('utf8');
+    return output
+      .split(/\r?\n/)
+      .slice(1)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => line.split(/\s+/))
+      .filter((parts) => parts.length >= 2 && parts[1] === 'device')
+      .map((parts) => parts[0]);
+  } catch {
+    return [];
+  }
+}
+
+function ensureAdbReverse(port) {
+  const deviceIds = getConnectedAdbDeviceIds();
+  if (!deviceIds.length) return { enabled: false, reason: 'no-adb-device' };
+
+  try {
+    for (const deviceId of deviceIds) {
+      execSync(`adb -s ${deviceId} reverse tcp:${port} tcp:${port}`, { stdio: 'ignore' });
+    }
+    return { enabled: true, deviceCount: deviceIds.length };
+  } catch {
+    return { enabled: false, reason: 'adb-reverse-failed' };
+  }
+}
+
+function chooseApiHost() {
+  const hostOverride = (process.env.CLOSET_API_HOST || process.env.EXPO_PUBLIC_API_HOST || '').trim();
+  if (hostOverride) return { host: hostOverride, source: 'env-override' };
+
+  const forceAdbReverse = parseBooleanEnv('CLOSET_USE_ADB_REVERSE') === true;
+  const disableAutoAdbReverse = parseBooleanEnv('CLOSET_AUTO_ADB_REVERSE') === false;
+
+  if (forceAdbReverse || !disableAutoAdbReverse) {
+    const reverse = ensureAdbReverse(5000);
+    if (reverse.enabled) {
+      return { host: '127.0.0.1', source: `adb-reverse(${reverse.deviceCount})` };
+    }
+  }
+
+  return { host: getLocalIp(), source: 'local-network' };
+}
+
+function writeEnv(host, source) {
+  const url = `http://${host}:5000`;
   const uploadMaxMb = readBackendUploadMaxMb();
   const removeBgApiKey =
     readEnvValue(envPath, 'EXPO_PUBLIC_REMOVE_BG_API_KEY')
@@ -99,8 +156,10 @@ function writeEnv(ip) {
   lines.push('');
   const content = lines.join('\n');
   fs.writeFileSync(envPath, content, { encoding: 'utf8' });
-  console.log(`Updated ${path.relative(process.cwd(), envPath)} to ${url} (upload max ${uploadMaxMb}MB)`);
+  console.log(
+    `Updated ${path.relative(process.cwd(), envPath)} to ${url} via ${source} (upload max ${uploadMaxMb}MB)`
+  );
 }
 
-const ip = getLocalIp();
-writeEnv(ip);
+const selected = chooseApiHost();
+writeEnv(selected.host, selected.source);

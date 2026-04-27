@@ -164,6 +164,22 @@ android {
                     }}
             }
             else {
+                def il2cppExecutable = file("${workingDir}/src/main/Il2CppOutputProject/IL2CPP/build/deploy/il2cpp${org.gradle.internal.os.OperatingSystem.current().isWindows() ? '.exe' : ''}")
+                if (!il2cppExecutable.exists()) {
+                    def missingPrebuiltAbis = archs
+                        .findAll { arch, abi -> !file(getIl2CppOutputPath(workingDir, abi)).exists() }
+                        .collect { arch, abi -> abi }
+
+                    if (missingPrebuiltAbis.isEmpty()) {
+                        println("IL2CPP compiler not found at ${il2cppExecutable}. Using prebuilt libil2cpp.so binaries from src/main/jniLibs.")
+                        return
+                    }
+
+                    throw new GradleException(
+                        "IL2CPP compiler not found at ${il2cppExecutable} and missing prebuilt libil2cpp.so for: ${missingPrebuiltAbis.join(', ')}"
+                    )
+                }
+
                 archs.each { arch, abi ->
                     buildIl2CppImpl(workingDir, 'Release', arch, abi, staticLibs[arch] as String[]);
                 }

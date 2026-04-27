@@ -655,6 +655,7 @@ export default function ItemDetailScreen() {
   const cpw = (item.timesWorn ?? 0) > 0
     ? ((item.totalCost ?? 0) / item.timesWorn!).toFixed(2)
     : (item.totalCost ?? 0).toFixed(2);
+  const arAvailability = ARService.getAvailability();
 
   const baseTheme = getAppTheme(isDarkMode, {
     light: {
@@ -953,8 +954,19 @@ export default function ItemDetailScreen() {
 
             <View style={s.detailsActions}>
               <TouchableOpacity
-                style={[s.pinkBtn, s.pinkBtnDetails]}
+                style={[
+                  s.pinkBtn,
+                  s.pinkBtnDetails,
+                  !arAvailability.available && s.disabledBtn,
+                ]}
+                disabled={!arAvailability.available}
                 onPress={() => {
+                  const availability = ARService.getAvailability();
+                  if (!availability.available) {
+                    Alert.alert("AR Try-On Unavailable", availability.reason ?? "This build does not include AR support.");
+                    return;
+                  }
+
                   const category = item.category?.[0] ?? 'Tops';
                   const isBottom = category === 'Bottoms';
                   ARService.openWithProduct({
@@ -965,7 +977,7 @@ export default function ItemDetailScreen() {
                   });
                 }}
               >
-                <Text style={s.pinkBtnText}>Try On</Text>
+                <Text style={s.pinkBtnText}>{arAvailability.available ? "Try On" : "Try On (Unavailable)"}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity

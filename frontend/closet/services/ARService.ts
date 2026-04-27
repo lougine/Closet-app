@@ -1,3 +1,4 @@
+import Constants from 'expo-constants';
 import { NativeModules, NativeEventEmitter, Platform } from 'react-native';
 
 const { UnityBridge } = NativeModules;
@@ -22,7 +23,43 @@ function getEmitter(): NativeEventEmitter {
   if (!_emitter && UnityBridge) {
     _emitter = new NativeEventEmitter(UnityBridge);
   }
-  return _emitter!;
+  return _emitter;
+}
+
+function getAvailability(): ARAvailability {
+  if (Platform.OS !== 'android') {
+    return {
+      available: false,
+      reason: 'AR try-on is currently available on Android only.',
+    };
+  }
+
+  if (!getUnityBridge()) {
+    return {
+      available: false,
+      reason:
+        'AR try-on is unavailable in this build. Use an Android dev/client build that includes the Unity native module.',
+    };
+  }
+
+  return { available: true };
+}
+
+function attachCloseListener(onClose?: () => void): void {
+  if (!onClose) return;
+
+  const emitter = getEmitter();
+  if (!emitter) return;
+
+  const sub = emitter.addListener('onUnityEvent', (json: string) => {
+    try {
+      const event = JSON.parse(json) as { type?: string };
+      if (event.type === 'closed') {
+        sub.remove();
+        onClose();
+      }
+    } catch {}
+  });
 }
 
 const ARService = {
