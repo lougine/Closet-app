@@ -17,9 +17,14 @@ export interface ARProduct {
   slot?: 'UpperBody' | 'LowerBody';
 }
 
+export interface ARAvailability {
+  available: boolean;
+  reason?: string;
+}
+
 let _emitter: NativeEventEmitter | null = null;
 
-function getEmitter(): NativeEventEmitter {
+function getEmitter(): NativeEventEmitter | null {
   if (!_emitter && UnityBridge) {
     _emitter = new NativeEventEmitter(UnityBridge);
   }
@@ -34,7 +39,7 @@ function getAvailability(): ARAvailability {
     };
   }
 
-  if (!getUnityBridge()) {
+  if (!UnityBridge) {
     return {
       available: false,
       reason:
@@ -64,6 +69,11 @@ function attachCloseListener(onClose?: () => void): void {
 
 const ARService = {
   /**
+   * Get AR availability status
+   */
+  getAvailability,
+
+  /**
    * Launch AR try-on with a single product
    */
   openWithProduct(product: ARProduct, onClose?: () => void): void {
@@ -87,7 +97,9 @@ const ARService = {
     UnityBridge.launchAR(payload);
 
     if (onClose) {
-      const sub = getEmitter().addListener('onUnityEvent', (json: string) => {
+      const emitter = getEmitter();
+      if (!emitter) return;
+      const sub = emitter.addListener('onUnityEvent', (json: string) => {
         try {
           const event = JSON.parse(json);
           if (event.type === 'closed') {
@@ -119,7 +131,9 @@ const ARService = {
     UnityBridge.launchAR(payload);
 
     if (onClose) {
-      const sub = getEmitter().addListener('onUnityEvent', (json: string) => {
+      const emitter = getEmitter();
+      if (!emitter) return;
+      const sub = emitter.addListener('onUnityEvent', (json: string) => {
         try {
           const event = JSON.parse(json);
           if (event.type === 'closed') {
