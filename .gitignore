@@ -1,6 +1,4 @@
-# =========================
-# UNITY
-# =========================
+# Unity
 [Ll]ibrary/
 [Tt]emp/
 [Oo]bj/
@@ -8,71 +6,20 @@
 [Bb]uilds/
 [Ll]ogs/
 UserSettings/
-MemoryCaptures/
-Assets/AssetStoreTools*
 
-# Unity VS / IDE
-*.csproj
-*.unityproj
-*.sln
-*.suo
-*.tmp
-*.user
-*.userprefs
-*.pidb
-*.booproj
-*.svd
-*.pdb
-*.mdb
-*.opendb
-*.VC.db
+# Plastic SCM (IMPORTANT)
+.plastic/
 
-# Unity crash / cache
-sysinfo.txt
-*.apk
-*.unitypackage
-*.app
-
-# Addressables
-[Aa]ssets/[Aa]ddressable[Aa]ssets[Dd]ata/*/*.bin*
-
-# =========================
-# NODE / BACKEND
-# =========================
+# Node / frontend
 node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
 
-logs/
-coverage/
-.nyc_output/
-.npm/
-.node_repl_history
-
-dist/
-build/
-
-# =========================
-# EXPO / REACT / JS TOOLING
-# =========================
+# Expo / JS tooling
 .expo/
 
-# =========================
-# IDE / OS
-# =========================
-.vscode/
-.idea/
+# Backups (DO NOT TRACK)
+backups/
+
+# OS / misc
 .DS_Store
 Thumbs.db
-
-# =========================
-# OTHER PROJECT ARTIFACTS
-# =========================
-uploads/
