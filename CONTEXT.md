@@ -532,7 +532,6 @@ Prioritized improvements that fit the current architecture:
 - Add background job/queue support for heavy image workflows (resizing, metadata extraction, delayed cleanup).
 - Persist image derivatives (thumbnail/preview) to reduce mobile bandwidth and improve feed latency.
 - Add signed URL strategy for private cloud assets where direct proxying becomes expensive.
-- Add periodic integrity job schedule with report artifacts (verify + orphan cleanup + anomaly summary).
 
 ### 5) Observability and operations
 - Introduce structured logging (`pino`/`winston`) with request IDs and correlation IDs across backend and scripts.
