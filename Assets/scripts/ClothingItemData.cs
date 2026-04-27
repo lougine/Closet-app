@@ -30,11 +30,3 @@ public enum ClothingType
     Accessory
 }
 
-public enum AttachPointType
-{
-    Head,
-    Chest,
-    Hips,
-    Legs,
-    Feet
-}

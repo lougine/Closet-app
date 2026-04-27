@@ -1,80 +1,89 @@
 using UnityEngine;
+using System.Collections.Generic;
 
 public class SnapToAttachPoint : MonoBehaviour
 {
-    public float snapDistance = 2.0f; 
-    public AttachPointType targetAttachPoint; 
-    public Vector3 visualOffset; // Use this to nudge the shirt if it snaps too high/low
-    
-    private Transform[] attachPoints;
+    [Header("Snapping Settings")]
+    public float snapDistance = 1.5f;
+    public AttachPointType targetAttachPoint;
+    public Vector3 visualOffset;
+
+    private Dictionary<AttachPointType, Transform> attachPointMap;
     private bool isSnapped = false;
 
     void Start()
     {
         GameObject mannequin = GameObject.Find("mannequin_female");
-        if (mannequin != null)
+
+        if (mannequin == null)
         {
-            attachPoints = new Transform[]
-            {
-                mannequin.transform.Find("Attachpoint_Head"),
-                mannequin.transform.Find("Attachpoint_Chest"),
-                mannequin.transform.Find("Attachpoint_Hips"),
-                mannequin.transform.Find("Attachpoint_Legs"),
-                mannequin.transform.Find("Attachpoint_feet")
-            };
+            Debug.LogError("Mannequin not found! Check name in Hierarchy.");
+            return;
+        }
+
+        attachPointMap = new Dictionary<AttachPointType, Transform>()
+        {
+            { AttachPointType.Head,  mannequin.transform.Find("Attachpoint_Head") },
+            { AttachPointType.Chest, mannequin.transform.Find("Attachpoint_Chest") },
+            { AttachPointType.Hips,  mannequin.transform.Find("Attachpoint_Hips") },
+            { AttachPointType.Legs,  mannequin.transform.Find("Attachpoint_Legs") },
+            { AttachPointType.Feet,  mannequin.transform.Find("Attachpoint_feet") }
+        };
+
+        foreach (var pair in attachPointMap)
+        {
+            if (pair.Value == null)
+                Debug.LogError("Missing attach point: " + pair.Key);
         }
     }
 
     void Update()
     {
-        if (isSnapped || attachPoints == null) return;
+        if (isSnapped || attachPointMap == null) return;
 
-        Transform point = GetTargetAttachPoint();
+        if (!attachPointMap.ContainsKey(targetAttachPoint)) return;
+
+        Transform point = attachPointMap[targetAttachPoint];
         if (point == null) return;
 
-        // Check distance from the child mesh if possible, otherwise use root
         float distance = Vector3.Distance(transform.position, point.position);
-
-        if (distance < snapDistance)
-        {
+        if (distance <= snapDistance)
             SnapTo(point);
-        }
-    }
-
-    Transform GetTargetAttachPoint()
-    {
-        if (attachPoints == null) return null;
-        switch (targetAttachPoint)
-        {
-            case AttachPointType.Head:  return attachPoints[0];
-            case AttachPointType.Chest: return attachPoints[1];
-            case AttachPointType.Hips:  return attachPoints[2];
-            case AttachPointType.Legs:  return attachPoints[3];
-            case AttachPointType.Feet:  return attachPoints[4];
-            default: return null;
-        }
     }
 
     void SnapTo(Transform point)
     {
         isSnapped = true;
         transform.SetParent(point);
-        
-        // Reset local position so it goes EXACTLY to the attach point
-        transform.localPosition = Vector3.zero + visualOffset; 
+        transform.localPosition = visualOffset;
         transform.localRotation = Quaternion.identity;
 
         Rigidbody rb = GetComponent<Rigidbody>();
-        if (rb != null) rb.isKinematic = true;
+        if (rb != null)
+        {
+            rb.isKinematic = true;
+            rb.useGravity = false;
+        }
 
-        Debug.Log("<color=green>SUCCESS:</color> Snapped to " + point.name);
+        Debug.Log("Snapped " + gameObject.name + " to " + point.name);
     }
 
     public void Unsnap()
     {
+        if (!isSnapped) return;
+
         isSnapped = false;
         transform.SetParent(null);
+
         Rigidbody rb = GetComponent<Rigidbody>();
-        if (rb != null) rb.isKinematic = false;
+        if (rb != null)
+        {
+            rb.isKinematic = false;
+            rb.useGravity = false;
+        }
+
+        Debug.Log("Unsnapped " + gameObject.name);
     }
 }
+
+
