@@ -6,10 +6,11 @@
 const { google } = require("googleapis");
 const fs = require("fs");
 const readline = require("readline");
+const path = require("path");
 
 const SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"];
-const CREDENTIALS_PATH = "./credentials.json";
-const TOKEN_PATH = "./token.json";
+const CREDENTIALS_PATH = path.resolve(__dirname, "credentials.json");
+const TOKEN_PATH = path.resolve(__dirname, "token.json");
 
 const credentials = JSON.parse(fs.readFileSync(CREDENTIALS_PATH));
 const { client_secret, client_id, redirect_uris } = credentials.installed;

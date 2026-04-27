@@ -3,16 +3,19 @@
 // Groq-Powered Conversation
 // ===============================
 
-require("dotenv").config({ path: '../.env' });
+const path = require("path");
+require("dotenv").config({ path: path.resolve(__dirname, "../.env") });
 const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
 const axios = require("axios");
 const cron = require("node-cron");
-const path = require("path");
 const fs = require("fs");
 const { google } = require("googleapis");
 const Groq = require("groq-sdk");
+
+const GOOGLE_CREDENTIALS_PATH = path.resolve(__dirname, "credentials.json");
+const GOOGLE_TOKEN_PATH = path.resolve(__dirname, "token.json");
 
 // ── LOCAL AI EMBEDDINGS ──
 let pipeline;
@@ -186,8 +189,8 @@ async function getCurrentWeather(city = "Cairo") {
 // ── GOOGLE CALENDAR ──
 function getCalendarClient() {
   try {
-    const creds = JSON.parse(fs.readFileSync("./credentials.json"));
-    const token = JSON.parse(fs.readFileSync("./token.json"));
+    const creds = JSON.parse(fs.readFileSync(GOOGLE_CREDENTIALS_PATH, "utf8"));
+    const token = JSON.parse(fs.readFileSync(GOOGLE_TOKEN_PATH, "utf8"));
     const { client_secret, client_id, redirect_uris } = creds.installed;
     const auth = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
     auth.setCredentials(token);
@@ -1690,7 +1693,8 @@ cron.schedule("0 7 * * *", async () => {
 });
 
 // ── START ──
-const PORT = process.env.PORT || 5001;
+const parsedAiPort = Number(process.env.AI_PORT || process.env.AI_SERVICE_PORT || 5001);
+const PORT = Number.isInteger(parsedAiPort) && parsedAiPort > 0 ? parsedAiPort : 5001;
 app.listen(PORT, () => {
   console.log(`
 ╔════════════════════════════════════════╗

@@ -824,10 +824,12 @@ export const s = StyleSheet.create({
   aiShowcaseMainColumn: {
     width: "72%",
     maxWidth: 280,
+    height: "100%",
     gap: 8,
   },
   aiShowcaseMainItem: {
     flex: 1,
+    minHeight: 88,
     borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",

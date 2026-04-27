@@ -2,7 +2,7 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useMemo, useState } from "react";
 import { ScrollView, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from "react-native";
 import * as SecureStore from "expo-secure-store";
-import { buildAuthHeaders, fetchApiWithFallback } from "../../../constants/api";
+import { buildAuthHeaders, buildImageUrl, fetchApiWithFallback } from "../../../constants/api";
 import AuthenticatedImage from "../../../components/AuthenticatedImage";
 import { s } from "../../../Styles/styling.styles";
 import { useAppTheme } from "../../../context/themeContext";
@@ -34,8 +34,14 @@ type WardrobeItem = {
   id: string | number;
   _id?: string;
   image?: string | null;
+  imageUrl?: string | null;
   bg?: string;
   category?: string[];
+};
+
+const resolveImageUri = (value?: string | null) => {
+  if (!value) return null;
+  return buildImageUrl(value);
 };
 
 type UseAiRecommendedLogicParams = {
@@ -308,9 +314,18 @@ export function useAiRecommendedLogic({
           String(item._id) === String(garment?._id)
         ));
 
-        if (matchedItem) return matchedItem;
+        if (matchedItem) {
+          const normalizedMatchedImage = resolveImageUri(
+            matchedItem.image || matchedItem.imageUrl || garment?.imageUrl || null,
+          );
 
-        const imageFromGarment = garment?.imageUrl;
+          return {
+            ...matchedItem,
+            image: normalizedMatchedImage,
+          };
+        }
+
+        const imageFromGarment = resolveImageUri(garment?.imageUrl || null);
         if (!imageFromGarment) return null;
 
         return {
@@ -563,9 +578,9 @@ export default function AiRecommendedCanvas(props: Props) {
             <View style={s.aiShowcaseBody}>
               <View style={s.aiShowcaseMainColumn}>
                 {aiShowcaseDisplayItems.length > 0 ? aiShowcaseDisplayItems.map((item) => (
-                  <View key={`main-${item.id}`} style={[s.aiShowcaseMainItem, { backgroundColor: item.bg || "#f7f7f7" }]}>
-                    {item.image
-                      ? <AuthenticatedImage source={{ uri: item.image }} style={s.aiShowcaseImage} resizeMode="contain" />
+                  <View key={`main-${String(item.id || item._id)}`} style={[s.aiShowcaseMainItem, { backgroundColor: item.bg || "#f7f7f7" }]}>
+                    {(item.image || item.imageUrl)
+                      ? <AuthenticatedImage source={{ uri: item.image || item.imageUrl }} style={s.aiShowcaseImage} resizeMode="contain" />
                       : <Ionicons name="shirt-outline" size={24} color="#bbb" />
                     }
                   </View>

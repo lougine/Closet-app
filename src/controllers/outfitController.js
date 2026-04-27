@@ -692,6 +692,7 @@ exports.getStyleChatResponse = async (req, res) => {
       garments,
       conversation: Array.isArray(req.body.messages) ? req.body.messages : [],
       recommendations: recommendationPayload.recommendations,
+      sessionId: String(req.user.userId || 'default'),
     });
 
     if (matchedIds && matchedIds.length > 0) {

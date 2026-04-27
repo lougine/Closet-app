@@ -3,10 +3,12 @@ const axios = require('axios');
 
 const GROQ_MODEL = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
 const GROQ_API_KEY = process.env.GROQ_API_KEY || process.env.GROQ_API_TOKEN || '';
+const AI_CHATBOT_URL = process.env.AI_CHATBOT_URL || 'http://127.0.0.1:5001/chatbot';
 
 const groqClient = GROQ_API_KEY ? new Groq({ apiKey: GROQ_API_KEY }) : null;
 
 const toTrimmedText = (value) => String(value || '').trim();
+const normalizeImageUrl = (value) => String(value || '').trim().replace(/[?#].*$/, '').replace(/\/+$/, '');
 
 const summarizeGarment = (garment) => {
   const parts = [
@@ -82,7 +84,15 @@ const buildFallbackReply = ({ message, event, temperatureC, garmentCount, recomm
   return `${reply} ${guidance.join(' ')}`.trim();
 };
 
-async function generateStyleChatReply({ message, event, temperatureC, garments = [], conversation = [], recommendations = [] }) {
+async function generateStyleChatReply({
+  message,
+  event,
+  temperatureC,
+  garments = [],
+  conversation = [],
+  recommendations = [],
+  sessionId = 'default',
+}) {
   const garmentSummary = garments.length > 0
     ? garments.slice(0, 20).map(summarizeGarment).join('; ')
     : 'No garments found';
@@ -100,9 +110,9 @@ async function generateStyleChatReply({ message, event, temperatureC, garments =
 
   try {
     // Attempt full integration with the robust Xenova AI + Rules microservice in the `ai/` folder
-    const aiServiceResponse = await axios.post('http://localhost:5001/chatbot', {
+    const aiServiceResponse = await axios.post(AI_CHATBOT_URL, {
       message,
-      sessionId: 'default', 
+      sessionId,
     }, { timeout: 15000 });
 
     if (aiServiceResponse.data) {
@@ -117,11 +127,11 @@ async function generateStyleChatReply({ message, event, temperatureC, garments =
           topOutfit.bottomObj?.imageUrl,
           topOutfit.shoeObj?.imageUrl,
           topOutfit.capObj?.imageUrl
-        ].filter(Boolean);
+        ].filter(Boolean).map(normalizeImageUrl);
 
         // Map the AI suggestions back to the real user's Garment IDs 
         // so AiRecommendedCanvas.tsx can render them visually!
-        const matchedGarments = garments.filter(g => aiUrls.includes(g.imageUrl));
+        const matchedGarments = garments.filter((g) => aiUrls.includes(normalizeImageUrl(g.imageUrl)));
         if (matchedGarments.length > 0) {
           const ids = matchedGarments.map(g => g._id).join(', ');
           rawReply += `\n\n[GARMENT_IDS: ${ids}]`;
@@ -129,7 +139,7 @@ async function generateStyleChatReply({ message, event, temperatureC, garments =
       }
     }
   } catch (err) {
-    console.warn(`AI Microservice (port 5001) unreachable, falling back to local Groq client. error: ${err.message}`);
+    console.warn(`AI Microservice unreachable at ${AI_CHATBOT_URL}, falling back to local Groq client. error: ${err.message}`);
   }
 
   if (!rawReply && groqClient) {

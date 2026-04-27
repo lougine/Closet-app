@@ -1,6 +1,10 @@
 const { google } = require("googleapis");
 const fs = require("fs");
 const mongoose = require("mongoose");
+const path = require("path");
+
+const CREDENTIALS_PATH = path.resolve(__dirname, "credentials.json");
+const TOKEN_PATH = path.resolve(__dirname, "token.json");
 
 // Schemas
 const scheduledOutfitSchema = new mongoose.Schema({
@@ -14,8 +18,8 @@ const ScheduledOutfit = mongoose.model("ScheduledOutfit", scheduledOutfitSchema)
 
 function getCalendarClient() {
   try {
-    const creds = JSON.parse(fs.readFileSync("./credentials.json"));
-    const token = JSON.parse(fs.readFileSync("./token.json"));
+    const creds = JSON.parse(fs.readFileSync(CREDENTIALS_PATH, "utf8"));
+    const token = JSON.parse(fs.readFileSync(TOKEN_PATH, "utf8"));
     const { client_secret, client_id, redirect_uris } = creds.installed;
     const auth = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
     auth.setCredentials(token);
