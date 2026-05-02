@@ -1,3 +1,42 @@
+<<<<<<< HEAD
+
+# ================= UNITY GENERATED =================
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+UserSettings/
+MemoryCaptures/
+
+# Unity metadata noise
+*.csproj
+*.unityproj
+*.sln
+*.user
+*.pidb
+*.booproj
+*.opendb
+*.VC.db
+
+# Crash / debug
+sysinfo.txt
+
+# Addressables
+[Aa]ssets/[Aa]ddressable[Aa]ssets[Dd]ata/
+
+# ================= IDE =================
+.vscode/
+.idea/
+
+# ================= OS =================
+.DS_Store
+Thumbs.db
+
+# ================= PLASTIC SCM =================
+.plastic/
+=======
 # Dependencies
 node_modules/
 npm-debug.log*
@@ -66,3 +105,4 @@ uploads/
 # Build outputs
 dist/
 build/
+>>>>>>> 1e058d5c2853bf73bd87d4b4d811e98f2f041fc7
